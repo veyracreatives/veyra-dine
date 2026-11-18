@@ -50,10 +50,17 @@
    "section": "Top of page"
   },
   {
-   "k": "t92969715",
+   "k": "t07a40f33",
    "type": "text",
-   "tag": "a",
-   "text": "Try free for 10 days",
+   "tag": "span",
+   "text": "for 10 days",
+   "section": "Top of page"
+  },
+  {
+   "k": "t9ccb64c3",
+   "type": "text",
+   "tag": "span",
+   "text": "and dhabas",
    "section": "Top of page"
   },
   {
@@ -127,6 +134,13 @@
    "section": "Top of page"
   },
   {
+   "k": "t4ca03e0d",
+   "type": "text",
+   "tag": "a",
+   "text": "Start free on your phone",
+   "section": "Top of page"
+  },
+  {
    "k": "te03d007c",
    "type": "text",
    "tag": "a",
@@ -145,6 +159,13 @@
    "type": "text",
    "tag": "a",
    "text": "Start free in your browser",
+   "section": "Top of page"
+  },
+  {
+   "k": "tc200e07b",
+   "type": "text",
+   "tag": "a",
+   "text": "Get the Windows app",
    "section": "Top of page"
   },
   {
@@ -400,10 +421,10 @@
    "section": "A menu they'll enjoy ordering from"
   },
   {
-   "k": "te0fab7ec",
+   "k": "t1e6b3865",
    "type": "text",
    "tag": "p",
-   "text": "The Windows app shows new orders, what's cooking and what's ready. Nothing gets lost on paper.",
+   "text": "The Windows app, or the admin on your phone, shows new orders, what's cooking and what's ready. Nothing gets lost on paper.",
    "section": "A menu they'll enjoy ordering from"
   },
   {
@@ -757,13 +778,6 @@
    "section": "Try it free. Pay once if you love it."
   },
   {
-   "k": "t07a40f33",
-   "type": "text",
-   "tag": "small",
-   "text": "for 10 days",
-   "section": "Try it free. Pay once if you love it."
-  },
-  {
    "k": "tf136c558",
    "type": "text",
    "tag": "li",
@@ -789,6 +803,13 @@
    "type": "text",
    "tag": "a",
    "text": "Download free",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "ta1db3a80",
+   "type": "text",
+   "tag": "a",
+   "text": "Start free trial",
    "section": "Try it free. Pay once if you love it."
   },
   {
@@ -985,6 +1006,20 @@
    "type": "text",
    "tag": "p",
    "text": "A Windows 10 or 11 computer (or laptop) at the counter with internet. Keep the app open and you'll hear every new order. Your staff can also open the order board on their phones.",
+   "section": "Good to know"
+  },
+  {
+   "k": "t010e5bf5",
+   "type": "text",
+   "tag": "summary",
+   "text": "Can I run my restaurant from my phone?",
+   "section": "Good to know"
+  },
+  {
+   "k": "t4c924911",
+   "type": "text",
+   "tag": "p",
+   "text": "Yes. Log in on any Android phone or iPhone and add Dine In Admin to your home screen. It works like an app: new orders ring and pop up, and you can accept orders, print the KOT and bill, and see sales by day and month. No Windows computer is needed, and several phones can be logged in at once.",
    "section": "Good to know"
   },
   {

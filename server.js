@@ -496,7 +496,7 @@ async function handle(req, res) {
   }
   if (m === 'GET' && /^\/(privacy|terms|refund|contact)\/?$/.test(p)) return serveFile(res, path.join(SITE_DIR, p.replace(/\//g, ''), 'index.html'), 'no-cache');
   if (m === 'GET' && /^\/site-media\/[A-Za-z0-9]+\.(png|jpg|webp|svg)$/.test(p)) { const f = safeJoin(path.join(DATA_DIR, 'site-media'), p.slice(11)); return f ? serveFile(res, f, 'public, max-age=31536000, immutable') : fail(res, 404, 'Not found'); }
-  if (m === 'GET' && (/^\/img\/[A-Za-z0-9._-]+$/.test(p) || /^\/(og\.jpg|favicon-32\.png|icon-180\.png|icon-512\.png)$/.test(p))) { const f = safeJoin(SITE_DIR, p); return f ? serveFile(res, f, 'public, max-age=86400') : fail(res, 404, 'Not found'); }
+  if (m === 'GET' && (/^\/img\/[A-Za-z0-9._-]+$/.test(p) || /^\/(og\.jpg|favicon-32\.png|icon-180\.png|icon-192\.png|icon-512\.png)$/.test(p))) { const f = safeJoin(SITE_DIR, p); return f ? serveFile(res, f, 'public, max-age=86400') : fail(res, 404, 'Not found'); }
   // Windows installer: served from this server (fast in India, with a real file size) when the local copy is ready, else from GitHub Pages.
   if (m === 'GET' && /^\/download\/(Veyra-Dine-In-Setup\.exe|latest\.yml|Veyra-Dine-In-Setup\.exe\.blockmap)$/.test(p)) {
     const name = p.slice(10), f = path.join(DL_DIR, name);
@@ -506,6 +506,24 @@ async function handle(req, res) {
 
     return serveFile(res, f, name.endsWith('.yml') ? 'no-cache' : 'public, max-age=3600');
   }
+  // Restaurant admin as a phone app: web app manifest + a small service worker (needed for install and for order pop-ups on Android)
+  if (m === 'GET' && p === '/admin.webmanifest') return send(res, 200, JSON.stringify({
+    name: 'Veyra Dine In Admin', short_name: 'Dine In Admin', description: 'Live orders, bills, KOT and sales for your restaurant',
+    id: '/admin', start_url: '/admin?app=1', scope: '/', display: 'standalone', orientation: 'any', background_color: '#FBF6EE', theme_color: '#E4572E',
+    icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }],
+  }), { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'no-cache' });
+  if (m === 'GET' && p === '/admin-sw.js') return send(res, 200, `// Veyra Dine In admin: shows order pop-ups and an offline page. It never stores orders or menus.
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+self.addEventListener('fetch', e => {
+  if (e.request.mode !== 'navigate') return;
+  e.respondWith(fetch(e.request).catch(() => new Response('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title><body style="font:16px system-ui;padding:40px 24px;text-align:center;background:#FBF6EE;color:#2b211b"><h2>No internet</h2><p>Orders will show again when your phone is back online.</p><button onclick="location.reload()" style="font:inherit;padding:12px 22px;border:0;border-radius:12px;background:#E4572E;color:#fff">Try again</button>', { headers: { 'Content-Type': 'text/html; charset=utf-8' } })));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(l => { const w = l.find(c => c.url.includes('/admin')); return w ? w.focus() : self.clients.openWindow('/admin'); }));
+});
+`, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' });
   if (m === 'GET' && p === '/favicon.ico') return serveFile(res, path.join(SITE_DIR, 'favicon-32.png'), 'public, max-age=86400');
   if (m === 'GET' && /^\/m\/[a-z0-9-]+\/?$/.test(p)) return serveMenuPage(req, res, url, p.split('/')[2]);
   if (m === 'GET' && p === '/robots.txt') return send(res, 200, `User-agent: *\nDisallow: /admin\nDisallow: /platform\nDisallow: /api/\nDisallow: /print-qr\nAllow: /m/\n\nSitemap: ${baseUrl(req)}/sitemap.xml\n`, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -1006,6 +1024,11 @@ async function handle(req, res) {
       } catch (e) { return fail(res, 400, e.message); }
     }
     // UPI QR for the printed bill
+    if (m === 'GET' && p === '/api/admin/phone-qr') { // QR the owner scans to open this admin on their phone
+      let b = baseUrl(req); if (/\/\/(localhost|127\.0\.0\.1)(:|$)/.test(b) && !process.env.PUBLIC_URL) { const ip = lanAddresses()[0]; if (ip) b = `http://${ip}:${PORT}`; }
+      const link = `${b}/admin/${r.slug}`;
+      return send(res, 200, { url: link, svg: await QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#1f1612', light: '#ffffff' } }) });
+    }
     if (m === 'GET' && p === '/api/admin/upi-qr') {
       if (!r.upiId) return fail(res, 404, 'No UPI ID');
       const amount = Math.max(1, Math.min(500000, Number(url.searchParams.get('am')) || 0));

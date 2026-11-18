@@ -74,7 +74,13 @@
   }
   function notify(title, body) {
     if (window.vdDesktop) window.vdDesktop.alert(title, body);
-    else if ('Notification' in window && Notification.permission === 'granted' && document.hidden) { try { new Notification(title, { body, tag: 'vd-' + Date.now() }); } catch {} }
+    else {
+      try { if (navigator.vibrate) navigator.vibrate([250, 120, 250]); } catch {}
+      if ('Notification' in window && Notification.permission === 'granted' && (document.hidden || isPhoneApp())) {
+        const opt = { body, tag: 'vd-' + Date.now(), icon: '/icon-192.png', badge: '/icon-192.png', vibrate: [250, 120, 250], renotify: true };
+        if (S.swReg && S.swReg.showNotification) S.swReg.showNotification(title, opt).catch(() => {}); else { try { new Notification(title, opt); } catch {} }
+      }
+    }
     let on = false; clearInterval(titleTimer); const base = `${S.me.restaurant.name} · Admin`;
     titleTimer = setInterval(() => { document.title = (on = !on) ? `🔔 ${title}` : base; }, 1000);
     setTimeout(() => { clearInterval(titleTimer); document.title = base; }, 20000);
@@ -264,10 +270,58 @@
     const [orders, requests, stats] = await Promise.all([api('/api/admin/orders?scope=active'), api('/api/admin/requests'), api('/api/admin/stats?tz=' + TZ)]);
     S.orders = orders; S.requests = requests; S.stats = stats;
   }
+  // ---------- phone app (install to home screen) ----------
+  const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  const isPhone = () => window.innerWidth < 760 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isPhoneApp = () => isStandalone() && isPhone();
+  const isIOS = () => /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); S.installEvt = e; if (S.me && (S.tab === 'orders' || S.tab === 'settings')) renderShell(); });
+  window.addEventListener('appinstalled', () => { S.installEvt = null; lsSet('vd_app_hint', 'x'); toast('Installed. Open “Dine In Admin” from your home screen.', 'ok'); });
+  async function installApp() {
+    if (S.installEvt) { S.installEvt.prompt(); const r = await S.installEvt.userChoice.catch(() => null); S.installEvt = null; if (r && r.outcome === 'accepted') return; renderShell(); return; }
+    phoneSteps();
+  }
+  function phoneSteps() {
+    const ios = isIOS();
+    modal(`<div class="sheet-head"><h3>Add to your home screen</h3><button class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body">
+      <ol class="steps">${ios
+        ? `<li>Open this page in <b>Safari</b>.</li><li>Tap the <b>Share</b> button (square with an arrow) at the bottom.</li><li>Scroll down and tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>`
+        : `<li>Open this page in <b>Chrome</b>.</li><li>Tap the <b>⋮</b> menu at the top right.</li><li>Tap <b>Install app</b> or <b>Add to Home screen</b>, then <b>Install</b>.</li>`}
+        <li>Open <b>Dine In Admin</b> from your home screen and tap <b>Turn on alerts</b> once.</li></ol>
+      <p class="muted" style="margin:12px 0 0;font-size:14px">You stay logged in for 30 days. Keep the app open (it can be in the background) to get the order sound and pop-up.</p>
+      </div><div class="sheet-foot"><button class="btn btn-primary" data-close>Got it</button></div>`);
+  }
+  function phoneBanner() {
+    if (window.vdDesktop || isStandalone() || !isPhone() || lsGet('vd_app_hint')) return '';
+    return `<div class="banner app-hint">${icon('mobile', 22)}<span><b>Use this as an app.</b> Put Dine In Admin on your home screen and open it in one tap.</span><button class="btn btn-primary" id="appInstall">${S.installEvt ? 'Install' : 'How'}</button><button class="icon-btn" id="appHintX" aria-label="Hide">${icon('x', 18)}</button></div>`;
+  }
+  async function phonePanel(box) {
+    if (!box) return;
+    const ios = isIOS(), inApp = isStandalone();
+    let q = null; try { q = await api('/api/admin/phone-qr'); } catch {}
+    box.innerHTML = `<div class="panel-head"><div><h2>Use on your phone</h2><span class="muted" style="font-size:14px">Take orders, print KOT and bills, and see sales from your phone. Works on Android and iPhone, no download from the Play Store needed.</span></div></div>
+      <div class="panel-body"><div class="phone-app">
+        ${q ? `<div class="qr-box">${q.svg}<small>Scan with your phone camera</small></div>` : ''}
+        <div class="phone-steps">
+          ${inApp ? `<div class="hint" style="background:var(--green-soft,#E7F6EC);color:#14532D;margin:0 0 12px">${icon('check', 20)}<div><b>You're using the phone app.</b> Tap <b>Turn on alerts</b> on Live orders once so new orders ring.</div></div>` : ''}
+          ${q ? `<div class="field"><span>Admin link for your phone</span><div style="display:flex;gap:8px"><input class="input" value="${esc(q.url)}" readonly style="min-width:0;flex:1"><button class="btn" id="cpyPhone" type="button">${icon('copy', 18)}</button></div></div>` : ''}
+          <ol class="steps"><li>Scan the QR or open the link on your phone and log in with your Restaurant ID and password.</li>
+            <li>${ios ? 'In Safari tap <b>Share › Add to Home Screen</b>.' : 'In Chrome tap <b>⋮ › Install app</b> (iPhone: Safari <b>Share › Add to Home Screen</b>).'}</li>
+            <li>Open <b>Dine In Admin</b> from the home screen and tap <b>Turn on alerts</b>.</li></ol>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+            ${!window.vdDesktop && !inApp && isPhone() ? `<button class="btn btn-primary" id="phoneInstall" type="button">${icon('mobile', 18)} ${S.installEvt ? 'Install on this phone' : 'Add to home screen'}</button>` : ''}
+            ${q ? `<a class="btn" target="_blank" href="https://wa.me/?text=${encodeURIComponent('Veyra Dine In admin for ' + S.me.restaurant.name + ': ' + q.url)}">${icon('phone', 18)} Send link on WhatsApp</a>` : ''}
+          </div>
+          ${q && /^http:\/\/(10|192\.168|172\.)/.test(q.url) ? `<p class="muted" style="font-size:13px;margin:10px 0 0">This computer runs your orders on the shop Wi-Fi, so the phone must be on the same Wi-Fi. Switch the app to online mode to use it from anywhere.</p>` : `<p class="muted" style="font-size:13px;margin:10px 0 0">Works on mobile data too. Several phones can be logged in at the same time, for example the owner and the counter.</p>`}
+        </div></div></div>`;
+    const cp = box.querySelector('#cpyPhone'); if (cp) cp.onclick = () => { navigator.clipboard.writeText(q.url).then(() => toast('Link copied', 'ok')).catch(() => { box.querySelector('input').select(); }); };
+    const ib = box.querySelector('#phoneInstall'); if (ib) ib.onclick = installApp;
+  }
   function renderOrders(c) {
     const st = S.stats || { ordersToday: 0, salesToday: 0, activeTables: 0, activeOrders: 0 };
     const isLocal = /localhost|127\.0\.0\.1/.test(S.me.baseUrl);
     c.innerHTML = `
+      ${phoneBanner()}
       ${!S.audioOk && !window.vdDesktop ? `<div class="banner">${icon('bell', 22)}<span>Turn on alerts so you hear a sound and get a pop-up for every new order.</span><button class="btn btn-primary" id="enableAlerts">Turn on alerts</button></div>` : ''}
       <div class="stats">
         <button class="stat link" data-gosales>  <small>Orders today</small><b>${st.ordersToday}</b><span class="sub">Other days ›</span></button>
@@ -282,6 +336,8 @@
         return `<div class="colwrap ${S.mobileCol === k ? 'on' : ''}"><div class="col-head"><span class="dot" style="background:${color}"></span>${l}<span class="n" style="background:color-mix(in srgb, ${color} 14%, #fff);color:${color}">${list.length}</span></div>
           <div class="col">${list.length ? list.map(orderCard).join('') : `<div class="col-empty">${k === 'new' ? (isLocal ? 'No new orders yet.' : 'Waiting for orders. New ones pop up here with a sound.') : 'Nothing here right now.'}</div>`}</div></div>`;
       }).join('')}</div>`;
+    const ai = document.getElementById('appInstall'); if (ai) ai.onclick = installApp;
+    const ax = document.getElementById('appHintX'); if (ax) ax.onclick = () => { lsSet('vd_app_hint', 'x'); renderOrders(c); };
     const en = document.getElementById('enableAlerts');
     if (en) en.onclick = async () => { unlockAudio(); chime(1); if ('Notification' in window && Notification.permission === 'default') await Notification.requestPermission(); renderOrders(c); toast('Alerts are on. Keep this page open.', 'ok'); };
     c.querySelectorAll('[data-gosales]').forEach(b => b.onclick = () => { setRange(...rangeFor('today'), 'today'); go('history'); });
@@ -682,6 +738,7 @@
         ${a.plan === 'lifetime' && lic && lic.updatesUntil && lic.updatesUntil < new Date().toISOString().slice(0, 10) ? `<p class="muted" style="margin:0">Your app keeps working. To get the newest features again, renew updates on <a href="https://wa.me/918928246726?text=${encodeURIComponent('Hi Veyra, I want to renew Veyra Dine In updates for ' + r.name)}" target="_blank">WhatsApp +91 89282 46726</a> and enter the new key above.</p>` : ''}
         <div style="display:flex;gap:8px;flex-wrap:wrap">${lic ? `<button class="btn" id="cpyKey">${icon('copy', 18)} Copy license key</button>` : `<a class="btn btn-primary" href="${esc(buyLink('lifetime'))}" target="_blank">Buy lifetime ${inr(S.me.plans.lifetime)}</a><a class="btn" href="${esc(buyLink('yearly'))}" target="_blank">Buy yearly ${inr(S.me.plans.yearly)}</a><a class="btn" href="${esc(buyLink('monthly'))}" target="_blank">Buy monthly ${inr(S.me.plans.monthly)}</a>`}<a class="btn" href="https://dinein.veyracreatives.com/download/Veyra-Dine-In-Setup.exe">${icon('download', 18)} Download Windows app</a></div>
       </div></div>
+      <div class="panel" id="phonePanel"></div>
       <form class="panel" id="ideaF"><div class="panel-head"><div><h2>Suggest a feature or ask for custom work</h2><span class="muted" style="font-size:14px">Tell Veyra what you'd like next, or what you need built for your restaurant. We reply on WhatsApp.</span></div></div><div class="panel-body form">
         <div class="wseg" style="display:flex;gap:8px;flex-wrap:wrap"><label class="switch"><input type="radio" name="type" value="feature" checked> Feature idea</label><label class="switch"><input type="radio" name="type" value="custom"> Custom build</label></div>
         <label class="field"><span>Your message</span><textarea class="input" name="message" rows="3" maxlength="2000" required placeholder="E.g. a kitchen screen, or 3 outlets with one dashboard"></textarea></label>
@@ -717,6 +774,7 @@
       </div></form>
       <button class="btn btn-lg" id="lo" style="justify-self:start">${icon('logout', 18)} Log out</button>
     </div>`;
+    phonePanel(document.getElementById('phonePanel'));
     const ck = document.getElementById('cpyKey'); if (ck) ck.onclick = async () => { const k = lic.code || lic.key; try { await navigator.clipboard.writeText(k); toast('License key copied'); } catch { prompt('Your license key', k); } };
     c.querySelectorAll('[data-license]').forEach(b => b.onclick = licenseModal);
     document.getElementById('ideaF').onsubmit = async e => { e.preventDefault(); const f = new FormData(e.target); try { await api('/api/requests', { method: 'POST', body: { type: f.get('type'), message: f.get('message') } }); e.target.reset(); toast(`${icon('check', 18)} Sent. Thank you!`, 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
@@ -945,6 +1003,7 @@
     const h = location.hash.slice(1); if (TABS.some(t => t[0] === h)) S.tab = h;
     await loadLive().catch(() => {});
     renderShell(); connect();
+    if (!window.vdDesktop && 'serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/admin-sw.js', { scope: '/' }).then(r => { S.swReg = r; }).catch(() => {});
     document.addEventListener('click', unlockOnce, { once: true });
   }
   function unlockOnce() { unlockAudio(); if (S.tab === 'orders') { const en = document.getElementById('enableAlerts'); if (en && S.audioOk && !('Notification' in window && Notification.permission === 'default')) renderOrders(document.getElementById('content')); } }

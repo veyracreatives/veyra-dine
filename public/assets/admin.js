@@ -7,7 +7,9 @@
 
   // ---------- helpers ----------
   async function api(path, opts = {}) {
-    const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
+    let res;
+    try { res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', cache: 'no-store', ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined }); }
+    catch (e) { if (S.me && !path.includes('/login')) goOffline(); const err = new Error('No internet right now. This is saved and will sync when you are back online.'); err.offline = true; throw err; }
     const data = await res.json().catch(() => ({}));
     if (res.status === 401 && !path.includes('/login')) { renderLogin(); throw new Error('Please log in'); }
     if (!res.ok) throw new Error(data.error || 'Something went wrong');
@@ -270,6 +272,138 @@
     const [orders, requests, stats] = await Promise.all([api('/api/admin/orders?scope=active'), api('/api/admin/requests'), api('/api/admin/stats?tz=' + TZ)]);
     S.orders = orders; S.requests = requests; S.stats = stats;
   }
+  // ---------- works offline: cache, outbox and sync ----------
+  S.offPaid = {};
+  const OFFK = () => 'vd_off_' + (S.me ? S.me.restaurant.slug : ''), OUTK = () => 'vd_outbox_' + (S.me ? S.me.restaurant.slug : '');
+  function saveCache() { if (!S.me) return; try { localStorage.setItem(OFFK(), JSON.stringify({ at: Date.now(), me: S.me, orders: S.orders, requests: S.requests, stats: S.stats, menu: S.menu, tables: S.tables })); } catch {} }
+  const outbox = () => { try { return JSON.parse(localStorage.getItem(OUTK()) || '[]'); } catch { return []; } };
+  const setOutbox = a => { try { localStorage.setItem(OUTK(), JSON.stringify(a)); } catch {} };
+  function queue(x) { const a = outbox(); a.push({ ...x, at: new Date().toISOString() }); setOutbox(a); drawOffBar(); }
+  let pingT = null, syncing = false;
+  function goOffline(justSync) {
+    if (!justSync && !S.offline) { S.offline = true; drawOffBar(); if (S.me && document.getElementById('content') && S.tab === 'orders') renderOrders(document.getElementById('content')); }
+    if (!pingT) pingT = setInterval(tryOnline, 8000);
+    if (justSync) tryOnline();
+  }
+  function drawOffBar() {
+    let bar = document.getElementById('offbar');
+    const n = outbox().length;
+    if (!S.offline && !n) { if (bar) bar.remove(); return; }
+    if (!bar) { bar = document.createElement('div'); bar.id = 'offbar'; bar.className = 'off-bar'; document.body.prepend(bar); }
+    bar.innerHTML = S.offline ? `${icon('wifi', 18)}<span><b>No internet.</b> Keep going: take counter orders, print KOT and bills. ${n ? `<b>${n} change${n === 1 ? '' : 's'}</b> will sync` : 'Everything syncs'} when the internet is back.</span>`
+      : `${icon('wifi', 18)}<span>Back online. Syncing ${n} saved change${n === 1 ? '' : 's'}…</span>`;
+  }
+  async function tryOnline() {
+    if (syncing) return;
+    try { const r = await fetch('/api/admin/stats?tz=' + TZ, { cache: 'no-store', credentials: 'same-origin' }); if (!r.ok) return; } catch { return; }
+    syncing = true; const wasOff = S.offline; S.offline = false; drawOffBar();
+    const items = outbox(), ids = {}; let done = 0;
+    try {
+      for (const x of items) {
+        if (x.kind === 'order') { const o = await api('/api/admin/orders', { method: 'POST', body: { ...x.body, offline: true, clientId: x.tmpId } }); ids[x.tmpId] = o.id; }
+        else if (x.kind === 'status') { const oid = ids[x.id] || x.id; if (!String(oid).startsWith('off-')) await api('/api/admin/orders/' + oid, { method: 'PATCH', body: { status: x.status } }).catch(e => { if (e.offline) throw e; }); }
+        else if (x.kind === 'payment') await api(`/api/admin/tables/${x.tableId}/payment`, { method: 'POST', body: x.body }).catch(e => { if (e.offline) throw e; });
+        else if (x.kind === 'settle') await api(`/api/admin/tables/${x.tableId}/settle`, { method: 'POST' }).catch(e => { if (e.offline) throw e; });
+        done++; setOutbox(items.slice(done));
+      }
+    } catch (e) { syncing = false; S.offline = true; drawOffBar(); return; }
+    clearInterval(pingT); pingT = null; syncing = false; S.offPaid = {};
+    setOutbox([]); drawOffBar();
+    try { await loadLive(); } catch {}
+    connect(); renderShell(); saveCache();
+    if (wasOff || done) toast(`${icon('check', 18)} Back online${done ? `. ${done} saved change${done === 1 ? '' : 's'} synced` : ''}`, 'ok');
+  }
+  window.addEventListener('online', () => { if (S.offline || outbox().length) tryOnline(); });
+  window.addEventListener('offline', () => { if (S.me) goOffline(); });
+  function offlineStatus(oid, status) {
+    const o = S.orders.find(x => x.id === oid); if (!o) return;
+    const a = outbox(), mine = a.find(x => x.kind === 'order' && x.tmpId === oid);
+    if (mine) { mine.body.status = status; setOutbox(a); } else queue({ kind: 'status', id: oid, status });
+    o.status = status; o.updatedAt = new Date().toISOString(); S.newIds.delete(oid);
+    if (!['new', 'preparing', 'ready'].includes(status)) { if (status !== 'cancelled') (S.offServed = S.offServed || []).push(o); S.orders = S.orders.filter(x => x.id !== oid); }
+    saveCache(); drawOffBar(); if (S.tab === 'orders') renderOrders(document.getElementById('content'));
+  }
+  function offlineBill(tableId) {
+    const t = (S.tables || []).find(x => x.id === tableId) || { id: tableId, name: (S.orders.find(o => o.tableId === tableId) || {}).tableName || 'Table' };
+    const list = [...S.orders, ...(S.offServed || [])].filter(o => o.tableId === tableId && o.status !== 'cancelled');
+    const lines = []; list.forEach(o => o.items.forEach((l, i) => lines.push({ key: o.id + ':' + i, name: l.name, qty: l.qty, price: l.price, amount: l.qty * l.price, gid: 'table', by: 'Table' })));
+    const total = list.reduce((a, o) => a + o.total, 0);
+    return { table: { id: t.id, name: t.name }, total, discount: list.reduce((a, o) => a + (o.discount || 0), 0), coupons: [...new Set(list.map(o => o.coupon).filter(Boolean))], lines, people: lines.length ? [{ gid: 'table', name: 'Table', amount: Math.round(total), own: total, sharedPart: 0 }] : [], paid: (S.offPaid[tableId] || []).slice(), orders: list.map(o => ({ id: o.id, number: o.number, status: o.status })) };
+  }
+
+  // ---------- counter order (also works offline) ----------
+  async function newOrder() {
+    if (!S.menu || !S.tables) { try { const [mn, tb] = await Promise.all([S.menu || api('/api/admin/menu'), S.tables || api('/api/admin/tables')]); S.menu = mn; S.tables = tb; saveCache(); } catch (err) { if (!S.menu || !S.tables) return toast('Open the Menu and Tables tabs once while online, then counter orders work offline too.', 'error'); } }
+    const items = S.menu.items.filter(i => !i.hidden), cats = S.menu.categories || [], tables = S.tables.filter(t => t.active !== false);
+    const cart = {}; let q = '', cat = '';
+    const L = S.me.restaurant.loyalty;
+    const o = modal(`<div class="sheet-head"><h3>New order</h3><button class="icon-btn" data-close>${icon('x', 20)}</button></div>
+      <div class="sheet-body pos">
+        <div class="pos-top"><label class="field"><span>Table</span><select class="input" id="ptab"><option value="">Counter / takeaway</option>${tables.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
+          <label class="field"><span>Customer name (optional)</span><input class="input" id="pname" maxlength="60"></label>
+          ${L ? `<label class="field"><span>Mobile for points (optional)</span><input class="input" id="pphone" inputmode="tel" maxlength="14"></label>` : ''}</div>
+        <div class="pos-find"><input class="input" id="pq" placeholder="Search dishes"><div class="pos-cats"><button class="chip on" data-pc="">All</button>${cats.map(k => `<button class="chip" data-pc="${k.id}">${esc(k.name)}</button>`).join('')}</div></div>
+        <div class="pos-list" id="plist"></div>
+        <label class="field"><span>Note for the kitchen (optional)</span><input class="input" id="pnote" maxlength="300" placeholder="E.g. less spicy"></label>
+      </div>
+      <div class="sheet-foot pos-foot"><div id="psum" class="muted">No dishes yet</div><button class="btn btn-primary btn-lg" id="psend" disabled>${icon('printer', 18)} Send to kitchen</button></div>`, { wide: true });
+    o.classList.add('pos-ov');
+    const draw = () => {
+      const list = items.filter(i => (!cat || i.categoryId === cat) && (!q || i.name.toLowerCase().includes(q)));
+      o.querySelector('#plist').innerHTML = list.map(i => `<div class="pos-it ${cart[i.id] ? 'on' : ''} ${i.available === false ? 'off' : ''}"><span class="nm">${dietMark(i.diet)} ${esc(i.name)}<small>${cur(i.price)}${i.available === false ? ' · sold out' : ''}</small></span>
+        ${cart[i.id] ? `<span class="pos-q"><button class="btn btn-sm" data-d="${i.id}">−</button><b>${cart[i.id]}</b><button class="btn btn-sm" data-a="${i.id}">+</button></span>` : `<button class="btn btn-sm" data-a="${i.id}">${icon('plus', 16)} Add</button>`}</div>`).join('') || '<div class="empty">No dishes found</div>';
+      const n = Object.values(cart).reduce((a, b) => a + b, 0), tot = Object.entries(cart).reduce((a, [id, qty]) => a + qty * (items.find(i => i.id === id) || {}).price, 0);
+      o.querySelector('#psum').innerHTML = n ? `<b>${n} item${n === 1 ? '' : 's'}</b> · ${cur(tot)}` : 'No dishes yet';
+      o.querySelector('#psend').disabled = !n;
+    };
+    o.querySelector('#plist').onclick = e => { const b = e.target.closest('[data-a],[data-d]'); if (!b) return; const id = b.dataset.a || b.dataset.d; cart[id] = Math.max(0, (cart[id] || 0) + (b.dataset.a ? 1 : -1)); if (!cart[id]) delete cart[id]; draw(); };
+    o.querySelector('#pq').oninput = e => { q = e.target.value.trim().toLowerCase(); draw(); };
+    o.querySelectorAll('[data-pc]').forEach(b => b.onclick = () => { cat = b.dataset.pc; o.querySelectorAll('[data-pc]').forEach(x => x.classList.toggle('on', x === b)); draw(); });
+    o.querySelector('#psend').onclick = async e => {
+      const btn = e.currentTarget; btn.disabled = true;
+      const tId = o.querySelector('#ptab').value, t = tables.find(x => x.id === tId);
+      const body = { tableId: tId || null, label: t ? '' : 'Counter', items: Object.entries(cart).map(([id, qty]) => ({ id, qty, price: (items.find(i => i.id === id) || {}).price })), name: o.querySelector('#pname').value.trim(), note: o.querySelector('#pnote').value.trim(), phone: o.querySelector('#pphone') ? o.querySelector('#pphone').value : '', status: 'preparing' };
+      let order;
+      if (!S.offline) { try { order = await api('/api/admin/orders', { method: 'POST', body }); } catch (err) { if (!err.offline) { btn.disabled = false; return toast(esc(err.message), 'error'); } } }
+      if (!order) { // offline: keep it here, print the KOT, sync later
+        const tmpId = 'off-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), lines = body.items.map(x => { const it = items.find(i => i.id === x.id); return { itemId: it.id, name: it.name, price: it.price, qty: x.qty, diet: it.diet }; });
+        const total = lines.reduce((a, l) => a + l.price * l.qty, 0);
+        order = { id: tmpId, number: 'OFF-' + (outbox().filter(x => x.kind === 'order').length + 1), tableId: tId || null, tableName: t ? t.name : 'Counter', items: lines, note: body.note, customerName: body.name, total, subtotal: total, discount: 0, coupon: '', status: 'preparing', createdAt: new Date().toISOString(), offline: true, source: 'counter' };
+        queue({ kind: 'order', tmpId, body: { ...body, createdAt: order.createdAt } });
+      }
+      o.close(); upsertOrder(order);
+      if (window.vdDesktop && window.vdDesktop.print && BILLCFG().autoKot) printKot(order);
+      toast(`${icon('check', 18)} Order for ${esc(order.tableName)} sent${order.offline && String(order.id).startsWith('off-') ? ' (saved offline)' : ''}. ${window.vdDesktop && BILLCFG().autoKot ? 'KOT printing.' : 'Tap KOT on the order to print the kitchen ticket.'}`, 'ok');
+    };
+    draw(); setTimeout(() => o.querySelector('#pq').focus(), 60);
+  }
+
+  // ---------- loyalty customers ----------
+  async function customers() {
+    const L = S.me.restaurant.loyaltyCfg; let list = [], q = '';
+    const o = modal(`<div class="sheet-head"><h3>Loyalty customers</h3><button class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body"><div class="empty">Loading…</div></div>`, { wide: true });
+    const draw = () => {
+      const f = list.filter(c => !q || c.phone.includes(q) || (c.name || '').toLowerCase().includes(q));
+      o.querySelector('.sheet-body').innerHTML = `<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><input class="input" id="cq" placeholder="Search name or number" style="flex:1;min-width:160px" value="${esc(q)}"><button class="btn" id="ccsv">${icon('download', 16)} Excel</button></div>
+        <p class="muted" style="margin:0 0 10px;font-size:13px">${list.length} customers · ${list.reduce((a, c) => a + c.points, 0)} points unused (worth ${cur(Math.round(list.reduce((a, c) => a + c.points, 0) * L.value))})</p>
+        ${f.length ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Customer</th><th class="r">Points</th><th class="r hide-sm">Visits</th><th class="r hide-sm">Spent</th><th></th></tr></thead><tbody>${f.map(c => `<tr><td><b>${esc(c.name || '–')}</b><br><span class="muted">${c.phone}</span></td><td class="r"><b>${c.points}</b></td><td class="r hide-sm">${c.visits}</td><td class="r hide-sm">${cur(c.spent)}</td><td class="r"><button class="btn btn-sm" data-adj="${c.phone}">Change</button></td></tr>`).join('')}</tbody></table></div>` : `<div class="empty">${icon('user', 36)}<div>${list.length ? 'No match' : 'No customers yet. Points start when guests or staff add a mobile number to an order.'}</div></div>`}`;
+      const cq = o.querySelector('#cq'); cq.oninput = e => { q = e.target.value.trim().toLowerCase(); const pos = e.target.selectionStart; draw(); const n = o.querySelector('#cq'); n.focus(); n.setSelectionRange(pos, pos); };
+      o.querySelector('#ccsv').onclick = () => { const qq = v => `"${String(v ?? '').replace(/"/g, '""')}"`; const rows = [['Name', 'Mobile', 'Points', 'Visits', 'Spent', 'Last visit'].map(qq).join(',')].concat(list.map(c => [c.name, c.phone, c.points, c.visits, c.spent, (c.lastAt || '').slice(0, 10)].map(qq).join(','))); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv' })); a.download = 'loyalty-customers.csv'; a.click(); };
+      o.querySelectorAll('[data-adj]').forEach(b => b.onclick = async () => {
+        const c = list.find(x => x.phone === b.dataset.adj);
+        const m = modal(`<form><div class="sheet-head"><h3>${esc(c.name || c.phone)}</h3><button type="button" class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body form">
+          <p style="margin:0">Has <b>${c.points} points</b>.</p>
+          <label class="field"><span>Name</span><input class="input" name="name" value="${esc(c.name)}" maxlength="60"></label>
+          <label class="field"><span>Add points (use − to take away)</span><input class="input" name="pts" type="number" step="1" placeholder="E.g. 20 or -20"></label>
+          <label class="field"><span>Reason (optional)</span><input class="input" name="note" maxlength="80" placeholder="E.g. birthday bonus"></label>
+          ${c.history.length ? `<div class="muted" style="font-size:13px">${c.history.slice(0, 6).map(h => `${new Date(h.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}: ${h.points > 0 ? '+' : ''}${h.points} ${esc(h.note)}`).join('<br>')}</div>` : ''}
+          </div><div class="sheet-foot"><button class="btn btn-primary btn-lg btn-block">Save</button></div></form>`);
+        m.querySelector('form').onsubmit = async e => { e.preventDefault(); const f = new FormData(e.target); try { const x = await api('/api/admin/customers/adjust', { method: 'POST', body: { phone: c.phone, name: f.get('name'), points: f.get('pts'), note: f.get('note') } }); Object.assign(c, x); m.close(); draw(); toast('Saved', 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
+      });
+    };
+    try { list = await api('/api/admin/customers'); draw(); } catch (err) { o.close(); toast(esc(err.message), 'error'); }
+  }
+
   // ---------- phone app (install to home screen) ----------
   const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
   const isPhone = () => window.innerWidth < 760 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || (window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches); // phones and tablets
@@ -322,6 +456,7 @@
     const isLocal = /localhost|127\.0\.0\.1/.test(S.me.baseUrl);
     c.innerHTML = `
       ${phoneBanner()}
+      <div class="o-tools"><button class="btn btn-primary" id="newOrder">${icon('plus', 18)} New order</button><span class="muted">Take an order at the counter or for a phone call. ${S.me.restaurant.service && S.me.restaurant.service.autoAccept ? 'QR orders go straight to the kitchen.' : ''}</span></div>
       ${!S.audioOk && !window.vdDesktop ? `<div class="banner">${icon('bell', 22)}<span>Turn on alerts so you hear a sound and get a pop-up for every new order.</span><button class="btn btn-primary" id="enableAlerts">Turn on alerts</button></div>` : ''}
       <div class="stats">
         <button class="stat link" data-gosales>  <small>Orders today</small><b>${st.ordersToday}</b><span class="sub">Other days ›</span></button>
@@ -336,6 +471,7 @@
         return `<div class="colwrap ${S.mobileCol === k ? 'on' : ''}"><div class="col-head"><span class="dot" style="background:${color}"></span>${l}<span class="n" style="background:color-mix(in srgb, ${color} 14%, #fff);color:${color}">${list.length}</span></div>
           <div class="col">${list.length ? list.map(orderCard).join('') : `<div class="col-empty">${k === 'new' ? (isLocal ? 'No new orders yet.' : 'Waiting for orders. New ones pop up here with a sound.') : 'Nothing here right now.'}</div>`}</div></div>`;
       }).join('')}</div>`;
+    const no = document.getElementById('newOrder'); if (no) no.onclick = () => newOrder();
     const ai = document.getElementById('appInstall'); if (ai) ai.onclick = installApp;
     const ax = document.getElementById('appHintX'); if (ax) ax.onclick = () => { lsSet('vd_app_hint', 'x'); renderOrders(c); };
     const en = document.getElementById('enableAlerts');
@@ -360,7 +496,7 @@
     const mins = (Date.now() - Date.parse(o.createdAt)) / 60000;
     const next = { new: ['preparing', 'Accept & start cooking'], preparing: ['ready', 'Mark as ready'], ready: ['served', 'Mark as served'] }[o.status];
     return `<article class="order ${S.newIds.has(o.id) ? 'is-new' : ''}">
-      <div class="o-head"><div><div class="o-table">${esc(o.tableName)}</div><div class="o-meta">Order #${o.number}${o.customerName ? ' · ' + esc(o.customerName) : ''}</div></div>
+      <div class="o-head"><div><div class="o-table">${esc(o.tableName)}</div><div class="o-meta">Order #${o.number}${o.customerName ? ' · ' + esc(o.customerName) : ''}</div>${o.offline && String(o.id).startsWith('off-') ? `<span class="badge badge-amber o-tag">${icon('wifi', 12)} Saved offline</span>` : o.source === 'counter' ? `<span class="badge badge-grey o-tag">Counter order</span>` : ''}</div>
         ${dueChip(o, mins)}</div>
       <div class="o-items">${o.items.map(l => `<div class="o-line"><span class="q">${l.qty}×</span>${dietMark(l.diet)}<span class="nm">${esc(l.name)}${l.note ? `<small>${esc(l.note)}</small>` : ''}${l.by && new Set(o.items.map(x => x.by)).size > 1 ? `<small class="by">for ${esc(l.by)}</small>` : ''}</span></div>`).join('')}</div>
       ${o.note ? `<div class="o-note">${icon('edit', 16)} ${esc(o.note)}</div>` : ''}
@@ -372,17 +508,19 @@
   }
   async function setStatus(oid, status) {
     if (status === 'cancelled' && !(await confirmBox('Cancel this order?', 'The customer will see that the order was cancelled.', 'Cancel order'))) return;
+    if (S.offline || String(oid).startsWith('off-')) return offlineStatus(oid, status);
     try {
       const o = await api('/api/admin/orders/' + oid, { method: 'PATCH', body: { status } });
       S.newIds.delete(oid); upsertOrder(o);
       if (status === 'served') toast(`${icon('check', 18)} ${esc(o.tableName)} served`, 'ok');
-    } catch (err) { toast(esc(err.message), 'error'); }
+    } catch (err) { if (err.offline) return offlineStatus(oid, status); toast(esc(err.message), 'error'); }
   }
   function upsertOrder(o) {
     const i = S.orders.findIndex(x => x.id === o.id);
     const active = ['new', 'preparing', 'ready'].includes(o.status);
     if (i >= 0) { if (active) S.orders[i] = o; else S.orders.splice(i, 1); } else if (active) S.orders.push(o);
-    api('/api/admin/stats?tz=' + TZ).then(s => { S.stats = s; if (S.tab === 'orders') renderOrders(document.getElementById('content')); });
+    if (!S.offline) api('/api/admin/stats?tz=' + TZ).then(s => { S.stats = s; saveCache(); if (S.tab === 'orders') renderOrders(document.getElementById('content')); }).catch(() => {});
+    saveCache();
     if (S.tab === 'orders') renderOrders(document.getElementById('content'));
     refreshBadges();
   }
@@ -739,6 +877,30 @@
         <div style="display:flex;gap:8px;flex-wrap:wrap">${lic ? `<button class="btn" id="cpyKey">${icon('copy', 18)} Copy license key</button>` : `<a class="btn btn-primary" href="${esc(buyLink('lifetime'))}" target="_blank">Buy lifetime ${inr(S.me.plans.lifetime)}</a><a class="btn" href="${esc(buyLink('yearly'))}" target="_blank">Buy yearly ${inr(S.me.plans.yearly)}</a><a class="btn" href="${esc(buyLink('monthly'))}" target="_blank">Buy monthly ${inr(S.me.plans.monthly)}</a>`}<a class="btn" href="https://dinein.veyracreatives.com/download/Veyra-Dine-In-Setup.exe">${icon('download', 18)} Download Windows app</a></div>
       </div></div>
       <div class="panel" id="phonePanel"></div>
+      <form class="panel" id="svcF"><div class="panel-head"><div><h2>Orders without a waiter</h2><span class="muted" style="font-size:14px">Guests scan, order and pay from the table. The kitchen gets the order straight away.</span></div></div><div class="panel-body form">
+        <label class="switch"><input type="checkbox" name="autoAccept" ${r.service && r.service.autoAccept ? 'checked' : ''}><span class="track"></span>Send QR orders straight to the kitchen (no "Accept" tap needed)</label>
+        <label class="switch"><input type="checkbox" name="payFirst" ${r.service && r.service.payFirst ? 'checked' : ''} ${r.upiId ? '' : 'disabled'}><span class="track"></span>Ask guests to pay by UPI right after they order</label>
+        ${r.upiId ? '' : '<p class="muted" style="margin:0;font-size:13px">Add your UPI ID under “Split bill and UPI payments” to turn on pay at the table.</p>'}
+        <p class="muted" style="margin:0;font-size:13px">${window.vdDesktop ? 'To print the kitchen ticket (KOT) by itself for every order, turn on “Print a KOT automatically” under Bill printer below.' : 'Kitchen tickets print by themselves in the Windows app (Settings › Bill printer).'} Guests' “I've paid” shows here with the amount. Check it in your UPI app.</p>
+      </div></form>
+      <form class="panel" id="wifiF"><div class="panel-head"><div><h2>WiFi for guests</h2><span class="muted" style="font-size:14px">Guests see a WiFi button on the menu with the name and password, a copy button and a QR to join.</span></div></div><div class="panel-body form">
+        <label class="switch"><input type="checkbox" name="on" ${r.wifiCfg && r.wifiCfg.on ? 'checked' : ''}><span class="track"></span>Show WiFi on the menu</label>
+        <div class="loy-rules" style="grid-template-columns:1fr 1fr">
+          <label class="field"><span>WiFi name</span><input class="input" name="ssid" maxlength="32" value="${esc((r.wifiCfg || {}).ssid || '')}" placeholder="E.g. MasalaTable_Guest"></label>
+          <label class="field"><span>Password (leave empty if none)</span><input class="input" name="pass" maxlength="63" value="${esc((r.wifiCfg || {}).pass || '')}" autocomplete="off"></label>
+        </div>
+        <button class="btn btn-primary" style="justify-self:start">Save WiFi</button>
+      </div></form>
+      <form class="panel" id="loyF"><div class="panel-head"><div><h2>Loyalty points</h2><span class="muted" style="font-size:14px">Customers collect points with their mobile number. No app or card needed. You choose the rules.</span></div>${r.loyaltyCfg && r.loyaltyCfg.on ? `<button type="button" class="btn btn-sm" id="custBtn">${icon('user', 16)} Customers</button>` : ''}</div><div class="panel-body form">
+        <label class="switch"><input type="checkbox" name="on" ${r.loyaltyCfg && r.loyaltyCfg.on ? 'checked' : ''}><span class="track"></span>Give loyalty points</label>
+        <div class="loy-rules">
+          <label class="field"><span>Spend (₹) to earn 1 point</span><input class="input" name="spend" type="number" min="1" step="1" value="${(r.loyaltyCfg || {}).spend || 100}"></label>
+          <label class="field"><span>1 point is worth (₹)</span><input class="input" name="value" type="number" min="0.01" step="0.01" value="${(r.loyaltyCfg || {}).value || 1}"></label>
+          <label class="field"><span>Points needed before they can be used</span><input class="input" name="min" type="number" min="0" step="1" value="${(r.loyaltyCfg || {}).min ?? 50}"></label>
+        </div>
+        <p class="muted" id="loyEx" style="margin:0;font-size:14px"></p>
+        <button class="btn btn-primary" style="justify-self:start">Save loyalty rules</button>
+      </div></form>
       <form class="panel" id="ideaF"><div class="panel-head"><div><h2>Suggest a feature or ask for custom work</h2><span class="muted" style="font-size:14px">Tell Veyra what you'd like next, or what you need built for your restaurant. We reply on WhatsApp.</span></div></div><div class="panel-body form">
         <div class="wseg" style="display:flex;gap:8px;flex-wrap:wrap"><label class="switch"><input type="radio" name="type" value="feature" checked> Feature idea</label><label class="switch"><input type="radio" name="type" value="custom"> Custom build</label></div>
         <label class="field"><span>Your message</span><textarea class="input" name="message" rows="3" maxlength="2000" required placeholder="E.g. a kitchen screen, or 3 outlets with one dashboard"></textarea></label>
@@ -775,6 +937,15 @@
       <button class="btn btn-lg" id="lo" style="justify-self:start">${icon('logout', 18)} Log out</button>
     </div>`;
     phonePanel(document.getElementById('phonePanel'));
+    const svcF = document.getElementById('svcF');
+    svcF.onchange = async () => { const f = new FormData(svcF); try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { service: { autoAccept: !!f.get('autoAccept'), payFirst: !!f.get('payFirst') } } }); saveCache(); toast('Saved', 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
+    const wifiF = document.getElementById('wifiF');
+    wifiF.onsubmit = async e => { e.preventDefault(); const f = new FormData(wifiF); try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { wifi: { on: !!f.get('on'), ssid: f.get('ssid'), pass: f.get('pass') } } }); saveCache(); toast('WiFi saved', 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
+    const loyF = document.getElementById('loyF');
+    const loyEx = () => { const f = new FormData(loyF), sp = Number(f.get('spend')) || 100, v = Number(f.get('value')) || 1, mn = Number(f.get('min')) || 0; document.getElementById('loyEx').innerHTML = `Example: a ₹1,000 bill earns <b>${Math.floor(1000 / sp)} points</b>. ${mn} points take <b>${cur(Math.round(mn * v))}</b> off a later bill. Points are added when the order is served or the table is cleared, and used from the bill at the counter.`; };
+    loyF.oninput = loyEx; loyEx();
+    loyF.onsubmit = async e => { e.preventDefault(); const f = new FormData(loyF); try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { loyalty: { on: !!f.get('on'), spend: f.get('spend'), value: f.get('value'), min: f.get('min') } } }); saveCache(); toast('Loyalty rules saved', 'ok'); renderSettings(c); } catch (err) { toast(esc(err.message), 'error'); } };
+    const cb = document.getElementById('custBtn'); if (cb) cb.onclick = customers;
     const ck = document.getElementById('cpyKey'); if (ck) ck.onclick = async () => { const k = lic.code || lic.key; try { await navigator.clipboard.writeText(k); toast('License key copied'); } catch { prompt('Your license key', k); } };
     c.querySelectorAll('[data-license]').forEach(b => b.onclick = licenseModal);
     document.getElementById('ideaF').onsubmit = async e => { e.preventDefault(); const f = new FormData(e.target); try { await api('/api/requests', { method: 'POST', body: { type: f.get('type'), message: f.get('message') } }); e.target.reset(); toast(`${icon('check', 18)} Sent. Thank you!`, 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
@@ -876,7 +1047,7 @@
     const c = BILLCFG(), r = S.me.restaurant;
     const items = []; for (const l of B.lines) { const k = l.name + '|' + l.price; const x = items.find(i => i.k === k); if (x) x.qty += l.qty; else items.push({ k, name: l.name, qty: l.qty, price: l.price }); }
     const sub = items.reduce((a, i) => a + i.qty * i.price, 0), paid = B.paid.reduce((a, p) => a + p.amount, 0), left = Math.max(0, Math.round(B.total - paid));
-    const M = { cash: 'Cash', upi: 'UPI', card: 'Card' };
+    const M = { cash: 'Cash', upi: 'UPI', card: 'Card', points: 'Points' };
     let qr = '';
     if (c.showUpi && r.upiId && left > 0 && !B.when) { try { qr = await (await fetch(`/api/admin/upi-qr?am=${left}&n=${encodeURIComponent(B.table.name + ' bill')}`)).text(); } catch {} }
     const html = receiptDoc(`${billHeader()}<hr>
@@ -910,23 +1081,37 @@
     let B, mode = 'person', n = 2, sel = null;
     const o = modal('<div class="sheet-body"><div class="empty">Loading…</div></div>', { wide: true });
     o.classList.add('cbill-ov');
-    const M = { cash: 'Cash', upi: 'UPI', card: 'Card' };
-    const load = async () => { B = await api(`/api/admin/tables/${tableId}/bill`); if (mode === 'equal' && n < 2) n = Math.max(2, B.people.length); draw(); };
+    const M = { cash: 'Cash', upi: 'UPI', card: 'Card' }, ML = { ...M, points: 'Points' };
+    let off = false, cust = null;
+    const load = async () => {
+      try { B = await api(`/api/admin/tables/${tableId}/bill`); off = false; }
+      catch (err) { if (!err.offline) throw err; B = offlineBill(tableId); off = true; }
+      if (mode === 'equal' && n < 2) n = Math.max(2, B.people.length); draw();
+    };
     function draw() {
       const paidTotal = B.paid.reduce((a, p) => a + p.amount, 0), left = Math.max(0, Math.round(B.total - paidTotal));
       const paidBy = gid => B.paid.filter(p => p.gid === gid).reduce((a, p) => a + p.amount, 0);
       const rows = mode === 'person'
         ? B.people.map(p => ({ gid: p.gid, name: p.name, amount: p.amount, due: Math.max(0, p.amount - paidBy(p.gid)), items: B.lines.filter(l => !l.shared && l.gid === p.gid) }))
         : Array.from({ length: n }, (_, i) => { const gid = 'eq' + (i + 1), each = Math.ceil(B.total / n), amt = i < n - 1 ? each : Math.max(0, Math.round(B.total) - each * (n - 1)); return { gid, name: 'Person ' + (i + 1), amount: amt, due: Math.max(0, amt - paidBy(gid)), items: [] }; });
+      const Lc = S.me.restaurant.loyalty;
       o.querySelector('.sheet').innerHTML = `<div class="sheet-head"><h3>${esc(B.table.name)} · Bill</h3><button class="icon-btn" data-close>${icon('x', 20)}</button></div>
       <div class="sheet-body cbill">
+        ${off ? `<div class="hint" style="margin:0 0 12px;background:#FEF3C7;color:#78350F">${icon('wifi', 18)}<div><b>Offline.</b> This bill is made from the orders on this screen. Payments and clearing the table are saved and sync when the internet is back.</div></div>` : ''}
+        ${Lc && !off && B.lines.length ? `<div class="loy">
+          <div class="loy-h">${icon('star', 16)} <b>Loyalty points</b><span class="muted">₹${Lc.spend} = 1 point · 1 point = ₹${Lc.value}</span></div>
+          ${cust ? `<div class="loy-c"><div><b>${esc(cust.name || 'Customer')}</b> <span class="muted">${cust.phone.replace(/(\d{5})(\d{5})/, '$1 $2')}</span><small>${cust.points} points (worth ${cur(Math.round(cust.points * Lc.value))})${cust.visits ? ' · ' + cust.visits + ' visits' : ' · new customer'}</small></div>
+              <div class="loy-b">${cust.points >= Lc.min && left ? `<button class="btn btn-sm btn-primary" id="useP">Use ${Math.min(cust.points, Math.floor(left / Lc.value))} points · ${cur(Math.round(Math.min(cust.points, Math.floor(left / Lc.value)) * Lc.value))} off</button>` : `<small class="muted">${cust.points < Lc.min ? `Can use points from ${Lc.min}` : ''}</small>`}<button class="btn btn-sm btn-ghost" id="chgP">Change</button></div></div>
+              <small class="muted">This customer gets points for this bill when the table is cleared (₹${Lc.spend} = 1 point).</small>`
+            : `<div class="loy-f"><input class="input" id="lph" inputmode="tel" maxlength="14" placeholder="Customer mobile number"><button class="btn" id="lgo">Add</button></div>`}
+        </div>` : ''}
         ${!B.lines.length ? `<div class="empty">${icon('receipt', 40)}<div>No open bill on this table.</div></div>` : `
         <div class="cb-top"><div><small>Total</small><b>${cur(B.total)}</b>${B.discount ? `<span class="muted">after ${cur(B.discount)} coupon</span>` : ''}</div><div><small>Paid</small><b>${cur(paidTotal)}</b></div><div><small>Still to pay</small><b class="${left ? 'due' : 'ok'}">${left ? cur(left) : 'All paid'}</b></div></div>
         <div class="seg cb-seg"><button class="${mode === 'person' ? 'on' : ''}" data-m="person">By what each ate</button><button class="${mode === 'equal' ? 'on' : ''}" data-m="equal">Split equally</button><button class="${mode === 'one' ? 'on' : ''}" data-m="one">One payment</button></div>
         ${mode === 'equal' ? `<div class="cb-n">Split between <button class="btn btn-sm" data-n="-1">−</button><b>${n}</b><button class="btn btn-sm" data-n="1">+</button> people · ${cur(Math.ceil(B.total / n))} each</div>` : ''}
         ${mode === 'one' ? `<div class="cb-row sel"><div class="cb-who"><b>Whole table</b><small>${B.lines.map(l => `${l.qty}× ${esc(l.name)}`).join(', ')}</small></div><div class="cb-amt">${cur(left)}</div>
             ${left ? `<div class="cb-pay">${Object.entries(M).map(([k, l]) => `<button class="btn btn-sm" data-pay="${k}" data-gid="table" data-name="Table" data-amt="${left}">${l}</button>`).join('')}</div>` : `<span class="badge badge-green">${icon('check', 13)} Paid</span>`}</div>`
-          : rows.map(r => `<div class="cb-row"><div class="cb-who"><b>${esc(r.name)}</b>${r.items.length ? `<small>${r.items.map(l => `${l.qty}× ${esc(l.name)}`).join(', ')}</small>` : ''}${B.paid.filter(p => p.gid === r.gid).map(p => `<small class="pd">${icon('check', 12)} ${cur(p.amount)} ${M[p.method] || 'UPI'}${p.counter ? '' : ' (guest says paid)'}</small>`).join('')}</div>
+          : rows.map(r => `<div class="cb-row"><div class="cb-who"><b>${esc(r.name)}</b>${r.items.length ? `<small>${r.items.map(l => `${l.qty}× ${esc(l.name)}`).join(', ')}</small>` : ''}${B.paid.filter(p => p.gid === r.gid).map(p => `<small class="pd">${icon('check', 12)} ${cur(p.amount)} ${ML[p.method] || 'UPI'}${p.counter ? '' : ' (guest says paid)'}</small>`).join('')}</div>
             <div class="cb-amt">${cur(r.amount)}</div>
             ${r.due ? `<div class="cb-pay">${Object.entries(M).map(([k, l]) => `<button class="btn btn-sm" data-pay="${k}" data-gid="${esc(r.gid)}" data-name="${esc(r.name)}" data-amt="${r.due}">${l}${r.due !== r.amount ? ' ' + cur(r.due) : ''}</button>`).join('')}</div>` : `<span class="badge badge-green">${icon('check', 13)} Paid</span>`}</div>`).join('')}
         ${mode === 'person' && B.lines.some(l => l.shared) ? `<p class="muted" style="font-size:13px">Shared by the table, split equally: ${B.lines.filter(l => l.shared).map(l => `${l.qty}× ${esc(l.name)}`).join(', ')}</p>` : ''}
@@ -939,15 +1124,22 @@
       </div>`;
       o.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { mode = b.dataset.m; if (mode === 'equal') n = Math.max(2, B.people.length); draw(); });
       o.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { n = Math.max(2, Math.min(30, n + Number(b.dataset.n))); draw(); });
+      const lgo = o.querySelector('#lgo'); if (lgo) { const lph = o.querySelector('#lph'); lph.onkeydown = e => { if (e.key === 'Enter') lgo.click(); };
+        lgo.onclick = async () => { try { const x = await api(`/api/admin/tables/${tableId}/loyalty`, { method: 'POST', body: { phone: lph.value } }); cust = x.customer; B = x; draw(); } catch (err) { toast(esc(err.message), 'error'); } }; }
+      const chg = o.querySelector('#chgP'); if (chg) chg.onclick = () => { cust = null; draw(); };
+      const useP = o.querySelector('#useP'); if (useP) useP.onclick = async () => { useP.disabled = true; try { const x = await api(`/api/admin/tables/${tableId}/redeem`, { method: 'POST', body: { phone: cust.phone, points: cust.points } }); cust = x.customer; B = x; toast(`${icon('check', 18)} Points used`, 'ok'); draw(); } catch (err) { useP.disabled = false; toast(esc(err.message), 'error'); } };
       o.querySelectorAll('[data-pay]').forEach(b => b.onclick = async () => {
         b.disabled = true;
+        if (off) { B.paid.push({ gid: b.dataset.gid, name: b.dataset.name, amount: Number(b.dataset.amt), method: b.dataset.pay, counter: true }); queue({ kind: 'payment', tableId, body: { gid: b.dataset.gid, name: b.dataset.name, amount: b.dataset.amt, method: b.dataset.pay } }); (S.offPaid[tableId] = S.offPaid[tableId] || []).push(B.paid[B.paid.length - 1]); draw(); return; }
         try { const x = await api(`/api/admin/tables/${tableId}/payment`, { method: 'POST', body: { gid: b.dataset.gid, name: b.dataset.name, amount: b.dataset.amt, method: b.dataset.pay } }); B = x; toast(`${icon('check', 18)} ${esc(b.dataset.name)} paid ${cur(b.dataset.amt)} by ${M[b.dataset.pay]}`, 'ok'); draw(); }
         catch (err) { b.disabled = false; toast(esc(err.message), 'error'); }
       });
       const pb = o.querySelector('#pbill'); if (pb) pb.onclick = () => printBill(B);
       const st = o.querySelector('#settle'); if (st) st.onclick = async () => {
         if (left && !(await confirmBox('Clear table with money still due?', `${cur(left)} is not marked as paid yet.`, 'Clear table'))) return;
-        await api(`/api/admin/tables/${tableId}/settle`, { method: 'POST' }); o.close();
+        if (off) { queue({ kind: 'settle', tableId }); delete S.offPaid[tableId]; S.orders = S.orders.filter(x => x.tableId !== tableId || x.status === 'new' || x.status === 'preparing'); saveCache(); }
+        else await api(`/api/admin/tables/${tableId}/settle`, { method: 'POST' });
+        o.close();
         S.requests = S.requests.filter(q => !(q.tableId === tableId && (q.type === 'bill' || q.type === 'paid'))); if (S.tab === 'orders') renderOrders(document.getElementById('content')); refreshBadges();
         toast(`${icon('check', 18)} ${esc(B.table.name)} is cleared for the next guests`, 'ok');
       };
@@ -997,13 +1189,22 @@
 
   // ---------- boot ----------
   async function boot() {
-    try { S.me = await api('/api/admin/me'); } catch { return; }
+    try { S.me = await api('/api/admin/me'); try { localStorage.setItem('vd_off_last', S.me.restaurant.slug); } catch {} }
+    catch (err) {
+      if (!err.offline) return;
+      const last = lsGet('vd_off_last'); let cch = null; try { cch = JSON.parse(localStorage.getItem('vd_off_' + last) || 'null'); } catch {}
+      if (!cch || !cch.me) { document.body.innerHTML = '<div style="font:16px system-ui;padding:60px 24px;text-align:center"><h2>No internet</h2><p>Open the admin once while online, then it keeps working offline.</p><button onclick="location.reload()" style="font:inherit;padding:12px 22px;border:0;border-radius:12px;background:#E4572E;color:#fff">Try again</button></div>'; return; }
+      Object.assign(S, { me: cch.me, orders: cch.orders || [], requests: cch.requests || [], stats: cch.stats, menu: cch.menu, tables: cch.tables });
+      S.offline = false; goOffline(); renderShell(); return;
+    }
     if (window.vdDesktop) { window.vdDesktop.ready({ name: S.me.restaurant.name, access: S.me.restaurant.access }); unlockAudio(); }
     if (!S.me.restaurant.access.active) return renderActivate();
     const h = location.hash.slice(1); if (TABS.some(t => t[0] === h)) S.tab = h;
     await loadLive().catch(() => {});
-    renderShell(); connect();
-    if (!window.vdDesktop && 'serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/admin-sw.js', { scope: '/' }).then(r => { S.swReg = r; }).catch(() => {});
+    renderShell(); connect(); saveCache();
+    Promise.all([S.menu ? S.menu : api('/api/admin/menu'), api('/api/admin/tables')]).then(([mn, tb]) => { S.menu = mn; S.tables = tb; saveCache(); }).catch(() => {});
+    if (outbox().length) goOffline(true);
+    if ('serviceWorker' in navigator && window.isSecureContext && location.protocol === 'https:') navigator.serviceWorker.register('/admin-sw.js', { scope: '/' }).then(r => { S.swReg = r; }).catch(() => {});
     document.addEventListener('click', unlockOnce, { once: true });
   }
   function unlockOnce() { unlockAudio(); if (S.tab === 'orders') { const en = document.getElementById('enableAlerts'); if (en && S.audioOk && !('Notification' in window && Notification.permission === 'default')) renderOrders(document.getElementById('content')); } }

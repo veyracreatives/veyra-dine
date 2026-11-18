@@ -137,8 +137,36 @@ function publicRestaurant(r) {
     poweredBy: r.poweredBy !== false,
     guestLogin: r.guestLogin !== false,
     upi: r.upiId ? { id: r.upiId, name: r.upiName || r.name } : null,
+    payFirst: !!(r.service && r.service.payFirst && r.upiId),
+    wifi: r.wifi && r.wifi.on && r.wifi.ssid ? { ssid: r.wifi.ssid, pass: r.wifi.pass || '', open: !r.wifi.pass } : null,
+    loyalty: loyaltyOn(r) ? { spend: r.loyalty.spend, value: r.loyalty.value, min: r.loyalty.min } : null,
   };
 }
+// ---------- loyalty points by phone number (owner turns it on in Settings) ----------
+const LOYALTY_DEFAULT = { on: false, spend: 100, value: 1, min: 50 };
+const loyaltyOn = r => !!(r.loyalty && r.loyalty.on);
+function normPhone(v) {
+  let d = String(v || '').replace(/\D/g, '');
+  if (d.length === 12 && d.startsWith('91')) d = d.slice(2); else if (d.length === 11 && d.startsWith('0')) d = d.slice(1);
+  return /^[6-9]\d{9}$/.test(d) ? d : '';
+}
+function customerOf(r, phone, create, name) {
+  if (!db.customers) db.customers = [];
+  let c = db.customers.find(x => x.restaurantId === r.id && x.phone === phone);
+  if (!c && create) { c = { id: id(12), restaurantId: r.id, phone, name: '', points: 0, spent: 0, visits: 0, createdAt: now(), lastAt: now(), history: [] }; db.customers.push(c); }
+  if (c && name && !c.name) c.name = str(name, 60);
+  return c;
+}
+function pointsLog(c, type, points, note, orderId) { c.history = [{ at: now(), type, points, note: note || '', ...(orderId ? { orderId } : {}) }, ...(c.history || [])].slice(0, 100); c.lastAt = now(); }
+function earnFor(r, o) { // points are added once, when the order is served or the table is cleared
+  if (!loyaltyOn(r) || !o.loyaltyPhone || o.pointsAt || o.status === 'cancelled') return 0;
+  const c = customerOf(r, o.loyaltyPhone, true, o.customerName && !/,/.test(o.customerName) ? o.customerName : '');
+  const pts = Math.floor(o.total / Math.max(1, r.loyalty.spend));
+  o.pointsAt = now(); o.points = pts; c.points += pts; c.spent = money(c.spent + o.total); c.visits++;
+  pointsLog(c, 'earn', pts, `Order #${o.number}`, o.id);
+  return pts;
+}
+const customerView = c => ({ phone: c.phone, name: c.name, points: c.points, spent: c.spent, visits: c.visits, lastAt: c.lastAt, createdAt: c.createdAt, history: (c.history || []).slice(0, 20) });
 const DAY = 86400000;
 // guest accounts: phone (10 digits, Indian numbers) or email
 function normLogin(v) {
@@ -220,7 +248,7 @@ function updatesUntilOf(pl) {
   const d = new Date((pl.iat || new Date().toISOString().slice(0, 10)) + 'T00:00:00Z'); d.setUTCFullYear(d.getUTCFullYear() + 1); return d.toISOString().slice(0, 10);
 }
 const BILL_DEFAULT = { width: '80', gstin: '', fssai: '', footer: 'Thank you! Please visit again.', autoKot: false, showUpi: true };
-function adminRestaurant(r) { return { ...publicRestaurant(r), upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null) } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}) }; }
+function adminRestaurant(r) { return { ...publicRestaurant(r), upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null) } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}), service: Object.assign({ autoAccept: false, payFirst: false }, r.service || {}), loyaltyCfg: Object.assign({}, LOYALTY_DEFAULT, r.loyalty || {}), wifiCfg: Object.assign({ on: false, ssid: '', pass: '' }, r.wifi || {}) }; }
 function newRestaurant({ name, slug, password, email, ownerName, phone, plan = 'trial' }) {
   let s = slugify(slug || name), n = 2;
   while (db.restaurants.some(r => r.slug === s)) s = slugify(slug || name) + '-' + n++;
@@ -305,7 +333,7 @@ function openStream(req, res, map, key) {
   req.on('close', () => { const s = map.get(key); if (s) { s.delete(res); if (!s.size) map.delete(key); } });
 }
 
-const adminOrder = o => ({ ...publicOrder(o), tableId: o.tableId || null }); // the counter needs the table to open its bill
+const adminOrder = o => ({ ...publicOrder(o), tableId: o.tableId || null, source: o.source || 'qr', offline: !!o.offline, points: o.points || 0, phone: o.loyaltyPhone || '' }); // the counter needs the table to open its bill
 const publicOrder = o => ({ id: o.id, number: o.number, tableName: o.tableName, items: o.items, note: o.note, customerName: o.customerName, total: o.total, subtotal: o.subtotal || o.total, discount: o.discount || 0, coupon: o.coupon || '', status: o.status, createdAt: o.createdAt, updatedAt: o.updatedAt, readyBy: o.readyBy || null, readyAt: o.readyAt || null });
 
 // ---------- wait-time promise: learn how long each dish really takes in this kitchen ----------
@@ -513,11 +541,19 @@ async function handle(req, res) {
     icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }],
   }), { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'no-cache' });
   if (m === 'GET' && p === '/admin-sw.js') return send(res, 200, `// Veyra Dine In admin: shows order pop-ups and an offline page. It never stores orders or menus.
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+const C = 'vd-admin-v2', SHELL = ['/admin', '/assets/base.css', '/assets/admin.css', '/assets/shell.css', '/assets/admin.js', '/assets/icons.js', '/assets/google.js', '/icon-192.png', '/favicon-32.png'];
+self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(C).then(c => Promise.all(SHELL.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => {}))))); });
+self.addEventListener('activate', e => e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x.startsWith('vd-admin') && x !== C).map(x => caches.delete(x)))).then(() => self.clients.claim())));
+// Network first, so updates show straight away. Without internet the admin still opens from the saved copy.
 self.addEventListener('fetch', e => {
+  const u = new URL(e.request.url);
+  if (e.request.method !== 'GET') return;
+  const shell = u.origin === location.origin && (u.pathname.startsWith('/assets/') || /^\\/(icon-192|favicon-32)\\.png$/.test(u.pathname));
+  const font = /fonts\\.(googleapis|gstatic)\\.com$/.test(u.hostname);
+  if (shell || font) { e.respondWith(fetch(e.request).then(r => { if (r.ok || r.type === 'opaque') { const c2 = r.clone(); caches.open(C).then(c => c.put(e.request, c2)); } return r; }).catch(() => caches.match(e.request, { ignoreSearch: true }))); return; }
   if (e.request.mode !== 'navigate') return;
-  e.respondWith(fetch(e.request).catch(() => new Response('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title><body style="font:16px system-ui;padding:40px 24px;text-align:center;background:#FBF6EE;color:#2b211b"><h2>No internet</h2><p>Orders will show again when your phone is back online.</p><button onclick="location.reload()" style="font:inherit;padding:12px 22px;border:0;border-radius:12px;background:#E4572E;color:#fff">Try again</button>', { headers: { 'Content-Type': 'text/html; charset=utf-8' } })));
+  const adminPage = u.pathname === '/admin' || u.pathname.startsWith('/admin/');
+  e.respondWith(fetch(e.request).then(r => { if (adminPage && r.ok) { const c2 = r.clone(); caches.open(C).then(c => c.put('/admin', c2)); } return r; }).catch(async () => (adminPage && await caches.match('/admin')) || new Response('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title><body style="font:16px system-ui;padding:40px 24px;text-align:center;background:#FBF6EE;color:#2b211b"><h2>No internet</h2><p>Orders will show again when your phone is back online.</p><button onclick="location.reload()" style="font:inherit;padding:12px 22px;border:0;border-radius:12px;background:#E4572E;color:#fff">Try again</button>', { headers: { 'Content-Type': 'text/html; charset=utf-8' } })));
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();
@@ -681,6 +717,17 @@ self.addEventListener('notificationclick', e => {
     }
     return fail(res, 404, 'Not found');
   }
+  if (m === 'GET' && (mt = /^\/api\/menu\/([a-z0-9-]+)\/wifi-qr$/.exec(p))) { // other guests can scan this to join the WiFi
+    const r = db.restaurants.find(x => x.slug === mt[1]); if (!r || !r.wifi || !r.wifi.on || !r.wifi.ssid) return fail(res, 404, 'Not found');
+    const e = v => String(v).replace(/([\\;,:"])/g, '\\$1');
+    const svg = await QRCode.toString(`WIFI:T:${r.wifi.pass ? 'WPA' : 'nopass'};S:${e(r.wifi.ssid)};${r.wifi.pass ? `P:${e(r.wifi.pass)};` : ''};`, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
+    return send(res, 200, svg, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-cache' });
+  }
+  if (m === 'GET' && (mt = /^\/api\/menu\/([a-z0-9-]+)\/points$/.exec(p))) { // guests check their points with their number
+    const r = db.restaurants.find(x => x.slug === mt[1]); if (!r || !loyaltyOn(r)) return fail(res, 404, 'Not found');
+    const ph = normPhone(url.searchParams.get('phone')); if (!ph) return fail(res, 400, 'Enter your 10-digit mobile number');
+    const c = customerOf(r, ph); return send(res, 200, { points: c ? c.points : 0, worth: Math.round((c ? c.points : 0) * r.loyalty.value), min: r.loyalty.min, spend: r.loyalty.spend, value: r.loyalty.value });
+  }
   if (m === 'POST' && (mt = /^\/api\/menu\/([a-z0-9-]+)\/orders$/.exec(p))) {
     const r = db.restaurants.find(x => x.slug === mt[1]);
     if (!r) return fail(res, 404, 'Restaurant not found');
@@ -715,13 +762,17 @@ self.addEventListener('notificationclick', e => {
       discount = v.discount; couponCode = v.coupon.code; v.coupon.uses = (v.coupon.uses || 0) + 1;
     }
     const total = money(subtotal - discount);
+    const lp = loyaltyOn(r) ? (normPhone(body.phone) || (guest && normPhone(guest.phone)) || '') : '';
+    const auto = !!(r.service && r.service.autoAccept);
     r.orderSeq = (r.orderSeq || 100) + 1;
     const order = {
       id: id(16), restaurantId: r.id, number: r.orderSeq, tableId: table.id, tableName: table.name,
       items: lines, note: str(body.note, 300), customerName: str(body.name, 60), total, subtotal, discount, coupon: couponCode,
-      status: 'new', createdAt: now(), updatedAt: now(), readyBy: estimateReady(r, lines),
+      status: auto ? 'preparing' : 'new', ...(auto ? { preparingAt: now(), autoAccepted: true } : {}), createdAt: now(), updatedAt: now(), readyBy: estimateReady(r, lines),
       ...(guest ? { guestId: guest.id, customerPhone: guest.phone || guest.email } : {}),
+      ...(lp ? { loyaltyPhone: lp } : {}),
     };
+    if (lp) customerOf(r, lp, true, body.name);
     if (guest) guest.lastAt = now();
     if (shared) {
       const people = [...new Set(lines.map(l => l.by))];
@@ -986,7 +1037,9 @@ self.addEventListener('notificationclick', e => {
       if (body.status === 'ready' && !o.readyAt) o.readyAt = now();
       if (body.status === 'preparing' && !o.preparingAt) o.preparingAt = now();
       if (body.status === 'served' && !o.readyAt) o.readyAt = now();
-      o.status = body.status; o.updatedAt = now(); save();
+      o.status = body.status; o.updatedAt = now();
+      if (o.status === 'served') earnFor(r, o);
+      save();
       { const t = db.tables.find(x => x.id === o.tableId); if (t) tableChanged(r, t, false); }
       emit(r.id, 'order', adminOrder(o)); emitOrder(o);
       return send(res, 200, publicOrder(o));
@@ -1036,10 +1089,30 @@ self.addEventListener('notificationclick', e => {
       res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-store' }); return res.end(svg);
     }
     // the counter can see a table's bill and take payments person by person
-    if ((mt = /^\/api\/admin\/tables\/([A-Za-z0-9]+)\/(bill|payment)$/.exec(p))) {
+    if ((mt = /^\/api\/admin\/tables\/([A-Za-z0-9]+)\/(bill|payment|loyalty|redeem)$/.exec(p))) {
       const table = db.tables.find(t => t.id === mt[1] && t.restaurantId === r.id);
       if (!table) return fail(res, 404, 'Table not found');
       if (m === 'GET' && mt[2] === 'bill') return send(res, 200, { table: { id: table.id, name: table.name }, ...billView(r, table) });
+      if (m === 'POST' && mt[2] === 'loyalty') { // attach a customer's phone so this table's bill earns points
+        if (!loyaltyOn(r)) return fail(res, 409, 'Turn on loyalty points in Settings first');
+        const ph = normPhone(body.phone); if (!ph) return fail(res, 400, 'Enter a 10-digit mobile number');
+        customerOf(r, ph, true, body.name);
+        for (const o of billView(r, table).orders) { const oo = db.orders.find(x => x.id === o.id); if (oo && !oo.loyaltyPhone) oo.loyaltyPhone = ph; }
+        save(); return send(res, 200, { table: { id: table.id, name: table.name }, ...billView(r, table), customer: customerView(customerOf(r, ph)) });
+      }
+      if (m === 'POST' && mt[2] === 'redeem') { // pay part of the bill with points
+        if (!loyaltyOn(r)) return fail(res, 409, 'Loyalty points are off');
+        const ph = normPhone(body.phone), c = ph && customerOf(r, ph); if (!c) return fail(res, 404, 'No points for this number yet');
+        const L = r.loyalty, B = billView(r, table), left = Math.max(0, Math.round(B.total - B.paid.reduce((a, x) => a + x.amount, 0)));
+        let pts = Math.floor(Number(body.points) || 0);
+        if (c.points < L.min) return fail(res, 409, `Needs at least ${L.min} points to use them. This customer has ${c.points}.`);
+        pts = Math.min(pts, c.points, Math.floor(left / L.value)); if (pts <= 0) return fail(res, 400, 'Nothing left to pay with points');
+        const amount = Math.round(pts * L.value);
+        c.points -= pts; pointsLog(c, 'redeem', -pts, `${table.name} bill, ₹${amount} off`);
+        db.requests.push({ id: id(12), restaurantId: r.id, tableId: table.id, tableName: table.name, type: 'paid', gid: 'points', name: (c.name || 'Customer') + ' · ' + pts + ' pts', amount, method: 'points', counter: true, done: true, createdAt: now() });
+        save(); tableChanged(r, table, false);
+        return send(res, 201, { table: { id: table.id, name: table.name }, ...billView(r, table), customer: customerView(c) });
+      }
       if (m === 'POST' && mt[2] === 'payment') {
         const amount = Math.round(Number(body.amount) || 0);
         if (amount <= 0) return fail(res, 400, 'Enter the amount paid');
@@ -1052,7 +1125,7 @@ self.addEventListener('notificationclick', e => {
     if (m === 'POST' && (mt = /^\/api\/admin\/tables\/([A-Za-z0-9]+)\/settle$/.exec(p))) {
       const table = db.tables.find(t => t.id === mt[1] && t.restaurantId === r.id);
       if (!table) return fail(res, 404, 'Table not found');
-      for (const o of db.orders) if (o.tableId === table.id && !o.settled) { o.settled = true; if (['new', 'preparing', 'ready'].includes(o.status)) continue; }
+      for (const o of db.orders) if (o.tableId === table.id && !o.settled) { o.settled = true; earnFor(r, o); }
       for (const q of db.requests) if (q.tableId === table.id && (q.type === 'bill' || q.type === 'paid') && !q.done) { q.done = true; q.settled = true; emit(r.id, 'request-done', { id: q.id }); }
       for (const q of db.requests) if (q.tableId === table.id && q.type === 'paid') q.settled = true;
       tableShares.delete(table.id); save();
@@ -1156,6 +1229,41 @@ self.addEventListener('notificationclick', e => {
     }
 
     // branding & settings
+    if (m === 'GET' && p === '/api/admin/customers') return send(res, 200, (db.customers || []).filter(c => c.restaurantId === r.id).sort((a, b) => (b.lastAt || '').localeCompare(a.lastAt || '')).map(customerView));
+    if (m === 'GET' && p === '/api/admin/customers/lookup') { const ph = normPhone(url.searchParams.get('phone')); if (!ph) return fail(res, 400, 'Enter a 10-digit mobile number'); const c = customerOf(r, ph); return send(res, 200, c ? customerView(c) : { phone: ph, name: '', points: 0, spent: 0, visits: 0, history: [], isNew: true }); }
+    if (m === 'POST' && p === '/api/admin/customers/adjust') {
+      const ph = normPhone(body.phone); if (!ph) return fail(res, 400, 'Enter a 10-digit mobile number');
+      const c = customerOf(r, ph, true, body.name), d = Math.round(Number(body.points) || 0);
+      if (body.name) c.name = str(body.name, 60);
+      if (d) { if (c.points + d < 0) return fail(res, 400, `This customer only has ${c.points} points`); c.points += d; pointsLog(c, 'adjust', d, str(body.note, 80) || 'Changed by the restaurant'); }
+      save(); return send(res, 200, customerView(c));
+    }
+    if (m === 'POST' && p === '/api/admin/orders') { // order taken at the counter (also used to sync orders made while offline)
+      const cid = str(body.clientId, 40);
+      if (cid) { const dup = db.orders.find(o => o.restaurantId === r.id && o.clientId === cid); if (dup) return send(res, 200, adminOrder(dup)); }
+      const table = db.tables.find(t => t.id === body.tableId && t.restaurantId === r.id);
+      const lines = [];
+      for (const line of Array.isArray(body.items) ? body.items.slice(0, 80) : []) {
+        const item = db.items.find(i => i.id === line.id && i.restaurantId === r.id);
+        const qty = Math.min(99, Math.max(0, parseInt(line.qty, 10) || 0));
+        if (!item || !qty) continue;
+        lines.push({ itemId: item.id, name: item.name, price: line.price != null && body.offline ? money(Number(line.price) || item.price) : item.price, qty, diet: item.diet, note: str(line.note, 140) });
+      }
+      if (!lines.length) return fail(res, 400, 'Add at least one dish');
+      const total = money(lines.reduce((a, l) => a + l.price * l.qty, 0));
+      let at = Date.parse(body.createdAt); if (!body.offline || !(at > Date.now() - 7 * DAY && at <= Date.now() + 60000)) at = Date.now();
+      const st = ['new', 'preparing', 'ready', 'served', 'cancelled'].includes(body.status) ? body.status : 'preparing';
+      const lp = loyaltyOn(r) ? normPhone(body.phone) : '';
+      r.orderSeq = (r.orderSeq || 100) + 1;
+      const order = { id: id(16), restaurantId: r.id, number: r.orderSeq, tableId: table ? table.id : null, tableName: table ? table.name : (str(body.label, 40) || 'Counter'),
+        items: lines, note: str(body.note, 300), customerName: str(body.name, 60), total, subtotal: total, discount: 0, coupon: '', status: st, source: 'counter',
+        createdAt: new Date(at).toISOString(), updatedAt: now(), readyBy: estimateReady(r, lines), ...(st !== 'new' ? { preparingAt: now() } : {}),
+        ...(cid ? { clientId: cid } : {}), ...(body.offline ? { offline: true } : {}), ...(lp ? { loyaltyPhone: lp } : {}) };
+      if (lp) customerOf(r, lp, true, body.name);
+      db.orders.push(order); if (st === 'served') earnFor(r, order); save();
+      emit(r.id, 'order', adminOrder(order)); if (table) tableChanged(r, table, false);
+      return send(res, 201, adminOrder(order));
+    }
     if (m === 'PUT' && p === '/api/admin/settings') {
       try {
         for (const k of ['name', 'tagline', 'phone', 'address', 'footerNote']) if (body[k] != null) r[k] = str(body[k], k === 'address' ? 200 : 120);
@@ -1179,6 +1287,21 @@ self.addEventListener('notificationclick', e => {
           if (body.bill.footer != null) b.footer = str(body.bill.footer, 120);
           for (const k of ['autoKot', 'showUpi']) if (body.bill[k] != null) b[k] = !!body.bill[k];
           r.bill = b;
+        }
+        if (body.wifi && typeof body.wifi === 'object') {
+          const W = Object.assign({ on: false, ssid: '', pass: '' }, r.wifi || {});
+          if (body.wifi.ssid != null) W.ssid = str(body.wifi.ssid, 32); if (body.wifi.pass != null) W.pass = String(body.wifi.pass).slice(0, 63);
+          if (body.wifi.on != null) W.on = !!body.wifi.on; if (W.on && !W.ssid) throw new Error('Enter the WiFi name');
+          r.wifi = W;
+        }
+        if (body.service && typeof body.service === 'object') { r.service = Object.assign({ autoAccept: false, payFirst: false }, r.service || {}); for (const k of ['autoAccept', 'payFirst']) if (body.service[k] != null) r.service[k] = !!body.service[k]; }
+        if (body.loyalty && typeof body.loyalty === 'object') {
+          const L = Object.assign({}, LOYALTY_DEFAULT, r.loyalty || {}), n = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round(Number(v) * 100) / 100 || 0));
+          if (body.loyalty.on != null) L.on = !!body.loyalty.on;
+          if (body.loyalty.spend != null) { L.spend = n(body.loyalty.spend, 1, 100000); if (!L.spend) throw new Error('Enter how many rupees earn 1 point'); }
+          if (body.loyalty.value != null) L.value = n(body.loyalty.value, 0.01, 10000);
+          if (body.loyalty.min != null) L.min = Math.round(n(body.loyalty.min, 0, 1000000));
+          r.loyalty = L;
         }
         if (body.socials) { r.socials = {}; for (const k of SOCIAL_KEYS) if (str(body.socials[k], 300)) r.socials[k] = str(body.socials[k], 300); }
       } catch (e) { return fail(res, 400, e.message); }

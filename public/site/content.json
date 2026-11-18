@@ -57,10 +57,10 @@
    "section": "Top of page"
   },
   {
-   "k": "t9ccb64c3",
+   "k": "tb7032b0f",
    "type": "text",
    "tag": "span",
-   "text": "and dhabas",
+   "text": "· works without internet",
    "section": "Top of page"
   },
   {
@@ -127,10 +127,10 @@
    "section": "Top of page"
   },
   {
-   "k": "tcb10dcba",
+   "k": "t566dbc22",
    "type": "text",
    "tag": "p",
-   "text": "Put a QR code on every table. Guests see your menu with photos and order from their own phone. Your counter gets each order instantly, with the table number and a sound.",
+   "text": "Put a QR code on every table. Guests order and pay from their own phone, and the KOT reaches your kitchen by itself, even when the internet is down.",
    "section": "Top of page"
   },
   {
@@ -260,10 +260,10 @@
    "section": "Top of page"
   },
   {
-   "k": "taa6d29ac",
+   "k": "t475ce9b0",
    "type": "text",
    "tag": "span",
-   "text": "Call waiter and ask for bill",
+   "text": "Keeps working offline",
    "section": "Top of page"
   },
   {
@@ -468,6 +468,202 @@
    "tag": "span",
    "text": "Plus order history for any day.",
    "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "te2dfb4b8",
+   "type": "text",
+   "tag": "span",
+   "text": "New in Veyra Dine In",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "td904f696",
+   "type": "text",
+   "tag": "span",
+   "text": "Never stops, even without internet.",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "ta426ebe0",
+   "type": "text",
+   "tag": "p",
+   "text": "Guests order and pay at the table, the kitchen gets the KOT straight away, and your counter keeps billing when the internet goes down.",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "tdcbb47de",
+   "type": "text",
+   "tag": "span",
+   "text": "No waiter",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "tb34260ff",
+   "type": "text",
+   "tag": "h3",
+   "text": "Scan, order and pay at the table",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "t9537fade",
+   "type": "text",
+   "tag": "p",
+   "text": "Turn on auto-accept and every order goes straight to the kitchen with its KOT. Turn on pay-first and guests pay by UPI before the food is made. Nobody has to walk to the table to take an order.",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "t28cba55d",
+   "type": "text",
+   "tag": "span",
+   "text": "Scan",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "t1d75774c",
+   "type": "text",
+   "tag": "span",
+   "text": "Order",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "tcd850fd8",
+   "type": "text",
+   "tag": "span",
+   "text": "Pay by UPI",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "ta5fd1d10",
+   "type": "text",
+   "tag": "span",
+   "text": "KOT in kitchen",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "te01fa717",
+   "type": "text",
+   "tag": "span",
+   "text": "Offline",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "tc1b6e372",
+   "type": "text",
+   "tag": "h3",
+   "text": "Works without internet",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "tb3e1ea3c",
+   "type": "text",
+   "tag": "p",
+   "text": "Internet gone? Keep taking counter orders, printing KOTs and bills, and marking payments. Everything is saved on the device and syncs by itself when you are back online.",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "tdaecdcd9",
+   "type": "text",
+   "tag": "div",
+   "text": "Offline · 3 orders saved on this device",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "t536992f8",
+   "type": "text",
+   "tag": "span",
+   "text": "OFF-2 · Table 4 · 2× Masala Dosa",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "tcec284b9",
+   "type": "text",
+   "tag": "small",
+   "text": "KOT printed",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "ta767d7af",
+   "type": "text",
+   "tag": "div",
+   "text": "Back online · all synced",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "tc3d5cebe",
+   "type": "text",
+   "tag": "h3",
+   "text": "Loyalty points",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "t68fdfec9",
+   "type": "text",
+   "tag": "p",
+   "text": "Guests collect points on their phone number. You choose the rules, or switch it off.",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "t7d1ca81d",
+   "type": "text",
+   "tag": "small",
+   "text": "₹100 spent = 1 point",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "tc5dd6a86",
+   "type": "text",
+   "tag": "h3",
+   "text": "WiFi password on the menu",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "t9d291750",
+   "type": "text",
+   "tag": "p",
+   "text": "Guests tap WiFi to see your network and password, copy it or scan a QR. Only if you turn it on.",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "t53ebc572",
+   "type": "text",
+   "tag": "small",
+   "text": "Network",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "tf845e85c",
+   "type": "text",
+   "tag": "b",
+   "text": "Cafe_Guest",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "taf74f7c5",
+   "type": "text",
+   "tag": "span",
+   "text": "Copy",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "tb83179f1",
+   "type": "text",
+   "tag": "h3",
+   "text": "Counter orders",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "t928ec54d",
+   "type": "text",
+   "tag": "p",
+   "text": "Walk-in or phone order? Add it at the counter in a few taps, pick the table or takeaway, and send the KOT.",
+   "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "t33c68a48",
+   "type": "text",
+   "tag": "span",
+   "text": "Takeaway · 1× Veg Biryani",
+   "section": "No waiter needed. Never stops, even without internet."
   },
   {
    "k": "t7c087ef3",
@@ -733,6 +929,41 @@
    "type": "text",
    "tag": "p",
    "text": "Orders and sales for today, and a full history by date.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t66cf3182",
+   "type": "text",
+   "tag": "h3",
+   "text": "Offline mode",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t7e0ee376",
+   "type": "text",
+   "tag": "p",
+   "text": "Orders, KOT and bills keep working without internet and sync later.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "ta1331db5",
+   "type": "text",
+   "tag": "p",
+   "text": "Points by phone number, your own rules, and an Excel list of customers.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "tc22ff693",
+   "type": "text",
+   "tag": "h3",
+   "text": "Guest WiFi",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t83b180fd",
+   "type": "text",
+   "tag": "p",
+   "text": "Show the WiFi password and a join QR on the menu, if you want to.",
    "section": "Built for Indian restaurants"
   },
   {
@@ -1030,10 +1261,66 @@
    "section": "Good to know"
   },
   {
-   "k": "t6c6cad3f",
+   "k": "tc47f8cb9",
    "type": "text",
    "tag": "p",
-   "text": "No. Your menu is hosted online, so it opens on mobile data too.",
+   "text": "No. Your menu is hosted online, so it opens on mobile data too. If you like, you can still show your WiFi password on the menu.",
+   "section": "Good to know"
+  },
+  {
+   "k": "t9989a69c",
+   "type": "text",
+   "tag": "summary",
+   "text": "Can it run without a waiter taking orders?",
+   "section": "Good to know"
+  },
+  {
+   "k": "td6cb4f3b",
+   "type": "text",
+   "tag": "p",
+   "text": "Yes. Turn on \"Accept new orders automatically\" and every order from a table goes straight to the kitchen and prints its KOT. Turn on \"Guests pay first\" and guests pay by UPI from their phone before the food is made. Your staff only serve the food.",
+   "section": "Good to know"
+  },
+  {
+   "k": "tf58affff",
+   "type": "text",
+   "tag": "summary",
+   "text": "What happens when the internet goes down?",
+   "section": "Good to know"
+  },
+  {
+   "k": "t61ccb31b",
+   "type": "text",
+   "tag": "p",
+   "text": "Your counter keeps working. You can take counter orders, print KOTs and bills, change order status and mark payments while offline. Everything is saved on the device and sent to the server by itself when the internet is back. Guests with mobile data can still order from the table menu, and those orders show up at the counter once you reconnect.",
+   "section": "Good to know"
+  },
+  {
+   "k": "t2d795a08",
+   "type": "text",
+   "tag": "summary",
+   "text": "How do loyalty points work?",
+   "section": "Good to know"
+  },
+  {
+   "k": "t6394a086",
+   "type": "text",
+   "tag": "p",
+   "text": "Turn on loyalty points in Settings and choose how much a guest spends for one point, what a point is worth and the minimum to redeem. Guests enter their phone number when they order, and points are added when the table is cleared. At billing, look up the number and use the points as payment. You can switch it off any time.",
+   "section": "Good to know"
+  },
+  {
+   "k": "t7b240262",
+   "type": "text",
+   "tag": "summary",
+   "text": "Can guests see our WiFi password?",
+   "section": "Good to know"
+  },
+  {
+   "k": "t56626e21",
+   "type": "text",
+   "tag": "p",
+   "text": "Only if you want them to. Add your network name and password in Settings and turn it on. Guests then see a WiFi button on the menu with the password, a copy button and a QR code that joins the network.",
    "section": "Good to know"
   },
   {

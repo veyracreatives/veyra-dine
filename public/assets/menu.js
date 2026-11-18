@@ -108,6 +108,7 @@
           <div class="name-row"><h1>${esc(r.name)}</h1>${r.tagline ? `<p class="tagline">${esc(r.tagline)}</p>` : ''}</div>
           ${D.table ? `<div class="table-chip">${icon('utensils', 18)} You're ordering for ${esc(D.table.name)}</div>` : ''}
           ${socials ? `<div class="socials">${socials}</div>` : ''}
+          ${r.wifi || r.loyalty ? `<div class="extras">${r.wifi ? `<button class="pill-btn" id="wifiBtn">${icon('wifi', 16)} WiFi</button>` : ''}${r.loyalty ? `<button class="pill-btn" id="ptsBtn">${icon('star', 16)} My points</button>` : ''}</div>` : ''}
         </div>
       </header>
       ${!D.table ? `<div class="notice">${icon('qr', 18)}<span>You're viewing the menu. To order, scan the QR code on your table.</span></div>` : ''}
@@ -135,6 +136,8 @@
     document.getElementById('q').oninput = e => { query = e.target.value; renderSections(); };
     document.getElementById('veg').onclick = e => { vegOnly = !vegOnly; e.currentTarget.classList.toggle('on', vegOnly); renderSections(); };
     const hb = document.getElementById('helpBtn'); if (hb) hb.onclick = openHelp;
+    const wb = document.getElementById('wifiBtn'); if (wb) wb.onclick = openWifi;
+    const pb = document.getElementById('ptsBtn'); if (pb) pb.onclick = openPoints;
     renderCartBar();
   }
 
@@ -283,6 +286,7 @@
         <div id="acct"></div>
         <label class="field me-name" ${D.restaurant.guestLogin ? 'hidden' : ''}><span>Your name, so friends see what you added</span><input class="input" id="cname" maxlength="40" placeholder="E.g. Asha" value="${esc(myName())}"></label>
         <div id="lines"></div>
+        ${D.restaurant.loyalty ? `<label class="field" id="lpf"><span>${icon('star', 15)} Mobile number for loyalty points (optional)</span><input class="input" id="cphone" inputmode="tel" maxlength="14" placeholder="10-digit mobile" value="${esc(load('vd_phone', ''))}"></label>` : ''}
         <div class="coupon-box" id="cbox"></div>
         <div class="form-grid">
           <label class="field"><span>Cooking instructions (optional)</span><textarea class="textarea" id="note" maxlength="300" placeholder="E.g. less spicy, no onion, Jain">${esc(sessionStorage.getItem('vd_note') || '')}</textarea></label>
@@ -309,7 +313,8 @@
         ? `<div class="coupon-on">${icon('check', 18)}<span><b>${esc(coupon.code)} applied</b><small>${esc(coupon.label)}</small></span><button class="btn btn-ghost btn-sm" id="crm">Remove</button></div>`
         : `<div class="coupon-in"><input class="input" id="ccode" placeholder="Have a coupon code?" autocapitalize="characters" maxlength="20"><button class="btn" id="capply">Apply</button></div>
            ${D.offers && D.offers.length ? `<div class="coupon-list">${D.offers.map(x => `<button class="chip-offer" data-code="${esc(x.code)}"><code>${esc(x.code)}</code> ${esc(x.label)}</button>`).join('')}</div>` : ''}`;
-      o.querySelector('#bill').innerHTML = `<div><span>Item total</span><span>${cur(sub)}</span></div>${off ? `<div class="save"><span>Coupon ${esc(coupon.code)}</span><span>−${cur(off)}</span></div>` : ''}<div class="grand"><span>To pay</span><span>${cur(pay)}</span></div>`;
+      o.querySelector('#bill').innerHTML = `<div><span>Item total</span><span>${cur(sub)}</span></div>${off ? `<div class="save"><span>Coupon ${esc(coupon.code)}</span><span>−${cur(off)}</span></div>` : ''}<div class="grand"><span>To pay</span><span>${cur(pay)}</span></div>${D.restaurant.loyalty && Math.floor(pay / D.restaurant.loyalty.spend) ? `<div class="save"><span>${icon('star', 14)} You earn</span><span>${Math.floor(pay / D.restaurant.loyalty.spend)} points</span></div>` : ''}${D.restaurant.payFirst ? `<div class="muted" style="font-size:13px"><span>You pay by UPI right after sending the order.</span></div>` : ''}`;
+      const lpf = o.querySelector('#lpf'); if (lpf) lpf.hidden = !!(G && G.phone);
       o.querySelector('#place').innerHTML = needLogin() ? `${icon('user', 18)} Log in to send order · ${cur(pay)}` : `Send ${groups.length > 1 ? "the table's" : ''} order to kitchen · ${cur(pay)}`;
       o.querySelector('#acct').innerHTML = !D.restaurant.guestLogin ? '' : G
         ? `<div class="acct-on"><span class="av">${esc(G.name.slice(0, 1).toUpperCase())}</span><span>Ordering as <b>${esc(G.name)}</b><small>${esc(G.phone || G.email)}</small></span><button class="btn btn-ghost btn-sm" id="glo">Not you?</button></div>`
@@ -339,7 +344,8 @@
       btn.disabled = true; btn.textContent = 'Sending to kitchen…';
       const name = o.querySelector('#cname').value.trim(); localStorage.setItem('vd_name', name);
       try {
-        const order = await api(`/api/menu/${slug}/orders`, { method: 'POST', body: { table: tableToken, shared: true, gid: GID, name, note: o.querySelector('#note').value, coupon: coupon ? coupon.code : '' } });
+        const cph = o.querySelector('#cphone'); if (cph && cph.value.trim()) store('vd_phone', cph.value.trim());
+        const order = await api(`/api/menu/${slug}/orders`, { method: 'POST', body: { table: tableToken, shared: true, gid: GID, name, note: o.querySelector('#note').value, coupon: coupon ? coupon.code : '', phone: cph ? cph.value.trim() : '' } });
         T = { lines: [], people: [] }; sessionStorage.removeItem('vd_note'); coupon = null; store('vd_coupon_' + slug, null);
         rememberOrder(order); o.close(); location.hash = 'order=' + order.id;
       } catch (err) { toast(esc(err.message), 'error'); btn.disabled = false; if (/log in/i.test(err.message)) G = null; if (/coupon/i.test(err.message)) { coupon = null; store('vd_coupon_' + slug, null); } draw(); }
@@ -413,6 +419,29 @@
   let justSettled = false;
   function noop() {}
 
+  // ---------- WiFi and loyalty points ----------
+  function copyText(t, okMsg) { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast(`${icon('check', 18)} ${okMsg}`, 'ok')).catch(() => toast('Press and hold to copy', '')); }
+  function openWifi() {
+    const w = D.restaurant.wifi;
+    const o = sheet(`<div class="sheet-head"><h2>${icon('wifi', 22)} Free WiFi</h2><button class="icon-btn" data-close aria-label="Close">${icon('x', 20)}</button></div>
+      <div class="sheet-body wifi-s">
+        <div class="wf-row"><small>Network</small><b>${esc(w.ssid)}</b><button class="btn btn-sm" id="cpS">${icon('copy', 16)} Copy</button></div>
+        <div class="wf-row"><small>Password</small><b class="pw">${w.open ? 'No password' : esc(w.pass)}</b>${w.open ? '' : `<button class="btn btn-sm btn-primary" id="cpP">${icon('copy', 16)} Copy</button>`}</div>
+        <ol class="wf-steps"><li>Copy the password.</li><li>Open your phone's <b>Settings › WiFi</b> and tap <b>${esc(w.ssid)}</b>.</li><li>Paste the password and join.</li></ol>
+        <div class="wf-qr"><img alt="WiFi QR code" src="/api/menu/${slug}/wifi-qr"><small>Friends can scan this with their camera to join in one tap.</small></div>
+      </div>`);
+    o.querySelector('#cpS').onclick = () => copyText(w.ssid, 'WiFi name copied');
+    const cp = o.querySelector('#cpP'); if (cp) cp.onclick = () => copyText(w.pass, 'Password copied');
+  }
+  function openPoints() {
+    const L = D.restaurant.loyalty, ph = load('vd_phone', '');
+    const o = sheet(`<div class="sheet-head"><h2>${icon('star', 22)} My points</h2><button class="icon-btn" data-close aria-label="Close">${icon('x', 20)}</button></div>
+      <div class="sheet-body"><p class="muted" style="margin:0 0 12px">Spend ${cur(L.spend)} and get 1 point. Each point is worth ${cur(L.value)} off a later bill${L.min ? ` once you have ${L.min} points` : ''}. Just give your mobile number when you order.</p>
+        <form id="pf" style="display:flex;gap:8px"><input class="input" id="pph" inputmode="tel" maxlength="14" placeholder="Your mobile number" value="${esc(ph)}" style="flex:1"><button class="btn btn-primary">Check</button></form>
+        <div id="pres" style="margin-top:14px"></div></div>`);
+    o.querySelector('#pf').onsubmit = async e => { e.preventDefault(); const v = o.querySelector('#pph').value; try { const x = await api(`/api/menu/${slug}/points?phone=${encodeURIComponent(v)}`); store('vd_phone', v); o.querySelector('#pres').innerHTML = `<div class="pts-card"><b>${x.points}</b><span>points</span><small>${x.points >= x.min ? `Worth ${cur(x.worth)} off. Ask the counter to use them on your bill.` : `${x.min - x.points} more to go before you can use them.`}</small></div>`; } catch (err) { toast(esc(err.message), 'error'); } };
+  }
+
   function openHelp() {
     const o = sheet(`<div class="sheet-head"><h2>How can we help?</h2><button class="icon-btn" data-close aria-label="Close">${icon('x', 20)}</button></div>
       <div class="sheet-body"><p class="muted" style="margin:0 0 14px">We'll let the staff know you're at ${esc(D.table.name)}.</p><div class="help-grid">
@@ -453,6 +482,12 @@
           ${order.discount ? `<div><span>Item total</span><span>${cur(order.subtotal)}</span></div><div class="save"><span>Coupon ${esc(order.coupon)}</span><span>−${cur(order.discount)}</span></div>` : ''}
           <div class="t"><span>Total</span><span>${cur(order.total)}</span></div></div>
       </div>
+      ${r.payFirst && r.upi && D.table && order.status !== 'cancelled' ? (load('vd_paid_' + order.id, false) ? `<div class="paid-ok">${icon('check', 20)}<span><b>Payment sent</b><small>The counter will check ${cur(order.total)} in their UPI app.</small></span></div>` : `<div class="paynow">
+        <div class="pn-h"><small>Pay now</small><b>${cur(order.total)}</b></div>
+        <a class="btn btn-primary btn-lg btn-block" href="${esc(upiHref(order.total, '#' + order.number))}">${icon('phone', 20)} Pay ${cur(order.total)} with UPI</a>
+        <small class="muted center">Opens GPay, PhonePe, Paytm or any UPI app. Paid to ${esc(r.upi.name)}.</small>
+        <button class="btn btn-block" id="ipaid1">${icon('check', 18)} I've paid</button></div>`) : ''}
+      ${r.loyalty && load('vd_phone', '') && Math.floor(order.total / r.loyalty.spend) && order.status !== 'cancelled' ? `<div class="pts-earn">${icon('star', 18)}<span>You earn <b>${Math.floor(order.total / r.loyalty.spend)} points</b> on this order${order.status === 'served' ? '' : ' when it is served'}.</span></div>` : ''}
       <div class="stack">
         ${canOrder() ? `<button class="btn btn-primary btn-lg btn-block" id="more">${icon('plus', 20)} Order more</button>` : ''}
         ${D.table ? `<a class="btn btn-lg btn-block" href="#bill">${icon('list', 20)} Split the bill and pay</a>` : ''}
@@ -465,6 +500,11 @@
     document.getElementById('back').onclick = back;
     const more = document.getElementById('more'); if (more) more.onclick = back;
     const h2 = document.getElementById('help2'); if (h2) h2.onclick = openHelp;
+    const ip1 = document.getElementById('ipaid1'); if (ip1) ip1.onclick = async () => {
+      ip1.disabled = true;
+      try { await api(`/api/menu/${slug}/table/paid`, { method: 'POST', body: { t: tableToken, gid: GID, name: myName() || order.customerName || 'A guest', amount: order.total } }); store('vd_paid_' + order.id, true); toast(`${icon('check', 18)} Thanks! The counter has been told.`, 'ok'); renderStatus(order); }
+      catch (err) { ip1.disabled = false; toast(esc(err.message), 'error'); }
+    };
     renderCartBar();
   }
   function eta(order) {

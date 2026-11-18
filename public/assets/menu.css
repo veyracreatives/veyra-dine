@@ -223,3 +223,24 @@ button.pl:hover { background: var(--bg); }
 .gerr { color: #B42318; font-weight: 600; font-size: 14px; min-height: 0; } .gerr:empty { display: none; }
 .gfoot { text-align: center; font-size: 12.5px; }
 .glogin [hidden], .me-name[hidden] { display: none !important; }
+
+/* WiFi, points, pay now */
+.extras { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+.wifi-s { display: grid; gap: 10px; }
+.wf-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.wf-row small { grid-column: 1; color: var(--muted); font-size: 12px; }
+.wf-row b { grid-column: 1; font-size: 18px; word-break: break-all; }
+.wf-row .pw { font-family: ui-monospace, Consolas, monospace; letter-spacing: .02em; }
+.wf-row .btn { grid-column: 2; grid-row: 1 / span 2; }
+.wf-steps { margin: 4px 0 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; color: var(--ink-2, #4a3f38); }
+.wf-qr { display: grid; justify-items: center; gap: 6px; padding: 12px; }
+.wf-qr img { width: 150px; height: 150px; }
+.wf-qr small { color: var(--muted); text-align: center; font-size: 12px; }
+.pts-card { display: grid; justify-items: center; gap: 2px; padding: 18px; border-radius: 16px; background: var(--brand-soft, #FCE9E3); text-align: center; }
+.pts-card b { font-size: 40px; line-height: 1; color: var(--brand); } .pts-card small { color: var(--muted); margin-top: 6px; }
+.paynow { display: grid; gap: 10px; padding: 16px; margin: 16px 0; border-radius: 18px; border: 2px solid var(--brand); background: #fff; }
+.pn-h { display: flex; justify-content: space-between; align-items: baseline; } .pn-h b { font-size: 26px; }
+.paid-ok, .pts-earn { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 14px; margin: 14px 0; background: var(--green-soft); color: var(--green); }
+.paid-ok small { display: block; color: inherit; opacity: .85; }
+.pts-earn { background: var(--brand-soft, #FCE9E3); color: var(--ink); }
+.paynow .center { text-align: center; font-size: 12.5px; }

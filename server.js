@@ -536,8 +536,8 @@ async function handle(req, res) {
   // product website (landing page) at the root; restaurants use /admin and /signup
   const SITE_DIR = path.join(PUBLIC_DIR, 'site');
   if (m === 'GET' && (p === '/' || p === '/index.html')) {
-    if (!db.siteContent) return serveFile(res, path.join(SITE_DIR, 'index.html'));
-    if (!siteCache) { const stockFile = path.join(SITE_DIR, 'content.json'); siteCache = siteContent.render(fs.readFileSync(path.join(SITE_DIR, 'index.html'), 'utf8'), db.siteContent, fs.existsSync(stockFile) ? JSON.parse(fs.readFileSync(stockFile, 'utf8')) : null); }
+    // picture links carry ?v=<file time>, so browsers fetch a picture again as soon as it changes on an update
+    if (!siteCache) { const stockFile = path.join(SITE_DIR, 'content.json'), raw = fs.readFileSync(path.join(SITE_DIR, 'index.html'), 'utf8'); siteCache = db.siteContent ? siteContent.render(raw, db.siteContent, fs.existsSync(stockFile) ? JSON.parse(fs.readFileSync(stockFile, 'utf8')) : null) : raw; siteCache = siteCache.replace(/(src|content|href)="((?:https:\/\/[^"\/]+)?\/?(?:img\/[A-Za-z0-9._-]+|og\.jpg))"/g, (m, a, u) => { try { const f = path.join(SITE_DIR, u.replace(/^https:\/\/[^\/]+/, '').replace(/^\//, '')); return a + '="' + u + '?v=' + Math.round(fs.statSync(f).mtimeMs).toString(36) + '"'; } catch (e) { return m; } }); }
     return send(res, 200, siteCache, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
   }
   if (m === 'GET' && /^\/(privacy|terms|refund|contact)\/?$/.test(p)) return serveFile(res, path.join(SITE_DIR, p.replace(/\//g, ''), 'index.html'), 'no-cache');

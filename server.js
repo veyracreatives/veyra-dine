@@ -358,7 +358,9 @@ function lanAddresses() {
   return out;
 }
 // ---- Sign in with Google: the browser gets an ID token from Google, we check it with Google and read the email ----
-const googleClientId = () => (process.env.GOOGLE_CLIENT_ID || (db.config && db.config.googleClientId) || '').trim();
+// Veyra's Google sign-in client (public id, works only on https://dinein.veyracreatives.com). /platform > Google sign-in can replace it.
+const DEFAULT_GOOGLE_CLIENT_ID = '726577267171-aot0ttr7q8e636cug5jnbe5jacu0af1c.apps.googleusercontent.com';
+const googleClientId = req => (process.env.GOOGLE_CLIENT_ID || (db.config && db.config.googleClientId) || (!req || /(^|\.)dinein\.veyracreatives\.com$/.test(String(req.headers.host || '').split(':')[0])) && !process.versions.electron && DEFAULT_GOOGLE_CLIENT_ID || '').trim();
 function verifyGoogle(credential) {
   return new Promise((resolve, reject) => {
     const cid = googleClientId(); if (!cid) return reject(Object.assign(new Error('Google sign-in is not set up yet.'), { status: 400 }));
@@ -758,7 +760,7 @@ async function handle(req, res) {
     setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0))); trackEvent('login'); saveSoon();
     return send(res, 200, { ok: true, slug: r.slug });
   }
-  if (m === 'GET' && p === '/api/auth/config') return send(res, 200, { googleClientId: googleClientId() });
+  if (m === 'GET' && p === '/api/auth/config') return send(res, 200, { googleClientId: googleClientId(req) });
   if (m === 'POST' && p === '/api/admin/google') { // log in, or start a free trial, with a Google account
     let gu; try { gu = await verifyGoogle(body.credential); } catch (e) { return fail(res, e.status || 400, e.message); }
     let r = db.restaurants.find(x => x.email === gu.email);

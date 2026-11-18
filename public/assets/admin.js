@@ -94,7 +94,7 @@
     if (es) { es.close(); es = null; }
     mode = mode || (location.pathname.startsWith('/signup') ? 'signup' : 'login');
     const pre = location.pathname.split('/')[2] || localStorage.getItem('vd_slug') || '';
-    document.title = mode === 'signup' ? 'Start your free trial' : 'Log in';
+    document.title = mode === 'signup' ? 'Start your free trial' : mode === 'forgot' ? 'Reset your password' : 'Log in';
     app.innerHTML = `<div class="auth">
       <div class="brand-side"><div class="logo"><span class="mark">${icon('qr', 24)}</span>Veyra Dine In</div>
         <h1>Orders from every table, <em>right here.</em></h1><p>Guests scan the QR on their table and order from their phone. You see it here with the table number and a sound.</p>
@@ -112,20 +112,29 @@
             <label class="field"><span>Create a password</span><input class="input" name="password" type="password" minlength="6" required autocomplete="new-password"><small>Staff use this to open orders on their phones.</small></label>
             <button class="btn btn-primary btn-lg btn-block">Start 10-day free trial</button>
           </div></form>`
+        : mode === 'forgot' ? `<div><h2>Reset your password</h2><p class="muted">Signed up with a Gmail or Google account? Continue with Google using that email. You'll be logged in and can set a new password straight away.</p></div>`
         : `<form id="lf"><h2>Welcome back</h2><p class="muted">Log in to see your live orders.</p>
           <div class="form">
             <label class="field"><span>Email or restaurant ID</span><input class="input" name="slug" value="${esc(pre)}" required autocapitalize="off" autocomplete="username"></label>
             <label class="field"><span>Password</span><input class="input" type="password" name="password" required autocomplete="current-password"></label>
             <button class="btn btn-lg btn-block btn-dark">Log in</button>
           </div>
-          <div class="small-link">Forgot your password? Message us on <a href="https://wa.me/918928246726" target="_blank">WhatsApp</a>.</div></form>`}
-        <div id="gwrap" hidden><div class="or" style="margin:20px 0 14px">or</div><div class="gbtn" style="display:flex;justify-content:center;min-height:44px"></div></div>
+          <div class="small-link"><a href="#" data-mode="forgot">Forgot your password?</a></div></form>`}
+        <div id="gwrap" hidden>${mode === 'forgot' ? '' : '<div class="or" style="margin:20px 0 14px">or</div>'}<div class="gbtn" style="display:flex;justify-content:center;min-height:44px"></div></div>
+        ${mode === 'forgot' ? `<div class="small-link" style="margin-top:18px">Not a Google account? Message us on <a href="https://wa.me/918928246726" target="_blank">WhatsApp</a> and we'll reset it for you.<br><a href="#" data-mode="login">Back to log in</a></div>` : ''}
       </div></div></div>`;
-    app.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => renderLogin(b.dataset.mode));
-    const afterLogin = async (r, created) => { localStorage.setItem('vd_slug', r.slug); history.replaceState(null, '', '/admin/' + r.slug + location.search); if (created) S.tab = 'menu'; await boot(); if (created) toast(`${icon('check', 18)} Your free trial has started`, 'ok'); };
-    window.VDGoogle && VDGoogle.mount(document.getElementById('gwrap'), async credential => {
+    app.querySelectorAll('[data-mode]').forEach(b => b.onclick = e => { e.preventDefault(); renderLogin(b.dataset.mode); });
+    const afterLogin = async (r, created) => { if (r.reset) setTimeout(newPassword, 400); localStorage.setItem('vd_slug', r.slug); history.replaceState(null, '', '/admin/' + r.slug + location.search); if (created) S.tab = 'menu'; await boot(); if (created) toast(`${icon('check', 18)} Your free trial has started`, 'ok'); };
+    const reset = mode === 'forgot';
+    const gw = document.getElementById('gwrap');
+    // Windows app: Google blocks sign-in inside app windows, so finish it in the normal browser
+    if (/Electron/i.test(navigator.userAgent) && /(^|\.)veyracreatives\.com$/.test(location.hostname)) {
+      gw.hidden = false;
+      gw.querySelector('.gbtn').innerHTML = `<button type="button" class="btn btn-lg btn-block gdev"><svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg> Continue with Google</button>`;
+      gw.querySelector('.gdev').onclick = () => googleDevice(reset, afterLogin);
+    } else window.VDGoogle && VDGoogle.mount(gw, async credential => {
       try {
-        const r = await api('/api/admin/google', { method: 'POST', body: { credential } });
+        const r = await api('/api/admin/google', { method: 'POST', body: { credential, reset } });
         if (!r.needSignup) return afterLogin(r);
         const card = app.querySelector('.form-card');
         card.innerHTML = `<form id="gsf"><span class="trial-chip">${icon('check', 15)} 10-day free trial</span><h2>One more step</h2><p class="muted">Signed in as <b>${esc(r.email)}</b>. Tell us about your restaurant.</p>
@@ -155,6 +164,29 @@
     };
   }
 
+  // Windows app: sign in with Google in the normal browser, then this window logs in by itself
+  async function googleDevice(reset, afterLogin) {
+    let d; try { d = await api('/api/admin/google/device', { method: 'POST', body: { reset } }); } catch (err) { return toast(esc(err.message), 'error'); }
+    window.open(d.url, '_blank');
+    const o = modal(`<div class="sheet-head"><h3>Finish in your browser</h3><button class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body">
+      <p style="margin:0 0 10px">We opened Google sign-in in your web browser. Check that it shows this code:</p>
+      <div style="font:800 28px/1 ui-monospace,Consolas,monospace;letter-spacing:.12em;background:var(--brand-soft,#FDE7DC);color:#C2410C;padding:14px;border-radius:12px;text-align:center">${esc(d.short)}</div>
+      <p class="muted" style="margin:12px 0 0;font-size:14px">This window logs in by itself once you're done. <a href="${esc(d.url)}" target="_blank">Open the browser again</a></p></div>`);
+    let stop = false; const end = () => { stop = true; }; o.addEventListener('click', e => { if (e.target === o || e.target.closest('[data-close]')) end(); });
+    const started = Date.now();
+    while (!stop && Date.now() - started < 15 * 60000) {
+      await new Promise(r => setTimeout(r, 2000)); if (stop) return;
+      try { const r = await api('/api/admin/google/device/poll?c=' + encodeURIComponent(d.code)); if (r.ok) { o.close(); return afterLogin(r, r.created); } }
+      catch (err) { o.close(); return toast(esc(err.message), 'error'); }
+    }
+  }
+  function newPassword() {
+    const o = modal(`<form><div class="sheet-head"><h3>Set a new password</h3></div><div class="sheet-body form">
+      <p class="muted" style="margin:0">You're logged in with Google. Choose a new password for your restaurant. Staff use it to open orders on their phones.</p>
+      <label class="field"><span>New password</span><input class="input" type="password" name="next" minlength="6" required autocomplete="new-password"><small>At least 6 characters. Other devices will be logged out.</small></label>
+      </div><div class="sheet-foot" style="display:flex;gap:10px;justify-content:flex-end"><button type="button" class="btn" data-close>Later</button><button class="btn btn-primary">Save password</button></div></form>`);
+    o.querySelector('form').onsubmit = async e => { e.preventDefault(); try { await api('/api/admin/password', { method: 'POST', body: { next: new FormData(e.target).get('next') } }); o.close(); toast('New password saved', 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
+  }
   // ---------- trial, license, buying ----------
   const inr = n => '₹' + Number(n).toLocaleString('en-IN');
   function buyLink(plan) {

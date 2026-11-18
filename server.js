@@ -405,6 +405,7 @@ function lanAddresses() {
 }
 // ---- Sign in with Google: the browser gets an ID token from Google, we check it with Google and read the email ----
 // Veyra's Google sign-in client (public id, works only on https://dinein.veyracreatives.com). /platform > Google sign-in can replace it.
+const deviceLinks = new Map(); // Windows app Google sign-in: secret code -> { short, at, rid }
 const DEFAULT_GOOGLE_CLIENT_ID = '726577267171-aot0ttr7q8e636cug5jnbe5jacu0af1c.apps.googleusercontent.com';
 const googleClientId = req => (process.env.GOOGLE_CLIENT_ID || (db.config && db.config.googleClientId) || (!req || /(^|\.)dinein\.veyracreatives\.com$/.test(String(req.headers.host || '').split(':')[0])) && !process.versions.electron && DEFAULT_GOOGLE_CLIENT_ID || '').trim();
 function verifyGoogle(credential) {
@@ -582,13 +583,30 @@ self.addEventListener('notificationclick', e => {
   if (m === 'GET' && p === '/robots.txt') return send(res, 200, `User-agent: *\nDisallow: /admin\nDisallow: /platform\nDisallow: /api/\nDisallow: /print-qr\nAllow: /m/\n\nSitemap: ${baseUrl(req)}/sitemap.xml\n`, { 'Content-Type': 'text/plain; charset=utf-8' });
   if (m === 'GET' && p === '/sitemap.xml') { const b = baseUrl(req), d = new Date().toISOString().slice(0, 10), u = (loc, freq, pri) => `  <url><loc>${b}${loc}</loc><lastmod>${d}</lastmod><changefreq>${freq}</changefreq><priority>${pri}</priority></url>`;
     return send(res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[u('/', 'weekly', '1.0'), u('/signup', 'monthly', '0.8'), ...['contact', 'privacy', 'terms', 'refund'].map(x => u('/' + x, 'yearly', '0.3')), ...db.restaurants.filter(r => access(r).active).map(r => u('/m/' + r.slug, 'weekly', '0.6'))].join('\n')}\n</urlset>\n`, { 'Content-Type': 'application/xml; charset=utf-8' }); }
+  if (m === 'GET' && p === '/admin/google-link') {
+    const cid = googleClientId(req);
+    return send(res, 200, `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in to Veyra Dine In</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap"><link rel="stylesheet" href="/assets/base.css">
+<style>body{background:#FBF6EE;margin:0;font-family:"Plus Jakarta Sans",system-ui,sans-serif;color:#1B1714}.c{max-width:440px;margin:8vh auto;padding:28px;background:#fff;border:1px solid #E6DCCB;border-radius:22px}.k{font:800 26px/1 ui-monospace,Consolas,monospace;letter-spacing:.12em;background:#FDE7DC;color:#C2410C;padding:12px 16px;border-radius:12px;text-align:center;margin:10px 0 18px}h1{font-size:24px;margin:0 0 8px}p{color:#5B524A}#g{display:flex;justify-content:center;min-height:44px}.ok{background:#DCFCE7;color:#166534;padding:16px;border-radius:14px;font-weight:700}.form{display:grid;gap:10px}</style></head><body><div class="c" id="c">
+<h1>Sign in to the Windows app</h1><p>Check that this code matches the one in your Veyra Dine In app, then continue with Google.</p><div class="k" id="k">…</div><div id="g"></div>
+<p style="font-size:13px">Only continue if you just clicked "Continue with Google" in the app. Never use a link someone sent you.</p></div>
+<script>(function(){var q=new URLSearchParams(location.search),c=q.get('c')||'',box=document.getElementById('c');
+var esc=function(v){return String(v).replace(/[&<>"]/g,function(x){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]})};
+fetch('/api/admin/google/device/info?c='+encodeURIComponent(c)).then(function(r){return r.json()}).then(function(d){if(d.error){box.innerHTML='<h1>Link expired</h1><p>'+esc(d.error)+'</p>';return}document.getElementById('k').textContent=d.short;start(d.reset)});
+function post(b){return fetch('/api/admin/google/device/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'Something went wrong');return j})})}
+function done(n){box.innerHTML='<div class="ok">You are signed in'+(n?' to '+esc(n):'')+'.</div><p>Go back to the Veyra Dine In app. It opens by itself in a few seconds. You can close this tab.</p>'}
+function start(reset){var s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=function(){google.accounts.id.initialize({client_id:${JSON.stringify(cid)},ux_mode:'popup',callback:function(r){var cred=r.credential;post({c:c,credential:cred}).then(function(j){if(!j.needSignup)return done(j.name);
+box.innerHTML='<h1>One more step</h1><p>Signed in as <b>'+esc(j.email)+'</b>. Tell us about your restaurant to start the 10-day free trial.</p><form class="form" id="f"><input class="input" name="name" required maxlength="80" placeholder="Restaurant name"><input class="input" name="phone" required inputmode="tel" maxlength="16" placeholder="Mobile (WhatsApp)"><button class="btn btn-primary btn-lg btn-block">Start free trial</button></form>';
+document.getElementById('f').onsubmit=function(e){e.preventDefault();var f=new FormData(e.target);post({c:c,credential:cred,name:f.get('name'),phone:f.get('phone')}).then(function(j){done(j.name)}).catch(function(er){alert(er.message)})}}).catch(function(er){box.insertAdjacentHTML('beforeend','<p style="color:#B91C1C">'+esc(er.message)+'</p>')})}});
+google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',size:'large',shape:'pill',text:reset?'continue_with':'signin_with',width:320})};document.head.appendChild(s)}})();</script></body></html>`, { 'Content-Type': 'text/html; charset=utf-8', 'Referrer-Policy': 'no-referrer' });
+  }
   if (m === 'GET' && p === '/signup') { // the sign-up page is public, so search engines may index it (the admin pages stay hidden)
     const b = baseUrl(req), h = fs.readFileSync(path.join(PUBLIC_DIR, 'admin.html'), 'utf8')
       .replace('<meta name="robots" content="noindex, nofollow">', `<meta name="robots" content="index, follow"><meta name="description" content="Start your free 10-day trial of Veyra Dine In, the QR code menu and table ordering system for restaurants, cafés and dhabas in India. No card needed."><link rel="canonical" href="${b}/signup"><meta property="og:title" content="Start your free trial · Veyra Dine In"><meta property="og:image" content="${b}/og.jpg">`)
       .replace(/<title>[^<]*<\/title>/, '<title>Free trial: QR Code Ordering for Restaurants · Veyra Dine In</title>');
     return send(res, 200, h, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
   }
-  if (m === 'GET' && /^\/admin(\/[a-z0-9-]+)?\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'admin.html'));
+  if (m === 'GET' && p !== '/admin/google-link' && /^\/admin(\/[a-z0-9-]+)?\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'admin.html'));
   if (m === 'GET' && p === '/platform') return serveFile(res, path.join(PUBLIC_DIR, 'platform.html'));
   if (m === 'GET' && p === '/print-qr') return serveFile(res, path.join(PUBLIC_DIR, 'print-qr.html'));
   if (m === 'GET' && p.startsWith('/uploads/')) { const f = safeJoin(UPLOAD_DIR, p.slice(9)); return f ? serveFile(res, f, 'public, max-age=31536000, immutable') : fail(res, 404, 'Not found'); }
@@ -909,8 +927,48 @@ self.addEventListener('notificationclick', e => {
       trackEvent('signup_google'); save();
       return send(res, 201, { ok: true, slug: r.slug, created: true });
     }
+    if (body.reset) r.resetUntil = Date.now() + 15 * 60000;
     setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0))); trackEvent('login_google'); saveSoon();
-    return send(res, 200, { ok: true, slug: r.slug });
+    return send(res, 200, { ok: true, slug: r.slug, reset: !!body.reset });
+  }
+  // ---- Google sign-in for the Windows app: Google blocks sign-in inside app windows, so the app opens the
+  // normal browser, the owner signs in there, and the app (polling with a secret code) gets logged in. ----
+  if (m === 'POST' && p === '/api/admin/google/device') {
+    if (!googleClientId(req)) return fail(res, 400, 'Google sign-in is not set up on this server.');
+    const tk = 'gdev|' + clientIp(req); if (tooMany(tk)) return fail(res, 429, 'Too many tries. Please wait 10 minutes.'); failCount(tk);
+    if (deviceLinks.size > 2000) for (const [k, v] of deviceLinks) if (Date.now() - v.at > 15 * 60000) deviceLinks.delete(k);
+    const code = id(32), short = Array.from(crypto.randomBytes(6), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join('').replace(/^(...)/, '$1-');
+    deviceLinks.set(code, { short, at: Date.now(), rid: null, reset: !!body.reset });
+    return send(res, 200, { code, short, url: baseUrl(req) + '/admin/google-link?c=' + code });
+  }
+  if (m === 'GET' && p === '/api/admin/google/device/poll') {
+    const code = str(url.searchParams.get('c'), 40), L = deviceLinks.get(code);
+    if (!L || Date.now() - L.at > 15 * 60000) { deviceLinks.delete(code); return fail(res, 410, 'This sign-in has expired. Please try again.'); }
+    if (!L.rid) return send(res, 200, { waiting: true });
+    const r = db.restaurants.find(x => x.id === L.rid); deviceLinks.delete(code); if (!r) return fail(res, 404, 'Restaurant not found');
+    if (L.reset) { r.resetUntil = Date.now() + 15 * 60000; saveSoon(); }
+    setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0)));
+    return send(res, 200, { ok: true, slug: r.slug, created: !!L.created, reset: L.reset });
+  }
+  if (m === 'POST' && p === '/api/admin/google/device/confirm') {
+    const L = deviceLinks.get(str(body.c, 40)); if (!L || Date.now() - L.at > 15 * 60000 || L.rid) return fail(res, 410, 'This sign-in link has expired. Start again from the app.');
+    let gu; try { gu = await verifyGoogle(body.credential); } catch (e) { return fail(res, e.status || 400, e.message); }
+    let r = db.restaurants.find(x => x.email === gu.email);
+    if (!r) {
+      if (L.reset) return fail(res, 404, `No restaurant uses ${gu.email}. Pick the Google account you signed up with, or message us on WhatsApp.`);
+      if (!str(body.name)) return send(res, 200, { needSignup: true, email: gu.email });
+      if (!/^[0-9+\s-]{8,16}$/.test(str(body.phone))) return fail(res, 400, 'Please enter a valid mobile number');
+      r = newRestaurant({ name: body.name, password: crypto.randomBytes(12).toString('hex'), email: gu.email, ownerName: gu.name, phone: body.phone, plan: 'trial' });
+      r.phone = str(body.phone, 30); r.google = true;
+      for (const name of ['Starters', 'Main Course', 'Desserts', 'Drinks']) db.categories.push({ id: id(), restaurantId: r.id, name, sort: db.categories.length });
+      trackEvent('signup_google'); L.created = true; save();
+    } else trackEvent('login_google');
+    L.rid = r.id; return send(res, 200, { ok: true, name: r.name });
+  }
+  if (m === 'GET' && p === '/api/admin/google/device/info') {
+    const L = deviceLinks.get(str(url.searchParams.get('c'), 40));
+    if (!L || Date.now() - L.at > 15 * 60000 || L.rid) return fail(res, 410, 'This sign-in link has expired or was already used. Start again from the app.');
+    return send(res, 200, { short: L.short, reset: L.reset });
   }
   if (m === 'POST' && p === '/api/admin/logout') { setCookie(res, 'vd_admin', '', 0); return send(res, 200, { ok: true }); }
 
@@ -1394,9 +1452,10 @@ self.addEventListener('notificationclick', e => {
       return send(res, 200, adminRestaurant(r));
     }
     if (m === 'POST' && p === '/api/admin/password') {
-      if (!checkPassword(body.current || '', r.passwordHash)) return fail(res, 400, 'Current password is wrong');
+      const viaGoogle = r.resetUntil && r.resetUntil > Date.now();
+      if (!viaGoogle && !checkPassword(body.current || '', r.passwordHash)) return fail(res, 400, 'Current password is wrong');
       if (str(body.next).length < 6) return fail(res, 400, 'New password needs at least 6 characters');
-      r.passwordHash = hashPassword(body.next); r.sessionVer = (r.sessionVer || 0) + 1; save();
+      r.passwordHash = hashPassword(body.next); r.sessionVer = (r.sessionVer || 0) + 1; delete r.resetUntil; save();
       setCookie(res, 'vd_admin', sign(r.id + '|' + r.sessionVer));
       return send(res, 200, { ok: true });
     }

@@ -459,11 +459,20 @@ const tableUrl = (req, r, t) => `${baseUrl(req)}/m/${r.slug}?t=${t.token}`;
 
 // ---------- static files ----------
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.json': 'application/json', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2' };
-function serveFile(res, file, cache = 'no-cache') {
+function serveFile(res, file, cache = 'no-cache', range) {
   fs.stat(file, (err, st) => {
     if (err || !st.isFile()) return fail(res, 404, 'Not found');
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Content-Length': st.size, 'Cache-Control': cache });
-    fs.createReadStream(file).pipe(res);
+    const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
+    // byte ranges let a stopped download resume, and let download managers fetch in parallel
+    const r = /^bytes=(\d*)-(\d*)$/.exec(range || '');
+    if (r && (r[1] || r[2])) {
+      let a = r[1] ? +r[1] : Math.max(0, st.size - +r[2]), b = r[1] && r[2] ? Math.min(+r[2], st.size - 1) : st.size - 1;
+      if (a >= st.size || a > b) { res.writeHead(416, { 'Content-Range': 'bytes */' + st.size }); return res.end(); }
+      res.writeHead(206, { 'Content-Type': type, 'Content-Length': b - a + 1, 'Content-Range': `bytes ${a}-${b}/${st.size}`, 'Accept-Ranges': 'bytes', 'Cache-Control': cache });
+      return fs.createReadStream(file, { start: a, end: b, highWaterMark: 1 << 20 }).pipe(res);
+    }
+    res.writeHead(200, { 'Content-Type': type, 'Content-Length': st.size, 'Accept-Ranges': 'bytes', 'Cache-Control': cache });
+    fs.createReadStream(file, { highWaterMark: 1 << 20 }).pipe(res);
   });
 }
 // Public menu page with search-friendly title, description, share preview and Restaurant + Menu structured data.
@@ -550,7 +559,7 @@ async function handle(req, res) {
     if (!fs.existsSync(f)) { res.writeHead(302, { Location: DL_REMOTE + '/' + name }); return res.end(); }
     if (name.endsWith('.exe')) res.setHeader('Content-Disposition', 'attachment; filename="' + name + '"');
 
-    return serveFile(res, f, name.endsWith('.yml') ? 'no-cache' : 'public, max-age=3600');
+    return serveFile(res, f, name.endsWith('.yml') ? 'no-cache' : 'public, max-age=3600', req.headers.range);
   }
   // Restaurant admin as a phone app: web app manifest + a small service worker (needed for install and for order pop-ups on Android)
   if (m === 'GET' && p === '/admin.webmanifest') return send(res, 200, JSON.stringify({

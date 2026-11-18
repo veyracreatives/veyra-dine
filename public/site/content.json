@@ -1135,6 +1135,34 @@
    "section": "Footer"
   },
   {
+   "k": "tcf01481f",
+   "type": "text",
+   "tag": "a",
+   "text": "Privacy",
+   "section": "Footer"
+  },
+  {
+   "k": "ta55a275a",
+   "type": "text",
+   "tag": "a",
+   "text": "Terms",
+   "section": "Footer"
+  },
+  {
+   "k": "tbe32adaa",
+   "type": "text",
+   "tag": "a",
+   "text": "Refunds",
+   "section": "Footer"
+  },
+  {
+   "k": "tb37456c4",
+   "type": "text",
+   "tag": "a",
+   "text": "Contact",
+   "section": "Footer"
+  },
+  {
    "k": "t908e482c",
    "type": "text",
    "tag": "span",

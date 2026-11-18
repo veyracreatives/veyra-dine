@@ -491,6 +491,7 @@ async function handle(req, res) {
     if (!siteCache) { const stockFile = path.join(SITE_DIR, 'content.json'); siteCache = siteContent.render(fs.readFileSync(path.join(SITE_DIR, 'index.html'), 'utf8'), db.siteContent, fs.existsSync(stockFile) ? JSON.parse(fs.readFileSync(stockFile, 'utf8')) : null); }
     return send(res, 200, siteCache, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
   }
+  if (m === 'GET' && /^\/(privacy|terms|refund|contact)\/?$/.test(p)) return serveFile(res, path.join(SITE_DIR, p.replace(/\//g, ''), 'index.html'), 'no-cache');
   if (m === 'GET' && /^\/site-media\/[A-Za-z0-9]+\.(png|jpg|webp|svg)$/.test(p)) { const f = safeJoin(path.join(DATA_DIR, 'site-media'), p.slice(11)); return f ? serveFile(res, f, 'public, max-age=31536000, immutable') : fail(res, 404, 'Not found'); }
   if (m === 'GET' && (/^\/img\/[A-Za-z0-9._-]+$/.test(p) || /^\/(og\.jpg|favicon-32\.png|icon-180\.png|icon-512\.png)$/.test(p))) { const f = safeJoin(SITE_DIR, p); return f ? serveFile(res, f, 'public, max-age=86400') : fail(res, 404, 'Not found'); }
   // Windows installer: served from this server (fast in India, with a real file size) when the local copy is ready, else from GitHub Pages.

@@ -16,7 +16,7 @@ open('index.html', 'w').write(t)
 # ---------- SEO-ready website for real hosting (site/) ----------
 import os, re, json, html as H, shutil
 from PIL import Image
-SITE = (sys.argv[2] if len(sys.argv) > 2 else 'https://veyracreatives.github.io/dine-in').rstrip('/')
+SITE = (sys.argv[2] if len(sys.argv) > 2 else 'https://dinein.veyracreatives.com').rstrip('/')
 os.makedirs('site/img', exist_ok=True)
 page = open('index.html').read()
 page = page.replace(f'href="{rep["{{DOWNLOAD}}"]}" target="_blank" rel="noopener"', f'href="{rep["{{DOWNLOAD}}"]}" download')

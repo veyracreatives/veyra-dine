@@ -354,10 +354,14 @@ async function handle(req, res) {
   const m = req.method;
 
   // ---- pages ----
-  if (m === 'GET' && p === '/') { res.writeHead(302, { Location: process.env.HOME_URL || 'https://veyracreatives.github.io/dine-in/' }); return res.end(); } // product website; restaurants use /admin and /signup
+  // product website (landing page) at the root; restaurants use /admin and /signup
+  const SITE_DIR = path.join(PUBLIC_DIR, 'site');
+  if (m === 'GET' && (p === '/' || p === '/index.html')) return serveFile(res, path.join(SITE_DIR, 'index.html'));
+  if (m === 'GET' && (/^\/img\/[A-Za-z0-9._-]+$/.test(p) || /^\/(og\.jpg|favicon-32\.png|icon-180\.png|icon-512\.png)$/.test(p))) { const f = safeJoin(SITE_DIR, p); return f ? serveFile(res, f, 'public, max-age=86400') : fail(res, 404, 'Not found'); }
+  if (m === 'GET' && p === '/favicon.ico') return serveFile(res, path.join(SITE_DIR, 'favicon-32.png'), 'public, max-age=86400');
   if (m === 'GET' && /^\/m\/[a-z0-9-]+\/?$/.test(p)) return serveMenuPage(req, res, url, p.split('/')[2]);
   if (m === 'GET' && p === '/robots.txt') return send(res, 200, `User-agent: *\nDisallow: /admin\nDisallow: /platform\nDisallow: /api/\nDisallow: /print-qr\nAllow: /m/\n\nSitemap: ${baseUrl(req)}/sitemap.xml\n`, { 'Content-Type': 'text/plain; charset=utf-8' });
-  if (m === 'GET' && p === '/sitemap.xml') return send(res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${db.restaurants.filter(r => access(r).active).map(r => `  <url><loc>${baseUrl(req)}/m/${r.slug}</loc><changefreq>weekly</changefreq></url>`).join('\n')}\n</urlset>\n`, { 'Content-Type': 'application/xml; charset=utf-8' });
+  if (m === 'GET' && p === '/sitemap.xml') return send(res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${baseUrl(req)}/</loc><changefreq>monthly</changefreq><priority>1.0</priority></url>\n${db.restaurants.filter(r => access(r).active).map(r => `  <url><loc>${baseUrl(req)}/m/${r.slug}</loc><changefreq>weekly</changefreq></url>`).join('\n')}\n</urlset>\n`, { 'Content-Type': 'application/xml; charset=utf-8' });
   if (m === 'GET' && (p === '/signup' || /^\/admin(\/[a-z0-9-]+)?\/?$/.test(p))) return serveFile(res, path.join(PUBLIC_DIR, 'admin.html'));
   if (m === 'GET' && p === '/platform') return serveFile(res, path.join(PUBLIC_DIR, 'platform.html'));
   if (m === 'GET' && p === '/print-qr') return serveFile(res, path.join(PUBLIC_DIR, 'print-qr.html'));

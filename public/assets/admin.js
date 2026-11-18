@@ -111,8 +111,28 @@
             <button class="btn btn-lg btn-block btn-dark">Log in</button>
           </div>
           <div class="small-link">Forgot your password? Message us on <a href="https://wa.me/918928246726" target="_blank">WhatsApp</a>.</div></form>`}
+        <div id="gwrap" hidden><div class="or" style="margin:20px 0 14px">or</div><div class="gbtn" style="display:flex;justify-content:center;min-height:44px"></div></div>
       </div></div></div>`;
     app.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => renderLogin(b.dataset.mode));
+    const afterLogin = async (r, created) => { localStorage.setItem('vd_slug', r.slug); history.replaceState(null, '', '/admin/' + r.slug + location.search); if (created) S.tab = 'menu'; await boot(); if (created) toast(`${icon('check', 18)} Your free trial has started`, 'ok'); };
+    window.VDGoogle && VDGoogle.mount(document.getElementById('gwrap'), async credential => {
+      try {
+        const r = await api('/api/admin/google', { method: 'POST', body: { credential } });
+        if (!r.needSignup) return afterLogin(r);
+        const card = app.querySelector('.form-card');
+        card.innerHTML = `<form id="gsf"><span class="trial-chip">${icon('check', 15)} 30-day free trial</span><h2>One more step</h2><p class="muted">Signed in as <b>${esc(r.email)}</b>. Tell us about your restaurant.</p>
+          <div class="form"><label class="field"><span>Restaurant name</span><input class="input" name="name" required maxlength="80" autocomplete="organization"></label>
+          <label class="field"><span>Mobile (WhatsApp)</span><input class="input" name="phone" required inputmode="tel" maxlength="16" autocomplete="tel"></label>
+          <button class="btn btn-primary btn-lg btn-block">Start 30-day free trial</button></div>
+          <div class="small-link"><a href="#" id="gback">Use a different account</a></div></form>`;
+        card.querySelector('#gback').onclick = e => { e.preventDefault(); renderLogin(mode); };
+        card.querySelector('#gsf').onsubmit = async e => {
+          e.preventDefault(); const f = new FormData(e.target), btn = e.submitter; if (btn) btn.disabled = true;
+          try { afterLogin(await api('/api/admin/google', { method: 'POST', body: { credential, name: f.get('name'), phone: f.get('phone') } }), true); }
+          catch (err) { toast(esc(err.message), 'error'); if (btn) btn.disabled = false; }
+        };
+      } catch (err) { toast(esc(err.message), 'error'); }
+    }, { text: mode === 'signup' ? 'signup_with' : 'signin_with' });
     const lf = document.getElementById('lf');
     if (lf) lf.onsubmit = async e => {
       e.preventDefault(); const f = new FormData(e.target);
@@ -140,7 +160,7 @@
     return `<div class="trial-bar">${icon('clock', 18)} ${label}<a class="btn btn-sm btn-primary" href="${esc(buyLink('lifetime'))}" target="_blank">Buy lifetime ${inr(S.me.plans.lifetime)}</a><button class="btn btn-sm" data-license>Enter license key</button></div>`;
   }
   function keyForm(onDone) {
-    return { html: `<label class="field"><span>License key</span><div class="key-row"><input class="input" id="lk" placeholder="VD1-…" autocomplete="off" spellcheck="false"><button class="btn btn-primary" id="lkBtn" type="button">Activate</button></div></label>`,
+    return { html: `<label class="field"><span>License key</span><div class="key-row"><input class="input" id="lk" placeholder="VEYRA-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false"><button class="btn btn-primary" id="lkBtn" type="button">Activate</button></div></label>`,
       bind(root) {
         root.querySelector('#lkBtn').onclick = async e => {
           const btn = e.currentTarget; btn.disabled = true;
@@ -610,7 +630,14 @@
   function renderSettings(c) {
     const r = S.me.restaurant;
     const menuUrl = `${S.me.baseUrl}/m/${r.slug}`;
+    const a = r.access || {}, lic = r.license;
+    const planTxt = a.plan === 'lifetime' ? 'Lifetime' : a.plan === 'yearly' ? `Yearly, until ${new Date(a.until).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}` : `Free trial, ${a.daysLeft} day${a.daysLeft === 1 ? '' : 's'} left`;
+    const keyTxt = lic ? (lic.code || lic.key.slice(0, 18) + '…') : '';
     c.innerHTML = `<div style="display:grid;gap:18px;max-width:720px">
+      <div class="panel" id="planPanel"><div class="panel-head"><h2>Plan and license</h2>${a.plan === 'trial' || (a.plan === 'yearly' && a.daysLeft <= 30) ? '<button class="btn btn-sm btn-primary" data-license>Enter license key</button>' : ''}</div><div class="panel-body form">
+        <div class="lic-box" style="margin:0"><span>Plan</span><b>${esc(planTxt)}</b>${lic ? `<span>Licensed to</span><b>${esc(lic.to)}</b><span>License key</span><b style="font-family:ui-monospace,Consolas,monospace;word-break:break-all">${esc(keyTxt)}</b>${lic.at ? `<span>Activated</span><b>${new Date(lic.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</b>` : ''}` : ''}<span>Updates</span><b>${a.plan === 'trial' ? 'Included after you buy' : 'Included'}</b></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${lic ? `<button class="btn" id="cpyKey">${icon('copy', 18)} Copy license key</button>` : `<a class="btn btn-primary" href="${esc(buyLink('lifetime'))}" target="_blank">Buy lifetime ${inr(S.me.plans.lifetime)}</a><a class="btn" href="${esc(buyLink('yearly'))}" target="_blank">Buy yearly ${inr(S.me.plans.yearly)}</a>`}<a class="btn" href="https://dinein.veyracreatives.com/download/Veyra-Dine-In-Setup.exe">${icon('download', 18)} Download Windows app</a></div>
+      </div></div>
       <div class="panel"><div class="panel-head"><h2>Your restaurant</h2></div><div class="panel-body form">
         <label class="field"><span>Restaurant ID (used to log in)</span><input class="input" value="${esc(r.slug)}" readonly></label>
         <label class="field"><span>Menu link without a table (view only, for Instagram bio or Google)</span><div style="display:flex;gap:8px"><input class="input" value="${esc(menuUrl)}" readonly><button class="btn" id="cpy">${icon('copy', 18)}</button></div></label>
@@ -641,6 +668,8 @@
       </div></form>
       <button class="btn btn-lg" id="lo" style="justify-self:start">${icon('logout', 18)} Log out</button>
     </div>`;
+    const ck = document.getElementById('cpyKey'); if (ck) ck.onclick = async () => { const k = lic.code || lic.key; try { await navigator.clipboard.writeText(k); toast('License key copied'); } catch { prompt('Your license key', k); } };
+    c.querySelectorAll('[data-license]').forEach(b => b.onclick = licenseModal);
     document.getElementById('cpy').onclick = async () => { try { await navigator.clipboard.writeText(menuUrl); toast('Link copied'); } catch { prompt('Copy this link', menuUrl); } };
     document.getElementById('toHist').onclick = () => go('history');
     document.getElementById('toOffers').onclick = () => go('offers');

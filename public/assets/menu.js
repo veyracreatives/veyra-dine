@@ -238,6 +238,7 @@
           <label class="field"><span>Password</span><input class="input" type="password" name="password" autocomplete="current-password" placeholder="At least 4 characters"></label>
           <div class="gerr" id="ge" role="alert"></div>
           <button class="btn btn-primary btn-lg btn-block" id="gb"></button>
+          <div id="ggw" hidden><div style="display:flex;align-items:center;gap:12px;margin:4px 0 12px;color:#8a8178;font-size:12px;font-weight:700;letter-spacing:.08em"><span style="flex:1;height:1px;background:currentColor;opacity:.3"></span>OR<span style="flex:1;height:1px;background:currentColor;opacity:.3"></span></div><div class="gbtn" style="display:flex;justify-content:center;min-height:44px"></div></div>
           <small class="muted gfoot">We use this only for your orders at ${esc(D.restaurant.name)}. Forgot your password? Ask the staff to reset it.</small>
         </form>`);
       const f = o.querySelector('#gf');
@@ -263,6 +264,13 @@
           toast(`${icon('check', 18)} Hi ${esc(G.name)}!`, 'ok'); done = true; closeIt(); resolve(true);
         } catch (err) { o.querySelector('#ge').textContent = err.message; btn.disabled = false; if (/already have an account/i.test(err.message)) set('login'); }
       };
+      window.VDGoogle && VDGoogle.mount(o.querySelector('#ggw'), async credential => {
+        try {
+          const r = await api(`/api/menu/${slug}/guest/google`, { method: 'POST', body: { credential } });
+          G = r.guest; localStorage.setItem('vd_had_acct', '1'); await adoptGuestName();
+          toast(`${icon('check', 18)} Hi ${esc(G.name)}!`, 'ok'); done = true; closeIt(); resolve(true);
+        } catch (err) { o.querySelector('#ge').textContent = err.message; }
+      });
       setTimeout(() => (mode === 'login' ? f.login : f.name).focus(), 50);
     });
   }

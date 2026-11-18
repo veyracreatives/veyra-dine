@@ -7,7 +7,7 @@ const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
 const QRCode = require('qrcode');
-const { verifyKey } = require('./lib/license');
+const { verifyKey, PUBLIC_KEY: LICENSE_PUBLIC_KEY } = require('./lib/license');
 
 const PORT = Number(process.env.PORT) || 3000;
 const ROOT = __dirname;
@@ -154,6 +154,50 @@ const publicGuest = g => ({ name: g.name, phone: g.phone ? g.phone.replace(/^(\d
 const tries = new Map();
 function tooMany(key) { const t = tries.get(key); return t && t.n >= 8 && Date.now() - t.at < 10 * 60000; }
 function failCount(key) { const t = tries.get(key) || { n: 0, at: 0 }; if (Date.now() - t.at > 10 * 60000) t.n = 0; t.n++; t.at = Date.now(); tries.set(key, t); }
+// ---- Short license keys: VEYRA-XXXX-XXXX-XXXX ----
+// Veyra HQ makes a normal signed key that carries the short code (payload.s) and registers it on the online
+// server. Restaurants type the short code; the server (or the local app, through the online server) swaps it
+// for the signed key and records which restaurant activated it. Old VD1- keys keep working as before.
+const LICENSE_SERVER = (process.env.LICENSE_SERVER || 'https://dinein.veyracreatives.com').replace(/\/$/, '');
+const SHORT_RE = /^VEYRA-?([0-9A-HJKMNP-TV-Z]{4})-?([0-9A-HJKMNP-TV-Z]{4})-?([0-9A-HJKMNP-TV-Z]{4})$/;
+function normShort(raw) {
+  const k = String(raw || '').toUpperCase().replace(/[\s‐-―]+/g, m => /\s/.test(m) ? '' : '-').replace(/O/g, '0').replace(/[IL]/g, '1').replace(/^VEYRA(?=[0-9A-Z])/, 'VEYRA-');
+  const m = SHORT_RE.exec(k);
+  return m ? `VEYRA-${m[1]}-${m[2]}-${m[3]}` : null;
+}
+function hqSigned(msg, sig) { // requests from Veyra HQ are signed with the private license key
+  try { return crypto.verify(null, Buffer.from(msg), LICENSE_PUBLIC_KEY, Buffer.from(String(sig || ''), 'base64url')); } catch { return false; }
+}
+function claimLocal(code, rid, name, via, ip) {
+  db.licenseCodes = db.licenseCodes || {};
+  const L = db.licenseCodes[code];
+  if (!L) { const e = new Error('This license key was not found. Please check it, or ask Veyra on WhatsApp +91 89282 46726.'); e.status = 404; throw e; }
+  L.activations = L.activations || [];
+  const other = L.activations.find(a => a.rid !== rid);
+  if (other) { const e = new Error('This license key is already used by another restaurant. Ask Veyra on WhatsApp +91 89282 46726 if you moved to a new computer.'); e.status = 409; throw e; }
+  const a = L.activations.find(x => x.rid === rid);
+  if (a) { a.lastAt = now(); a.name = name; } else L.activations.push({ rid, name: str(name, 80), via, ip: ip || '', at: now(), lastAt: now() });
+  save();
+  return L.key;
+}
+function postJson(url, data) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify(data), u = new URL(url);
+    const rq = require(u.protocol === 'http:' ? 'http' : 'https').request(u, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, r => {
+      let s = ''; r.on('data', c => s += c); r.on('end', () => { let j = {}; try { j = JSON.parse(s); } catch {} if (r.statusCode >= 400) { const e = new Error(j.error || 'The license server answered ' + r.statusCode); e.status = r.statusCode; return reject(e); } resolve(j); });
+    });
+    rq.on('error', () => { const e = new Error('Could not reach the Veyra license server. Check the internet and try again.'); e.status = 503; reject(e); });
+    rq.setTimeout(15000, () => rq.destroy(new Error('timeout')));
+    rq.end(body);
+  });
+}
+async function claimShort(code, r, req) {
+  db.licenseCodes = db.licenseCodes || {};
+  const central = db.licenseCodes[code] || baseUrl(req).replace(/\/$/, '') === LICENSE_SERVER;
+  if (central) return claimLocal(code, r.id, r.name, 'online', clientIp(req));
+  const j = await postJson(LICENSE_SERVER + '/api/licenses/claim', { code, rid: (db.config.installId || (db.config.installId = id())) + ':' + r.id, name: r.name });
+  return j.key;
+}
 // Is this restaurant allowed to take orders? (trial running, or paid)
 function access(r) {
   const plan = r.plan || 'lifetime'; // restaurants made before plans existed keep working
@@ -163,7 +207,7 @@ function access(r) {
   return { plan, active: daysLeft > 0, daysLeft: Math.max(0, daysLeft), until };
 }
 const BILL_DEFAULT = { width: '80', gstin: '', fssai: '', footer: 'Thank you! Please visit again.', autoKot: false, showUpi: true };
-function adminRestaurant(r) { return { ...publicRestaurant(r), upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), bill: Object.assign({}, BILL_DEFAULT, r.bill || {}) }; }
+function adminRestaurant(r) { return { ...publicRestaurant(r), upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}) }; }
 function newRestaurant({ name, slug, password, email, ownerName, phone, plan = 'trial' }) {
   let s = slugify(slug || name), n = 2;
   while (db.restaurants.some(r => r.slug === s)) s = slugify(slug || name) + '-' + n++;
@@ -300,6 +344,21 @@ function lanAddresses() {
   for (const list of Object.values(os.networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal) out.push(a.address);
   return out;
 }
+// ---- Sign in with Google: the browser gets an ID token from Google, we check it with Google and read the email ----
+const googleClientId = () => (process.env.GOOGLE_CLIENT_ID || (db.config && db.config.googleClientId) || '').trim();
+function verifyGoogle(credential) {
+  return new Promise((resolve, reject) => {
+    const cid = googleClientId(); if (!cid) return reject(Object.assign(new Error('Google sign-in is not set up yet.'), { status: 400 }));
+    require('https').get('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(String(credential || '')), r => {
+      let s = ''; r.on('data', c => s += c); r.on('end', () => {
+        let j = {}; try { j = JSON.parse(s); } catch {}
+        const ok = r.statusCode === 200 && j.aud === cid && /accounts\.google\.com$/.test(j.iss || '') && (j.email_verified === true || j.email_verified === 'true') && Number(j.exp) * 1000 > Date.now();
+        ok ? resolve({ email: String(j.email).toLowerCase(), name: j.name || j.given_name || '' }) : reject(Object.assign(new Error('Google sign-in failed. Please try again.'), { status: 401 }));
+      });
+    }).on('error', () => reject(Object.assign(new Error('Could not reach Google. Check the internet.'), { status: 503 })));
+  });
+}
+const clientIp = req => String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '';
 function baseUrl(req) {
   if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, '');
   const proto = req.headers['x-forwarded-proto'] || 'http';
@@ -412,13 +471,21 @@ async function handle(req, res) {
   let mt;
 
   // ===== guest accounts (log in before ordering) =====
-  if ((mt = /^\/api\/menu\/([a-z0-9-]+)\/guest\/(me|signup|login|logout)$/.exec(p))) {
+  if ((mt = /^\/api\/menu\/([a-z0-9-]+)\/guest\/(me|signup|login|logout|google)$/.exec(p))) {
     const r = db.restaurants.find(x => x.slug === mt[1]);
     if (!r) return fail(res, 404, 'Restaurant not found');
     const act = mt[2];
     if (m === 'GET' && act === 'me') { const g = guestOf(req, r); return send(res, 200, { guest: g ? publicGuest(g) : null }); }
     if (m !== 'POST') return fail(res, 404, 'Not found');
     if (act === 'logout') { setCookie(res, 'vd_guest_' + r.id, '', 0); return send(res, 200, { ok: true }); }
+    if (act === 'google') {
+      let gu; try { gu = await verifyGoogle(body.credential); } catch (e) { return fail(res, e.status || 400, e.message); }
+      let g = db.guests.find(x => x.restaurantId === r.id && x.email === gu.email);
+      if (!g) { g = { id: id(12), restaurantId: r.id, name: str(gu.name, 40) || gu.email.split('@')[0], phone: '', email: gu.email, passwordHash: hashPassword(crypto.randomBytes(12).toString('hex')), ver: 0, google: true, createdAt: now(), lastAt: now() }; db.guests.push(g); }
+      g.lastAt = now(); save();
+      setCookie(res, 'vd_guest_' + r.id, sign(g.id + '|' + (g.ver || 0)), 60 * 60 * 24 * 180);
+      return send(res, 200, { guest: publicGuest(g) });
+    }
     const login = normLogin(body.login);
     if (!login) return fail(res, 400, 'Enter a 10-digit mobile number or an email address.');
     const key = (req.socket.remoteAddress || '') + '|' + r.id + '|' + login.value;
@@ -621,7 +688,51 @@ async function handle(req, res) {
     setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0)));
     return send(res, 200, { ok: true, slug: r.slug });
   }
+  if (m === 'GET' && p === '/api/auth/config') return send(res, 200, { googleClientId: googleClientId() });
+  if (m === 'POST' && p === '/api/admin/google') { // log in, or start a free trial, with a Google account
+    let gu; try { gu = await verifyGoogle(body.credential); } catch (e) { return fail(res, e.status || 400, e.message); }
+    let r = db.restaurants.find(x => x.email === gu.email);
+    if (!r) {
+      if (!str(body.name)) return send(res, 200, { needSignup: true, email: gu.email, ownerName: gu.name });
+      if (!/^[0-9+\s-]{8,16}$/.test(str(body.phone))) return fail(res, 400, 'Please enter a valid mobile number');
+      r = newRestaurant({ name: body.name, password: crypto.randomBytes(12).toString('hex'), email: gu.email, ownerName: gu.name, phone: body.phone, plan: 'trial' });
+      r.phone = str(body.phone, 30); r.google = true;
+      for (const name of ['Starters', 'Main Course', 'Desserts', 'Drinks']) db.categories.push({ id: id(), restaurantId: r.id, name, sort: db.categories.length });
+      save();
+      setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0)));
+      return send(res, 201, { ok: true, slug: r.slug, created: true });
+    }
+    setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0)));
+    return send(res, 200, { ok: true, slug: r.slug });
+  }
   if (m === 'POST' && p === '/api/admin/logout') { setCookie(res, 'vd_admin', '', 0); return send(res, 200, { ok: true }); }
+
+  // ---- license server (used by Veyra HQ and by Windows apps running in local mode) ----
+  if (m === 'POST' && p === '/api/licenses/register') { // HQ registers a new short code; only keys signed by Veyra are accepted
+    const v = verifyKey(body.key), code = v.ok && normShort(v.payload.s);
+    if (!v.ok || !code) return fail(res, 400, v.ok ? 'This key has no short code.' : v.error);
+    db.licenseCodes = db.licenseCodes || {};
+    const L = db.licenseCodes[code];
+    if (L && L.id !== v.payload.id) return fail(res, 409, 'That short code is already taken.');
+    if (!L) { db.licenseCodes[code] = { key: v.key, id: v.payload.id, n: v.payload.n, p: v.payload.p, exp: v.payload.exp || null, at: now(), activations: [] }; save(); }
+    return send(res, 200, { ok: true, code });
+  }
+  if (m === 'POST' && p === '/api/licenses/claim') {
+    const code = normShort(body.code), ip = clientIp(req), tk = 'lic|' + ip;
+    if (tooMany(tk)) return fail(res, 429, 'Too many tries. Please wait 10 minutes.');
+    if (!code) { failCount(tk); return fail(res, 400, 'That does not look like a license key. Keys look like VEYRA-XXXX-XXXX-XXXX.'); }
+    try { return send(res, 200, { key: claimLocal(code, 'pc:' + str(body.rid, 80), body.name, 'windows', ip) }); }
+    catch (e) { if (e.status === 404) failCount(tk); return fail(res, e.status || 400, e.message); }
+  }
+  if (m === 'POST' && (p === '/api/licenses/status' || p === '/api/licenses/reset')) { // HQ only: signed with the private key
+    const ts = Number(body.ts), code = normShort(body.code) || '';
+    if (!(Math.abs(Date.now() - ts) < 10 * 60000) || !hqSigned(`${p}|${code}|${ts}`, body.sig)) return fail(res, 403, 'Not allowed');
+    db.licenseCodes = db.licenseCodes || {};
+    if (p === '/api/licenses/reset') { const L = db.licenseCodes[code]; if (!L) return fail(res, 404, 'Not found'); L.activations = []; save(); return send(res, 200, { ok: true }); }
+    const out = {};
+    for (const [c, L] of Object.entries(db.licenseCodes)) out[c] = { id: L.id, n: L.n, at: L.at, activations: (L.activations || []).map(a => ({ name: a.name, via: a.via, at: a.at, lastAt: a.lastAt })) };
+    return send(res, 200, { codes: out });
+  }
 
   if (p.startsWith('/api/admin/')) {
     const r = adminOf(req);
@@ -632,7 +743,10 @@ async function handle(req, res) {
       return send(res, 200, { restaurant: adminRestaurant(r), baseUrl: baseUrl(req), lan: lanAddresses(), port: PORT, publicUrlSet: !!process.env.PUBLIC_URL, plans: PLANS, buyUrl: BUY_URL });
     }
     if (m === 'POST' && p === '/api/admin/activate') {
-      const v = verifyKey(body.key);
+      const code = normShort(body.key);
+      let raw = body.key;
+      if (code) { try { raw = await claimShort(code, r, req); } catch (e) { return fail(res, e.status || 400, e.message); } }
+      const v = verifyKey(raw);
       if (!v.ok) return fail(res, 400, v.error);
       db.config.usedLicenses = db.config.usedLicenses || {};
       const owner = db.config.usedLicenses[v.payload.id];
@@ -640,7 +754,7 @@ async function handle(req, res) {
       db.config.usedLicenses[v.payload.id] = r.id;
       r.plan = v.payload.p === 'yearly' ? 'yearly' : 'lifetime';
       r.paidUntil = v.payload.exp ? new Date(v.payload.exp + 'T23:59:59Z').toISOString() : null;
-      r.licenseKey = v.key; r.licensedTo = v.payload.n; r.activatedAt = now();
+      r.licenseKey = v.key; r.licenseCode = code || v.payload.s || null; r.licensedTo = v.payload.n; r.activatedAt = now();
       save();
       return send(res, 200, { ok: true, restaurant: adminRestaurant(r) });
     }
@@ -959,6 +1073,12 @@ async function handle(req, res) {
       if (body.extendTrialDays) { const base = Math.max(Date.now(), Date.parse(r.trialEnds || 0) || 0); r.plan = 'trial'; r.trialEnds = new Date(base + Number(body.extendTrialDays) * DAY).toISOString(); }
       if (body.plan === 'lifetime') { r.plan = 'lifetime'; r.paidUntil = null; }
       save(); return send(res, 200, publicRestaurant(r));
+    }
+    if (m === 'GET' && p === '/api/platform/google') return send(res, 200, { clientId: googleClientId(), fromEnv: !!process.env.GOOGLE_CLIENT_ID });
+    if (m === 'POST' && p === '/api/platform/google') {
+      const cid = str(body.clientId, 200);
+      if (cid && !/^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/.test(cid)) return fail(res, 400, 'That does not look like a Google Client ID. It ends with .apps.googleusercontent.com');
+      db.config.googleClientId = cid; save(); return send(res, 200, { ok: true, clientId: cid });
     }
     if (m === 'POST' && p === '/api/platform/password') {
       if (str(body.next).length < 8) return fail(res, 400, 'Use at least 8 characters');

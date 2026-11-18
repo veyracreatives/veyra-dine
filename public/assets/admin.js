@@ -785,7 +785,7 @@
     return `<!doctype html><html><head><meta charset="utf-8"><title>Bill</title><style>
       @page { size: ${w}mm auto; margin: 0 }
       * { box-sizing: border-box } html, body { margin: 0; background: #fff }
-      body { width: ${w}mm; padding: 3mm ${narrow ? 2.5 : 4}mm 8mm; font: ${narrow ? 11 : 12.5}px/1.35 "Segoe UI", Arial, sans-serif; color: #000 }
+      body { width: ${w}mm; margin: 0 auto; padding: 3mm ${narrow ? 2.5 : 4}mm 8mm; font: ${narrow ? 11 : 12.5}px/1.35 "Segoe UI", Arial, sans-serif; color: #000 }
       .c { text-align: center } .b { font-weight: 700 } .sm { font-size: ${narrow ? 9.5 : 10.5}px } .xl { font-size: ${narrow ? 18 : 22}px; font-weight: 800; letter-spacing: .02em }
       h1 { font-size: ${narrow ? 15 : 17}px; margin: 0 0 1mm; text-align: center; text-transform: uppercase; letter-spacing: .04em }
       hr { border: 0; border-top: 1px dashed #000; margin: 2mm 0 }

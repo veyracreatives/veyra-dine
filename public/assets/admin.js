@@ -418,13 +418,15 @@
           <table class="tbl"><thead><tr><th>Table</th><th class="r">Orders</th><th class="r">Sales</th></tr></thead><tbody>${R.tables.map(t => `<tr><td>${esc(t.name)}</td><td class="r">${t.orders}</td><td class="r">${cur(t.sales)}</td></tr>`).join('')}</tbody></table></div>
       </div>` : ''}
       <div class="panel"><div class="panel-head"><h2>Orders</h2>${R.list.length ? `<button class="btn btn-sm" id="csv">${icon('download', 16)} Download (Excel)</button>` : ''}</div>
-      ${R.list.length ? `<table class="tbl"><thead><tr><th>Order</th><th>Table</th><th class="hide-sm">Items</th><th>Status</th><th class="r">Total</th></tr></thead><tbody>
+      ${R.list.length ? `<table class="tbl"><thead><tr><th>Order</th><th>Table</th><th class="hide-sm">Items</th><th>Status</th><th class="r">Total</th><th class="r"><span class="hide-sm">Bill</span></th></tr></thead><tbody>
         ${R.list.map(o => `<tr><td><b>#${o.number}</b><br><span class="muted">${one ? '' : short(dkey(Date.parse(o.createdAt))) + ', '}${new Date(o.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span></td><td>${esc(o.tableName)}${o.customerName ? `<br><span class="muted">${esc(o.customerName)}</span>` : ''}</td>
-          <td class="hide-sm">${o.items.map(l => `${l.qty}× ${esc(l.name)}`).join('<br>')}</td><td><span class="badge ${B[o.status]}">${o.status[0].toUpperCase() + o.status.slice(1)}</span></td><td class="r"><b>${cur(o.total)}</b></td></tr>`).join('')}
-        </tbody><tfoot><tr><td colspan="3" class="hide-sm"></td><td><b>${R.orders} orders</b></td><td class="r"><b>${cur(R.sales)}</b></td></tr></tfoot></table>`
+          <td class="hide-sm">${o.items.map(l => `${l.qty}× ${esc(l.name)}`).join('<br>')}</td><td><span class="badge ${B[o.status]}">${o.status[0].toUpperCase() + o.status.slice(1)}</span></td><td class="r"><b>${cur(o.total)}</b></td><td class="r">${o.status !== 'cancelled' ? `<button class="btn btn-sm btn-ghost" data-rbill="${o.id}" title="Print this bill again">${icon('printer', 16)}<span class="hide-sm"> Print</span></button>` : ''}</td></tr>`).join('')}
+        </tbody><tfoot><tr><td colspan="3" class="hide-sm"></td><td><b>${R.orders} orders</b></td><td class="r"><b>${cur(R.sales)}</b></td><td></td></tr></tfoot></table>`
         : `<div class="empty">${icon('receipt', 40)}<div>No orders ${one ? 'on this day' : 'in these dates'}.</div></div>`}</div>`;
     rep.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { setRange(b.dataset.day, b.dataset.day); renderHistory(c); });
     drawWhatSells(R, one);
+    rep.querySelectorAll('[data-rbill]').forEach(b => b.onclick = () => { const o = R.list.find(x => x.id === b.dataset.rbill); if (!o) return;
+      printBill({ table: { name: o.tableName }, when: o.createdAt, orders: [o], people: o.customerName ? [{ name: o.customerName }] : [], lines: o.items.map(l => ({ name: l.name, qty: l.qty, price: l.price })), discount: o.discount || 0, coupons: o.coupon ? [o.coupon] : [], total: o.total, paid: [] }); });
     const csv = document.getElementById('csv');
     if (csv) csv.onclick = () => {
       const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -818,10 +820,10 @@
     const sub = items.reduce((a, i) => a + i.qty * i.price, 0), paid = B.paid.reduce((a, p) => a + p.amount, 0), left = Math.max(0, Math.round(B.total - paid));
     const M = { cash: 'Cash', upi: 'UPI', card: 'Card' };
     let qr = '';
-    if (c.showUpi && r.upiId && left > 0) { try { qr = await (await fetch(`/api/admin/upi-qr?am=${left}&n=${encodeURIComponent(B.table.name + ' bill')}`)).text(); } catch {} }
+    if (c.showUpi && r.upiId && left > 0 && !B.when) { try { qr = await (await fetch(`/api/admin/upi-qr?am=${left}&n=${encodeURIComponent(B.table.name + ' bill')}`)).text(); } catch {} }
     const html = receiptDoc(`${billHeader()}<hr>
-      <div class="c b">BILL · ${esc(B.table.name)}</div>
-      <div class="r sm"><span>${stamp()}</span><span>${B.orders.length ? 'Order ' + B.orders.map(o => '#' + o.number).join(', ') : ''}</span></div>
+      <div class="c b">BILL · ${esc(B.table.name)}</div>${B.when ? '<div class="c sm">(Reprint)</div>' : ''}
+      <div class="r sm"><span>${stamp(B.when)}</span><span>${B.orders.length ? 'Order ' + B.orders.map(o => '#' + o.number).join(', ') : ''}</span></div>
       ${B.people.length > 1 ? `<div class="sm">Guests: ${B.people.map(p => esc(p.name)).join(', ')}</div>` : ''}
       <hr><div class="r sm b"><span>Item</span><span>Amount</span></div>
       ${items.map(i => `<div class="it"><div class="r"><span>${i.qty} × ${esc(i.name)}</span><span>${pm(i.qty * i.price)}</span></div>${i.qty > 1 ? `<small>@ ${pm(i.price)} each</small>` : ''}</div>`).join('')}

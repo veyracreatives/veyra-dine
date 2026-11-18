@@ -115,7 +115,7 @@ body { background: var(--bg); }
 .choice { display: flex; gap: 8px; flex-wrap: wrap; }
 .choice label { cursor: pointer; }
 .choice input { position: absolute; opacity: 0; }
-.choice span { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--line); font-weight: 650; font-size: 14px; background: #fff; }
+.choice > label > span { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--line); font-weight: 650; font-size: 14px; background: #fff; }
 .choice input:checked + span { border-color: var(--brand); background: var(--brand-soft); }
 .choice input:focus-visible + span { outline: 3px solid var(--brand-soft); }
 .toggles { display: grid; gap: 14px; padding: 14px; border-radius: 14px; background: var(--bg); }

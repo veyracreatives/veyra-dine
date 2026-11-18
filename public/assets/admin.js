@@ -90,19 +90,19 @@
     app.innerHTML = `<div class="auth">
       <div class="brand-side"><div class="logo"><span class="mark">${icon('qr', 24)}</span>Veyra Dine In</div>
         <h1>Orders from every table, <em>right here.</em></h1><p>Guests scan the QR on their table and order from their phone. You see it here with the table number and a sound.</p>
-        <ul class="ticks"><li>${icon('check', 20)} 30 days free, every feature</li><li>${icon('check', 20)} No card needed</li><li>${icon('check', 20)} Your menu stays saved when you buy</li></ul>
+        <ul class="ticks"><li>${icon('check', 20)} 10 days free, every feature</li><li>${icon('check', 20)} No card needed</li><li>${icon('check', 20)} Your menu stays saved when you buy</li></ul>
         <div class="foot">Made by Veyra Creative &amp; Digital Lab · Navi Mumbai</div></div>
       <div class="form-side"><div class="form-card">
         <div class="tabs2"><button class="${mode === 'signup' ? 'on' : ''}" data-mode="signup">Start free trial</button><button class="${mode === 'login' ? 'on' : ''}" data-mode="login">Log in</button></div>
         ${mode === 'signup' ? `<form id="sf">
-          <span class="trial-chip">${icon('check', 15)} 30-day free trial</span><h2>Create your restaurant</h2><p class="muted">Takes one minute. You can change everything later.</p>
+          <span class="trial-chip">${icon('check', 15)} 10-day free trial</span><h2>Create your restaurant</h2><p class="muted">Takes one minute. You can change everything later.</p>
           <div class="form">
             <label class="field"><span>Restaurant name</span><input class="input" name="name" required maxlength="80" autocomplete="organization"></label>
             <div class="row2"><label class="field"><span>Your name</span><input class="input" name="ownerName" required maxlength="80" autocomplete="name"></label>
               <label class="field"><span>Mobile (WhatsApp)</span><input class="input" name="phone" required inputmode="tel" maxlength="16" autocomplete="tel"></label></div>
             <label class="field"><span>Email</span><input class="input" name="email" type="email" required autocomplete="email"></label>
             <label class="field"><span>Create a password</span><input class="input" name="password" type="password" minlength="6" required autocomplete="new-password"><small>Staff use this to open orders on their phones.</small></label>
-            <button class="btn btn-primary btn-lg btn-block">Start 30-day free trial</button>
+            <button class="btn btn-primary btn-lg btn-block">Start 10-day free trial</button>
           </div></form>`
         : `<form id="lf"><h2>Welcome back</h2><p class="muted">Log in to see your live orders.</p>
           <div class="form">
@@ -120,10 +120,10 @@
         const r = await api('/api/admin/google', { method: 'POST', body: { credential } });
         if (!r.needSignup) return afterLogin(r);
         const card = app.querySelector('.form-card');
-        card.innerHTML = `<form id="gsf"><span class="trial-chip">${icon('check', 15)} 30-day free trial</span><h2>One more step</h2><p class="muted">Signed in as <b>${esc(r.email)}</b>. Tell us about your restaurant.</p>
+        card.innerHTML = `<form id="gsf"><span class="trial-chip">${icon('check', 15)} 10-day free trial</span><h2>One more step</h2><p class="muted">Signed in as <b>${esc(r.email)}</b>. Tell us about your restaurant.</p>
           <div class="form"><label class="field"><span>Restaurant name</span><input class="input" name="name" required maxlength="80" autocomplete="organization"></label>
           <label class="field"><span>Mobile (WhatsApp)</span><input class="input" name="phone" required inputmode="tel" maxlength="16" autocomplete="tel"></label>
-          <button class="btn btn-primary btn-lg btn-block">Start 30-day free trial</button></div>
+          <button class="btn btn-primary btn-lg btn-block">Start 10-day free trial</button></div>
           <div class="small-link"><a href="#" id="gback">Use a different account</a></div></form>`;
         card.querySelector('#gback').onclick = e => { e.preventDefault(); renderLogin(mode); };
         card.querySelector('#gsf').onsubmit = async e => {
@@ -151,12 +151,14 @@
   const inr = n => '₹' + Number(n).toLocaleString('en-IN');
   function buyLink(plan) {
     const r = S.me.restaurant;
-    return S.me.buyUrl + encodeURIComponent(`Hi Veyra, I want to buy Veyra Dine In ${plan} (${plan === 'lifetime' ? inr(S.me.plans.lifetime) : inr(S.me.plans.yearly) + '/year'}) for ${r.name}. My login email: ${r.email || r.slug}`);
+    return S.me.buyUrl + encodeURIComponent(`Hi Veyra, I want to buy Veyra Dine In ${plan} (${plan === 'lifetime' ? inr(S.me.plans.lifetime) : plan === 'monthly' ? inr(S.me.plans.monthly) + '/month' : inr(S.me.plans.yearly) + '/year'}) for ${r.name}. My login email: ${r.email || r.slug}`);
   }
+  // A paid plan is 'ending soon' 7 days before a monthly plan ends, 30 days before a yearly one. A trial always shows the bar.
+  const endingSoon = a => a.plan === 'trial' || (a.plan === 'monthly' && a.daysLeft <= 7) || (a.plan === 'yearly' && a.daysLeft <= 30);
   function trialBar() {
     const a = S.me.restaurant.access;
-    if (!a || a.plan === 'lifetime' || (a.plan === 'yearly' && a.daysLeft > 30)) return '';
-    const label = a.plan === 'trial' ? `Free trial <span class="days">${a.daysLeft} day${a.daysLeft === 1 ? '' : 's'} left</span> Everything you set up stays when you buy.` : `Your yearly plan ends in <span class="days">${a.daysLeft} days</span>`;
+    if (!a || a.plan === 'lifetime' || !endingSoon(a)) return '';
+    const label = a.plan === 'trial' ? `Free trial <span class="days">${a.daysLeft} day${a.daysLeft === 1 ? '' : 's'} left</span> Everything you set up stays when you buy.` : `Your ${a.plan === 'monthly' ? 'monthly' : 'yearly'} plan ends in <span class="days">${a.daysLeft} day${a.daysLeft === 1 ? '' : 's'}</span>`;
     return `<div class="trial-bar">${icon('clock', 18)} ${label}<a class="btn btn-sm btn-primary" href="${esc(buyLink('lifetime'))}" target="_blank">Buy lifetime ${inr(S.me.plans.lifetime)}</a><button class="btn btn-sm" data-license>Enter license key</button></div>`;
   }
   function keyForm(onDone) {
@@ -172,7 +174,8 @@
   function buyOptions() {
     return `<div class="or">Don't have a key?</div><div class="buy-row">
       <a class="buy best" href="${esc(buyLink('lifetime'))}" target="_blank"><b>Lifetime</b><div class="pr">${inr(S.me.plans.lifetime)}</div><small>Pay once, use forever</small></a>
-      <a class="buy" href="${esc(buyLink('yearly'))}" target="_blank"><b>Yearly</b><div class="pr">${inr(S.me.plans.yearly)}</div><small>per year</small></a></div>
+      <a class="buy" href="${esc(buyLink('yearly'))}" target="_blank"><b>Yearly</b><div class="pr">${inr(S.me.plans.yearly)}</div><small>per year</small></a>
+      <a class="buy" href="${esc(buyLink('monthly'))}" target="_blank"><b>Monthly</b><div class="pr">${inr(S.me.plans.monthly)}</div><small>per month</small></a></div>
       <div class="help">${icon('phone', 18)} Need help? WhatsApp <a href="https://wa.me/918928246726" target="_blank">+91 89282 46726</a></div>`;
   }
   function licenseModal() {
@@ -631,13 +634,13 @@
     const r = S.me.restaurant;
     const menuUrl = `${S.me.baseUrl}/m/${r.slug}`;
     const a = r.access || {}, lic = r.license;
-    const planTxt = a.plan === 'lifetime' ? 'Lifetime' : a.plan === 'yearly' ? `Yearly, until ${new Date(a.until).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}` : `Free trial, ${a.daysLeft} day${a.daysLeft === 1 ? '' : 's'} left`;
+    const planTxt = a.plan === 'lifetime' ? 'Lifetime' : (a.plan === 'yearly' || a.plan === 'monthly') ? `${a.plan === 'monthly' ? 'Monthly' : 'Yearly'}, until ${new Date(a.until).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}` : `Free trial, ${a.daysLeft} day${a.daysLeft === 1 ? '' : 's'} left`;
     const keyTxt = lic ? (lic.code || lic.key.slice(0, 18) + '…') : '';
     c.innerHTML = `<div style="display:grid;gap:18px;max-width:720px">
-      <div class="panel" id="planPanel"><div class="panel-head"><h2>Plan and license</h2>${a.plan === 'trial' || (a.plan === 'yearly' && a.daysLeft <= 30) || (lic && lic.updatesUntil && lic.updatesUntil < new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10)) ? '<button class="btn btn-sm btn-primary" data-license>Enter license key</button>' : ''}</div><div class="panel-body form">
+      <div class="panel" id="planPanel"><div class="panel-head"><h2>Plan and license</h2>${endingSoon(a) || (lic && lic.updatesUntil && lic.updatesUntil < new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10)) ? '<button class="btn btn-sm btn-primary" data-license>Enter license key</button>' : ''}</div><div class="panel-body form">
         <div class="lic-box" style="margin:0"><span>Plan</span><b>${esc(planTxt)}</b>${lic ? `<span>Licensed to</span><b>${esc(lic.to)}</b><span>License key</span><b style="font-family:ui-monospace,Consolas,monospace;word-break:break-all">${esc(keyTxt)}</b>${lic.at ? `<span>Activated</span><b>${new Date(lic.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</b>` : ''}` : ''}<span>Updates</span><b>${a.plan === 'trial' ? 'Included after you buy' : lic && lic.updatesUntil ? (lic.updatesUntil >= new Date().toISOString().slice(0, 10) ? 'Included until ' : 'Ended on ') + new Date(lic.updatesUntil + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Included'}</b></div>
         ${a.plan === 'lifetime' && lic && lic.updatesUntil && lic.updatesUntil < new Date().toISOString().slice(0, 10) ? `<p class="muted" style="margin:0">Your app keeps working. To get the newest features again, renew updates on <a href="https://wa.me/918928246726?text=${encodeURIComponent('Hi Veyra, I want to renew Veyra Dine In updates for ' + r.name)}" target="_blank">WhatsApp +91 89282 46726</a> and enter the new key above.</p>` : ''}
-        <div style="display:flex;gap:8px;flex-wrap:wrap">${lic ? `<button class="btn" id="cpyKey">${icon('copy', 18)} Copy license key</button>` : `<a class="btn btn-primary" href="${esc(buyLink('lifetime'))}" target="_blank">Buy lifetime ${inr(S.me.plans.lifetime)}</a><a class="btn" href="${esc(buyLink('yearly'))}" target="_blank">Buy yearly ${inr(S.me.plans.yearly)}</a>`}<a class="btn" href="https://dinein.veyracreatives.com/download/Veyra-Dine-In-Setup.exe">${icon('download', 18)} Download Windows app</a></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${lic ? `<button class="btn" id="cpyKey">${icon('copy', 18)} Copy license key</button>` : `<a class="btn btn-primary" href="${esc(buyLink('lifetime'))}" target="_blank">Buy lifetime ${inr(S.me.plans.lifetime)}</a><a class="btn" href="${esc(buyLink('yearly'))}" target="_blank">Buy yearly ${inr(S.me.plans.yearly)}</a><a class="btn" href="${esc(buyLink('monthly'))}" target="_blank">Buy monthly ${inr(S.me.plans.monthly)}</a>`}<a class="btn" href="https://dinein.veyracreatives.com/download/Veyra-Dine-In-Setup.exe">${icon('download', 18)} Download Windows app</a></div>
       </div></div>
       <form class="panel" id="ideaF"><div class="panel-head"><div><h2>Suggest a feature or ask for custom work</h2><span class="muted" style="font-size:14px">Tell Veyra what you'd like next, or what you need built for your restaurant. We reply on WhatsApp.</span></div></div><div class="panel-body form">
         <div class="wseg" style="display:flex;gap:8px;flex-wrap:wrap"><label class="switch"><input type="radio" name="type" value="feature" checked> Feature idea</label><label class="switch"><input type="radio" name="type" value="custom"> Custom build</label></div>

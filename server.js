@@ -46,7 +46,8 @@ function syncInstaller() {
 }
 if (process.env.DL_MIRROR !== '0' && !process.versions.electron) { setTimeout(syncInstaller, 5000); setInterval(syncInstaller, 6 * 3600 * 1000).unref(); }
 // Plans and where the "Buy" buttons go. Change prices here.
-const PLANS = { trialDays: 30, lifetime: 14999, yearly: 5999 };
+const PLANS = { trialDays: 10, monthly: 799, yearly: 5999, lifetime: 24999 };
+const TERM_PLANS = ['monthly', 'yearly']; // paid plans that run until a date
 let siteCache = null; // landing page with HQ edits applied
 const BUY_URL = process.env.BUY_URL || 'https://wa.me/918928246726?text=';
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -54,7 +55,7 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 // ---------- tiny JSON database ----------
 let db = { config: {}, restaurants: [], categories: [], items: [], tables: [], orders: [], requests: [], coupons: [] };
 if (fs.existsSync(DB_FILE)) db = Object.assign(db, JSON.parse(fs.readFileSync(DB_FILE, 'utf8')));
-if (db.siteContent && db.siteContent.prices) for (const k of ['lifetime', 'yearly']) if (Number(db.siteContent.prices[k]) > 0) PLANS[k] = Number(db.siteContent.prices[k]);
+if (db.siteContent && db.siteContent.prices) for (const k of ['lifetime', 'yearly', 'monthly']) if (Number(db.siteContent.prices[k]) > 0) PLANS[k] = Number(db.siteContent.prices[k]);
 if (!db.coupons) db.coupons = [];
 if (!db.guests) db.guests = [];
 if (!db.config.secret) db.config.secret = crypto.randomBytes(32).toString('hex');
@@ -215,7 +216,7 @@ function access(r) {
 function updatesUntilOf(pl) {
   if (!pl) return null;
   if (pl.u) return pl.u;
-  if (pl.p === 'yearly') return pl.exp || null;
+  if (TERM_PLANS.includes(pl.p)) return pl.exp || null;
   const d = new Date((pl.iat || new Date().toISOString().slice(0, 10)) + 'T00:00:00Z'); d.setUTCFullYear(d.getUTCFullYear() + 1); return d.toISOString().slice(0, 10);
 }
 const BILL_DEFAULT = { width: '80', gstin: '', fssai: '', footer: 'Thank you! Please visit again.', autoKot: false, showUpi: true };
@@ -813,7 +814,7 @@ async function handle(req, res) {
       if (p === '/api/hq/site/save') {
         const c = body.content || {};
         db.siteContent = { texts: c.texts || {}, images: c.images || {}, prices: c.prices || {}, banner: c.banner || {}, testimonials: (c.testimonials || []).slice(0, 30), testimonialsTitle: str(c.testimonialsTitle, 80), faqs: (c.faqs || []).slice(0, 40), logo: c.logo || '', updatedAt: now() };
-        for (const k of ['lifetime', 'yearly']) if (Number(db.siteContent.prices[k]) > 0) PLANS[k] = Number(db.siteContent.prices[k]); // admin "Buy" buttons use the same prices
+        for (const k of ['lifetime', 'yearly', 'monthly']) if (Number(db.siteContent.prices[k]) > 0) PLANS[k] = Number(db.siteContent.prices[k]); // admin "Buy" buttons use the same prices
         siteCache = null; save(); return send(res, 200, { ok: true });
       }
       if (p === '/api/hq/site/media') { // logo or picture for the landing page
@@ -834,7 +835,7 @@ async function handle(req, res) {
     }
     if (p === '/api/hq/restaurant') {
       const r = db.restaurants.find(x => x.id === raw); if (!r) return fail(res, 404, 'Restaurant not found');
-      if (Number(body.extendTrialDays) > 0) { const base = Math.max(Date.now(), Date.parse(r.trialEnds || 0) || 0); if (r.plan !== 'lifetime' && r.plan !== 'yearly') { r.plan = 'trial'; r.trialEnds = new Date(base + Number(body.extendTrialDays) * DAY).toISOString(); } }
+      if (Number(body.extendTrialDays) > 0) { const base = Math.max(Date.now(), Date.parse(r.trialEnds || 0) || 0); if (r.plan !== 'lifetime' && !TERM_PLANS.includes(r.plan)) { r.plan = 'trial'; r.trialEnds = new Date(base + Number(body.extendTrialDays) * DAY).toISOString(); } }
       if ('suspended' in body) r.suspended = !!body.suspended;
       if ('note' in body) r.hqNote = str(body.note, 500);
       save(); return send(res, 200, { ok: true });
@@ -866,7 +867,7 @@ async function handle(req, res) {
       const owner = db.config.usedLicenses[v.payload.id];
       if (owner && owner !== r.id) return fail(res, 409, 'This license key is already used by another restaurant.');
       db.config.usedLicenses[v.payload.id] = r.id;
-      r.plan = v.payload.p === 'yearly' ? 'yearly' : 'lifetime';
+      r.plan = TERM_PLANS.includes(v.payload.p) ? v.payload.p : 'lifetime';
       r.paidUntil = v.payload.exp ? new Date(v.payload.exp + 'T23:59:59Z').toISOString() : null;
       r.licenseKey = v.key; r.licenseCode = code || v.payload.s || null; r.licensedTo = v.payload.n; r.activatedAt = now();
       r.updatesUntil = updatesUntilOf(v.payload);

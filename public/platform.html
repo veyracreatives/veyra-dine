@@ -45,7 +45,7 @@
       <p class="muted" style="font-size:13px;margin-top:16px">The first password is printed in the terminal when the server starts.</p></form></div>`;
     document.getElementById('f').onsubmit = async e => { e.preventDefault(); try { await api('/api/platform/login', { method: 'POST', body: { password: new FormData(e.target).get('p') } }); list(); } catch (err) { toast(esc(err.message), 'error'); } };
   }
-  const planBadge = a => a.plan === 'lifetime' ? '<span class="badge badge-green">Lifetime</span>' : a.active ? `<span class="badge ${a.plan === 'trial' ? 'badge-amber' : 'badge-blue'}">${a.plan === 'trial' ? 'Trial' : 'Yearly'} · ${a.daysLeft} days left</span>` : `<span class="badge badge-red">${a.plan === 'trial' ? 'Trial ended' : 'Expired'}</span>`;
+  const planBadge = a => a.plan === 'lifetime' ? '<span class="badge badge-green">Lifetime</span>' : a.active ? `<span class="badge ${a.plan === 'trial' ? 'badge-amber' : 'badge-blue'}">${a.plan === 'trial' ? 'Trial' : a.plan === 'monthly' ? 'Monthly' : 'Yearly'} · ${a.daysLeft} days left</span>` : `<span class="badge badge-red">${a.plan === 'trial' ? 'Trial ended' : 'Expired'}</span>`;
   async function list() {
     const rs = await api('/api/platform/restaurants');
     app.innerHTML = `<div class="wrap"><div class="head"><div><h1>Restaurants <span class="gold">· ${rs.length}</span></h1><span class="muted">Every restaurant gets its own menu, admin login, tables and branding.</span></div>

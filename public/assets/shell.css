@@ -42,7 +42,7 @@
 .key-row .input { font-family: ui-monospace, Consolas, monospace; letter-spacing: .02em; }
 .or { display: flex; align-items: center; gap: 14px; color: var(--ink-3); font-size: 13px; font-weight: 700; margin: 28px 0 18px; text-transform: uppercase; letter-spacing: .08em; }
 .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
-.buy-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.buy-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .buy { border: 1.5px solid var(--line); border-radius: 16px; padding: 16px 18px; text-decoration: none; display: block; }
 .buy.best { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 6%, #fff); }
 .buy b { display: block; font-size: 15px; }

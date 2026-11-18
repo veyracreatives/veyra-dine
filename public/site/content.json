@@ -50,10 +50,10 @@
    "section": "Top of page"
   },
   {
-   "k": "tc7670161",
+   "k": "t92969715",
    "type": "text",
    "tag": "a",
-   "text": "Try free for 30 days",
+   "text": "Try free for 10 days",
    "section": "Top of page"
   },
   {
@@ -148,10 +148,10 @@
    "section": "Top of page"
   },
   {
-   "k": "t99381aae",
+   "k": "t3d9537d2",
    "type": "text",
    "tag": "span",
-   "text": "30 days free",
+   "text": "10 days free",
    "section": "Top of page"
   },
   {
@@ -757,10 +757,10 @@
    "section": "Try it free. Pay once if you love it."
   },
   {
-   "k": "t2460a260",
+   "k": "t07a40f33",
    "type": "text",
    "tag": "small",
-   "text": "for 30 days",
+   "text": "for 10 days",
    "section": "Try it free. Pay once if you love it."
   },
   {
@@ -792,6 +792,90 @@
    "section": "Try it free. Pay once if you love it."
   },
   {
+   "k": "td31edb7b",
+   "type": "text",
+   "tag": "h3",
+   "text": "Monthly",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "tb1a40e6e",
+   "type": "text",
+   "tag": "div",
+   "text": "Start small, no big payment",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "td0e619b2",
+   "type": "text",
+   "tag": "small",
+   "text": "per month",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "tff6c2920",
+   "type": "text",
+   "tag": "li",
+   "text": "Everything in the trial",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t891ae582",
+   "type": "text",
+   "tag": "li",
+   "text": "Online hosting and all updates while active",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t1f0961b4",
+   "type": "text",
+   "tag": "li",
+   "text": "Renew each month, stop any time",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t77a0d42f",
+   "type": "text",
+   "tag": "a",
+   "text": "Buy monthly",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t7622eb5a",
+   "type": "text",
+   "tag": "h3",
+   "text": "Yearly",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t1a1285d4",
+   "type": "text",
+   "tag": "div",
+   "text": "Save 37% over monthly",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "td412fe96",
+   "type": "text",
+   "tag": "small",
+   "text": "per year",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t5abbd0dc",
+   "type": "text",
+   "tag": "li",
+   "text": "Renew each year, cancel any time",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t160f2fed",
+   "type": "text",
+   "tag": "a",
+   "text": "Buy yearly",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
    "k": "t8173c2a9",
    "type": "text",
    "tag": "span",
@@ -817,13 +901,6 @@
    "type": "text",
    "tag": "small",
    "text": "one time",
-   "section": "Try it free. Pay once if you love it."
-  },
-  {
-   "k": "tff6c2920",
-   "type": "text",
-   "tag": "li",
-   "text": "Everything in the trial",
    "section": "Try it free. Pay once if you love it."
   },
   {
@@ -859,48 +936,6 @@
    "type": "text",
    "tag": "a",
    "text": "Buy lifetime",
-   "section": "Try it free. Pay once if you love it."
-  },
-  {
-   "k": "t7622eb5a",
-   "type": "text",
-   "tag": "h3",
-   "text": "Yearly",
-   "section": "Try it free. Pay once if you love it."
-  },
-  {
-   "k": "tef669d70",
-   "type": "text",
-   "tag": "div",
-   "text": "Lower cost to start",
-   "section": "Try it free. Pay once if you love it."
-  },
-  {
-   "k": "td412fe96",
-   "type": "text",
-   "tag": "small",
-   "text": "per year",
-   "section": "Try it free. Pay once if you love it."
-  },
-  {
-   "k": "t891ae582",
-   "type": "text",
-   "tag": "li",
-   "text": "Online hosting and all updates while active",
-   "section": "Try it free. Pay once if you love it."
-  },
-  {
-   "k": "t5abbd0dc",
-   "type": "text",
-   "tag": "li",
-   "text": "Renew each year, cancel any time",
-   "section": "Try it free. Pay once if you love it."
-  },
-  {
-   "k": "t160f2fed",
-   "type": "text",
-   "tag": "a",
-   "text": "Buy yearly",
    "section": "Try it free. Pay once if you love it."
   },
   {
@@ -981,17 +1016,17 @@
    "section": "Good to know"
   },
   {
-   "k": "t82f51c0c",
+   "k": "tf29a076f",
    "type": "text",
    "tag": "summary",
-   "text": "What happens after the 30-day free trial?",
+   "text": "What happens after the 10-day free trial?",
    "section": "Good to know"
   },
   {
-   "k": "t0335e67e",
+   "k": "t16e9708d",
    "type": "text",
    "tag": "p",
-   "text": "The app asks for a license key. Buy the lifetime or yearly plan here and enter the key. Your menu, tables and QR codes stay exactly as they were, so there's nothing to set up again.",
+   "text": "The app asks for a license key. Buy the monthly, yearly or lifetime plan here and enter the key. Your menu, tables and QR codes stay exactly as they were, so there's nothing to set up again.",
    "section": "Good to know"
   },
   {
@@ -1115,7 +1150,8 @@
   }
  ],
  "prices": {
-  "lifetime": 14999,
-  "yearly": 5999
+  "lifetime": 24999,
+  "yearly": 5999,
+  "monthly": 799
  }
 }

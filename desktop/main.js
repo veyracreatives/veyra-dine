@@ -37,13 +37,14 @@ async function startLocalServer() {
   return `http://localhost:${actual}`;
 }
 
+let startQuery = '';
 function createWindow() {
   win = new BrowserWindow({
     width: 1360, height: 860, minWidth: 980, minHeight: 640, title: APP_NAME, icon: ICON, show: false,
     backgroundColor: '#FBF6EE', autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, autoplayPolicy: 'no-user-gesture-required' },
   });
-  win.loadURL(`${baseUrl}/admin`);
+  win.loadURL(`${baseUrl}/admin${startQuery}`);
   win.once('ready-to-show', () => win.show());
   // open outside links (WhatsApp, buy, test menu, print) in the normal browser
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -90,6 +91,13 @@ function createTray() {
 }
 
 // from the admin page (preload.js)
+// login screen in this-computer mode: 'Continue with Google' / 'Use my online account' switch to the online server straight away
+ipcMain.handle('vd:mode', () => ({ mode: baseUrl.startsWith('http://localhost') ? 'local' : 'online', canOnline: !!CONFIG.serverUrl }));
+ipcMain.on('vd:use-online', (_e, then) => {
+  if (!CONFIG.serverUrl) return;
+  try { fs.writeFileSync(MODE_FILE(), JSON.stringify({ mode: 'online', at: new Date().toISOString() })); } catch {}
+  quitting = true; app.relaunch({ args: process.argv.slice(1).filter(a => !a.startsWith('--then=')).concat(then === 'google' ? ['--then=google'] : []) }); app.exit(0);
+});
 // bill / KOT printing: list printers, and print a small receipt straight to the chosen printer
 ipcMain.handle('vd:printers', async () => {
   if (!win) return [];
@@ -215,6 +223,7 @@ async function switchMode(mode) {
 app.whenReady().then(async () => {
   try {
     baseUrl = runMode() === 'online' ? CONFIG.serverUrl.replace(/\/$/, '') : await startLocalServer();
+    if (process.argv.includes('--then=google') && !baseUrl.startsWith('http://localhost')) startQuery = '?google=1';
   } catch (err) {
     dialog.showErrorBox(APP_NAME, `Could not start: ${err.message}`); app.quit(); return;
   }

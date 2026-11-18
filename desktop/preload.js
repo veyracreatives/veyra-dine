@@ -8,4 +8,6 @@ contextBridge.exposeInMainWorld('vdDesktop', {
   updateLater: () => ipcRenderer.send('vd:update-later'),
   printers: () => ipcRenderer.invoke('vd:printers'),
   print: (html, opts) => ipcRenderer.invoke('vd:print', { html, ...(opts || {}) }),
+  mode: () => ipcRenderer.invoke('vd:mode'),
+  useOnline: then => ipcRenderer.send('vd:use-online', then || ''),
 });

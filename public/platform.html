@@ -49,7 +49,7 @@
   async function list() {
     const rs = await api('/api/platform/restaurants');
     app.innerHTML = `<div class="wrap"><div class="head"><div><h1>Restaurants <span class="gold">· ${rs.length}</span></h1><span class="muted">Every restaurant gets its own menu, admin login, tables and branding.</span></div>
-      <div style="display:flex;gap:8px"><button class="btn" id="gg">Google sign-in</button><button class="btn" id="pw">${icon('lock', 18)} Platform password</button><button class="btn btn-primary" id="add">${icon('plus', 18)} Add restaurant</button></div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="gg">Google sign-in</button><button class="btn" id="em">Email codes</button><button class="btn" id="pw">${icon('lock', 18)} Platform password</button><button class="btn btn-primary" id="add">${icon('plus', 18)} Add restaurant</button></div></div>
       <div class="rlist">${rs.map(r => `<div class="rrow"><div class="lg" style="color:${r.brandColor}">${r.logo ? `<img src="${esc(r.logo)}" alt="">` : esc(r.name[0])}</div>
         <div class="grow"><b>${esc(r.name)}</b> ${planBadge(r.access)}<br><small>ID: ${esc(r.slug)}${r.email ? ' · ' + esc(r.email) : ''}${r.ownerPhone ? ' · ' + esc(r.ownerPhone) : ''} · added ${new Date(r.createdAt).toLocaleDateString()}</small></div>
         <div class="nums"><span><b>${r.tables}</b>tables</span><span><b>${r.items}</b>dishes</span><span><b>${r.orders}</b>orders</span></div>
@@ -67,6 +67,21 @@
       const cur = await api('/api/platform/google').catch(() => ({ clientId: '' }));
       const o = modal(`<form><div class="sheet-head"><h3>Sign in with Google</h3><button type="button" class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body"><p class="muted" style="margin-top:0">Paste the Client ID from Google Cloud. It ends with .apps.googleusercontent.com. Leave it empty to turn Google sign-in off.</p><label class="field"><span>Google Client ID</span><input class="input" name="clientId" value="${esc(cur.clientId || '')}" placeholder="1234567890-abc123.apps.googleusercontent.com" spellcheck="false"></label><button class="btn btn-primary btn-block">Save</button></div></form>`);
       o.querySelector('form').onsubmit = async e => { e.preventDefault(); try { const r = await api('/api/platform/google', { method: 'POST', body: { clientId: new FormData(e.target).get('clientId').trim() } }); o.remove(); toast(r.clientId ? 'Google sign-in is on' : 'Google sign-in is off', 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
+    };
+    document.getElementById('em').onclick = async () => {
+      const c = await api('/api/platform/email').catch(() => ({}));
+      const o = modal(`<form><div class="sheet-head"><h3>Email codes for password reset</h3><button type="button" class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body">
+        <p class="muted" style="margin-top:0">Restaurants who forget their password get a 6-digit code by email. For Gmail: turn on 2-Step Verification, then make an App password at myaccount.google.com/apppasswords and paste it here. Leave the server empty to turn email codes off.</p>
+        <div class="form">
+          <div class="row2"><label class="field"><span>Email server</span><input class="input" name="host" value="${esc(c.host || '')}" placeholder="smtp.gmail.com"></label>
+            <label class="field"><span>Port</span><input class="input" name="port" type="number" value="${esc(c.port || 465)}"></label></div>
+          <label class="field"><span>Email address</span><input class="input" name="user" type="email" value="${esc(c.user || '')}" placeholder="you@gmail.com"></label>
+          <label class="field"><span>App password</span><input class="input" name="pass" type="password" autocomplete="new-password" placeholder="${c.hasPass ? 'Saved. Type only to change it' : '16 letters from Google'}"></label>
+          <label class="field"><span>Sender name shown in the email</span><input class="input" name="from" value="${esc(c.from || '')}" placeholder="Veyra Dine In &lt;you@gmail.com&gt;"></label>
+          <label class="field"><span>Send a test email to</span><input class="input" name="test" type="email" placeholder="optional"></label>
+        </div>${c.fromEnv ? '<p class="muted">Settings from the server environment are used first.</p>' : ''}</div>
+        <div class="sheet-foot"><button class="btn btn-primary btn-lg btn-block">Save</button></div></form>`);
+      o.querySelector('form').onsubmit = async e => { e.preventDefault(); const b = e.target.querySelector('.sheet-foot button'); b.disabled = true; try { const r = await api('/api/platform/email', { method: 'POST', body: Object.fromEntries(new FormData(e.target)) }); o.remove(); toast(r.off ? 'Email codes are off' : 'Saved. Email codes are on', 'ok'); } catch (err) { toast(esc(err.message), 'error'); b.disabled = false; } };
     };
     document.getElementById('pw').onclick = () => {
       const o = modal(`<form><div class="sheet-head"><h3>Change platform password</h3><button type="button" class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body"><label class="field"><span>New password</span><input class="input" type="password" name="next" minlength="8" required></label></div><div class="sheet-foot"><button class="btn btn-primary btn-lg btn-block">Save</button></div></form>`);

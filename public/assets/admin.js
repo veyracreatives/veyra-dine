@@ -112,7 +112,15 @@
             <label class="field"><span>Create a password</span><input class="input" name="password" type="password" minlength="6" required autocomplete="new-password"><small>Staff use this to open orders on their phones.</small></label>
             <button class="btn btn-primary btn-lg btn-block">Start 10-day free trial</button>
           </div></form>`
-        : mode === 'forgot' ? `<div><h2>Reset your password</h2><p class="muted">Signed up with a Gmail or Google account? Continue with Google using that email. You'll be logged in and can set a new password straight away.</p></div>`
+        : mode === 'forgot' ? `<div id="rst"><h2>Reset your password</h2><p class="muted">We'll email a 6-digit code to the email you signed up with.</p>
+          <form id="rf1" class="form"><label class="field"><span>Email or restaurant ID</span><input class="input" name="who" value="${esc(pre)}" required autocapitalize="off" autocomplete="username"></label>
+            <button class="btn btn-lg btn-block btn-dark">Email me a code</button></form>
+          <form id="rf2" class="form" hidden><p class="muted" id="rfTo" style="margin:0"></p>
+            <label class="field"><span>6-digit code</span><input class="input" name="code" required inputmode="numeric" autocomplete="one-time-code" maxlength="7" pattern="[0-9 ]{6,7}" style="font:700 22px/1 ui-monospace,Consolas,monospace;letter-spacing:.3em"></label>
+            <label class="field"><span>New password</span><input class="input" type="password" name="password" minlength="6" required autocomplete="new-password"></label>
+            <button class="btn btn-lg btn-block btn-dark">Save and log in</button>
+            <div class="small-link" style="margin-top:4px">No email? Check spam, or <a href="#" id="rfAgain">send a new code</a></div></form>
+          <p class="muted" id="rfGoogle" style="margin:18px 0 0">Signed up with Google? You can also continue with Google and set a new password straight away.</p></div>`
         : `<form id="lf"><h2>Welcome back</h2><p class="muted">Log in to see your live orders.</p>
           <div class="form">
             <label class="field"><span>Email or restaurant ID</span><input class="input" name="slug" value="${esc(pre)}" required autocapitalize="off" autocomplete="username"></label>
@@ -121,11 +129,28 @@
           </div>
           <div class="small-link"><a href="#" data-mode="forgot">Forgot your password?</a></div></form>`}
         <div id="gwrap" hidden>${mode === 'forgot' ? '' : '<div class="or" style="margin:20px 0 14px">or</div>'}<div class="gbtn" style="display:flex;justify-content:center;min-height:44px"></div></div>
-        ${mode === 'forgot' ? `<div class="small-link" style="margin-top:18px">Not a Google account? Message us on <a href="https://wa.me/918928246726" target="_blank">WhatsApp</a> and we'll reset it for you.<br><a href="#" data-mode="login">Back to log in</a></div>` : ''}
+        ${mode === 'forgot' ? `<div class="small-link" style="margin-top:18px">Still stuck? Message us on <a href="https://wa.me/918928246726" target="_blank">WhatsApp</a> and we'll reset it for you.<br><a href="#" data-mode="login">Back to log in</a></div>` : ''}
       </div></div></div>`;
     app.querySelectorAll('[data-mode]').forEach(b => b.onclick = e => { e.preventDefault(); renderLogin(b.dataset.mode); });
     const afterLogin = async (r, created) => { if (r.reset) setTimeout(newPassword, 400); localStorage.setItem('vd_slug', r.slug); history.replaceState(null, '', '/admin/' + r.slug + location.search); if (created) S.tab = 'menu'; await boot(); if (created) toast(`${icon('check', 18)} Your free trial has started`, 'ok'); };
     const reset = mode === 'forgot';
+    if (reset) {
+      const f1 = document.getElementById('rf1'), f2 = document.getElementById('rf2'); let who = '';
+      const sendCode = async () => {
+        const btn = f1.querySelector('button'); btn.disabled = true;
+        try { const r = await api('/api/admin/reset/start', { method: 'POST', body: { who } }); f1.hidden = true; f2.hidden = false; document.getElementById('rfTo').innerHTML = `We sent a code to <b>${esc(r.to)}</b>. It works for 10 minutes.`; f2.code.focus(); toast(`${icon('check', 18)} Code sent`, 'ok'); }
+        catch (err) { toast(esc(err.message), 'error'); } finally { btn.disabled = false; }
+      };
+      f1.onsubmit = e => { e.preventDefault(); who = f1.who.value.trim(); sendCode(); };
+      document.getElementById('rfAgain').onclick = e => { e.preventDefault(); sendCode(); };
+      f2.onsubmit = async e => {
+        e.preventDefault(); const btn = f2.querySelector('button'); btn.disabled = true;
+        try { const r = await api('/api/admin/reset/finish', { method: 'POST', body: { who, code: f2.code.value, password: f2.password.value } }); toast(`${icon('check', 18)} Password changed`, 'ok'); await afterLogin(r); }
+        catch (err) { toast(esc(err.message), 'error'); btn.disabled = false; }
+      };
+      // email codes need the server's email settings; without them, fall back to Google and WhatsApp only
+      fetch('/api/auth/config').then(r => r.json()).then(c => { if (!c.emailReset) { document.getElementById('rf1').hidden = true; document.querySelector('#rst > p.muted').textContent = 'Signed up with a Gmail or Google account? Continue with Google using that email. You\'ll be logged in and can set a new password straight away.'; document.getElementById('rfGoogle').hidden = true; } }).catch(() => {});
+    }
     const gw = document.getElementById('gwrap');
     // Windows app: Google blocks sign-in inside app windows, so finish it in the normal browser
     const onlineHost = /(^|\.)veyracreatives\.com$/.test(location.hostname);

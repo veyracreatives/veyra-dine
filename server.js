@@ -203,6 +203,13 @@ const publicGuest = g => ({ name: g.name, phone: g.phone ? g.phone.replace(/^(\d
 const tries = new Map();
 function tooMany(key) { const t = tries.get(key); return t && t.n >= 8 && Date.now() - t.at < 10 * 60000; }
 function failCount(key) { const t = tries.get(key) || { n: 0, at: 0 }; if (Date.now() - t.at > 10 * 60000) t.n = 0; t.n++; t.at = Date.now(); tries.set(key, t); }
+// ---- Password reset by email code ----
+const mailer = require('./lib/mailer');
+const smtpCfg = () => { const e = process.env; if (e.SMTP_HOST) return { host: e.SMTP_HOST, port: +e.SMTP_PORT || 465, user: e.SMTP_USER, pass: e.SMTP_PASS, from: e.SMTP_FROM || e.SMTP_USER }; const c = db.config && db.config.smtp; return c && c.host && c.user && c.pass ? c : null; };
+const resetCodes = new Map(); // restaurant id -> { hash, exp, tries }
+const escH = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const maskEmail = e => String(e || '').replace(/^(.)(.*?)(.)?@/, (m, a, b, c) => a + '•'.repeat(Math.min(6, Math.max(2, b.length))) + (c || '') + '@');
+const codeHash = (rid, code) => crypto.createHash('sha256').update(rid + '|' + code + '|' + db.config.secret).digest('hex');
 // ---- Short license keys: VEYRA-XXXX-XXXX-XXXX ----
 // Veyra HQ makes a normal signed key that carries the short code (payload.s) and registers it on the online
 // server. Restaurants type the short code; the server (or the local app, through the online server) swaps it
@@ -929,7 +936,36 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0))); trackEvent('login'); saveSoon();
     return send(res, 200, { ok: true, slug: r.slug });
   }
-  if (m === 'GET' && p === '/api/auth/config') return send(res, 200, { googleClientId: googleClientId(req) });
+  if (m === 'GET' && p === '/api/auth/config') return send(res, 200, { googleClientId: googleClientId(req), emailReset: !!smtpCfg() });
+  if (m === 'POST' && p === '/api/admin/reset/start') { // forgot password: email a 6-digit code to the restaurant's email
+    const cfg = smtpCfg(); if (!cfg) return fail(res, 400, 'Email codes are not set up yet. Message us on WhatsApp and we will reset it.');
+    const ip = 'rst|' + clientIp(req); if (tooMany(ip)) return fail(res, 429, 'Too many tries. Please wait 10 minutes.'); failCount(ip);
+    const who = str(body.who, 120).toLowerCase(); if (!who) return fail(res, 400, 'Type your email or restaurant ID');
+    const r = db.restaurants.find(x => (who.includes('@') ? (x.email || '').toLowerCase() === who : x.slug === slugify(who)));
+    if (!r || !r.email) { if (who.includes('@')) return send(res, 200, { ok: true, to: maskEmail(who) }); return fail(res, 404, r ? 'This restaurant has no email saved. Message us on WhatsApp and we will reset it.' : 'No restaurant with that ID. Try your email instead.'); }
+    const old = resetCodes.get(r.id); if (old && old.sent > Date.now() - 45000) return fail(res, 429, 'A code was sent a moment ago. Check your inbox and spam folder, or wait a minute to send again.');
+    const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+    try {
+      await mailer.send(cfg, { to: r.email, subject: `${code} is your Veyra Dine In code`,
+        text: `Your code to reset the password for ${r.name} is ${code}\n\nIt works for 10 minutes. If you did not ask for this, ignore this email; your password stays the same.\n\nVeyra Dine In`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:460px;margin:auto;padding:24px;color:#1B1714"><h2 style="margin:0 0 8px">Reset your password</h2><p style="margin:0 0 18px;color:#5b524b">For <b>${escH(r.name)}</b> on Veyra Dine In. Type this code in the app:</p><div style="font:700 34px/1 Consolas,monospace;letter-spacing:8px;background:#FDE7DC;color:#C2410C;padding:16px;border-radius:12px;text-align:center">${code}</div><p style="color:#5b524b;font-size:14px;margin:18px 0 0">It works for 10 minutes. If you did not ask for this, ignore this email; your password stays the same.</p></div>` });
+    } catch (e) { console.log('[reset] email failed:', e.message); return fail(res, 502, 'Could not send the email right now. Please try again, or message us on WhatsApp.'); }
+    resetCodes.set(r.id, { hash: codeHash(r.id, code), exp: Date.now() + 10 * 60000, tries: 0, sent: Date.now() });
+    trackEvent('reset_code_sent'); return send(res, 200, { ok: true, to: maskEmail(r.email) });
+  }
+  if (m === 'POST' && p === '/api/admin/reset/finish') {
+    const who = str(body.who, 120).toLowerCase();
+    const r = db.restaurants.find(x => (who.includes('@') ? (x.email || '').toLowerCase() === who : x.slug === slugify(who)));
+    const c = r && resetCodes.get(r.id);
+    if (!c || c.exp < Date.now()) return fail(res, 400, 'This code has expired. Ask for a new one.');
+    if (c.tries >= 5) { resetCodes.delete(r.id); return fail(res, 429, 'Too many wrong codes. Ask for a new one.'); }
+    if (codeHash(r.id, str(body.code, 10).replace(/\D/g, '')) !== c.hash) { c.tries++; return fail(res, 400, `That code is not right. ${5 - c.tries} tries left.`); }
+    if (str(body.password).length < 6) return fail(res, 400, 'New password needs at least 6 characters');
+    resetCodes.delete(r.id);
+    r.passwordHash = hashPassword(body.password); r.sessionVer = (r.sessionVer || 0) + 1; delete r.resetUntil; save();
+    setCookie(res, 'vd_admin', sign(r.id + '|' + r.sessionVer)); trackEvent('reset_done');
+    return send(res, 200, { ok: true, slug: r.slug });
+  }
   if (m === 'POST' && p === '/api/admin/google') { // log in, or start a free trial, with a Google account
     let gu; try { gu = await verifyGoogle(body.credential); } catch (e) { return fail(res, e.status || 400, e.message); }
     let r = db.restaurants.find(x => x.email === gu.email);
@@ -1542,6 +1578,14 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       if (body.extendTrialDays) { const base = Math.max(Date.now(), Date.parse(r.trialEnds || 0) || 0); r.plan = 'trial'; r.trialEnds = new Date(base + Number(body.extendTrialDays) * DAY).toISOString(); }
       if (body.plan === 'lifetime') { r.plan = 'lifetime'; r.paidUntil = null; }
       save(); return send(res, 200, publicRestaurant(r));
+    }
+    if (m === 'GET' && p === '/api/platform/email') { const c = (db.config && db.config.smtp) || {}; return send(res, 200, { host: c.host || '', port: c.port || 465, user: c.user || '', from: c.from || '', hasPass: !!c.pass, fromEnv: !!process.env.SMTP_HOST }); }
+    if (m === 'POST' && p === '/api/platform/email') {
+      const c = db.config.smtp || {}; const n = { host: str(body.host, 120), port: Number(body.port) || 465, user: str(body.user, 160), from: str(body.from, 200), pass: body.pass ? String(body.pass).replace(/\s+/g, '').slice(0, 200) : c.pass };
+      if (!n.host) { delete db.config.smtp; save(); return send(res, 200, { ok: true, off: true }); }
+      if (!n.user || !n.pass) return fail(res, 400, 'Email address and app password are needed');
+      if (body.test) { try { await mailer.send(n, { to: str(body.test, 160), subject: 'Veyra Dine In test email', text: 'Email codes for password reset are working.' }); } catch (e) { return fail(res, 400, e.message); } }
+      db.config.smtp = n; save(); return send(res, 200, { ok: true });
     }
     if (m === 'GET' && p === '/api/platform/google') return send(res, 200, { clientId: googleClientId(), fromEnv: !!process.env.GOOGLE_CLIENT_ID });
     if (m === 'POST' && p === '/api/platform/google') {

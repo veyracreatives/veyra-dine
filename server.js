@@ -1286,6 +1286,32 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       (body.ids || []).forEach((cid, i) => { const c = db.categories.find(x => x.id === cid && x.restaurantId === r.id); if (c) c.sort = i; });
       save(); return send(res, 200, { ok: true });
     }
+    // menu: bulk import (paste or CSV). Adds new categories and dishes, never deletes. A dish with the same name in the same category is updated, not duplicated.
+    if (m === 'POST' && p === '/api/admin/menu/import') {
+      const rows = Array.isArray(body.rows) ? body.rows.slice(0, 2000) : [];
+      if (!rows.length) return fail(res, 400, 'Nothing to import');
+      const key = x => String(x || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      const out = { categories: 0, added: 0, updated: 0, same: 0, skipped: [] };
+      let sort = Math.max(0, ...mine(db.items).map(x => x.sort));
+      for (const [i, row] of rows.entries()) {
+        const name = str(row.name, 80), cname = str(row.category, 60) || 'Menu';
+        let price; try { price = money(row.price); } catch (e) { price = NaN; }
+        if (!name || !(price >= 0)) { out.skipped.push(i + 1); continue; }
+        let c = mine(db.categories).find(x => key(x.name) === key(cname));
+        if (!c) { c = { id: id(), restaurantId: r.id, name: cname, sort: Math.max(0, ...mine(db.categories).map(x => x.sort)) + 1 }; db.categories.push(c); out.categories++; }
+        const d = String(row.diet || '').toLowerCase();
+        const diet = /non|chicken|mutton|fish|meat/.test(d) ? 'nonveg' : /egg/.test(d) ? 'egg' : /none|drink/.test(d) ? 'none' : 'veg';
+        const ex = mine(db.items).find(x => x.categoryId === c.id && key(x.name) === key(name));
+        if (ex) {
+          const desc = row.description != null && str(row.description, 300) ? str(row.description, 300) : ex.description;
+          if (ex.price === price && ex.description === desc) { out.same++; continue; }
+          ex.price = price; ex.description = desc; out.updated++; continue;
+        }
+        db.items.push({ id: id(), restaurantId: r.id, name, description: str(row.description, 300) || '', price, categoryId: c.id, diet, available: true, bestseller: false, spicy: /spicy|schezwan/i.test(String(row.spicy || '')) || row.spicy === true, photo: '', sort: ++sort });
+        out.added++;
+      }
+      save(); return send(res, 200, out);
+    }
     // menu: items
     const itemFields = (it, b) => {
       if (b.name != null) it.name = str(b.name, 80);

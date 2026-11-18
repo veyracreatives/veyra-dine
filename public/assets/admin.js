@@ -187,6 +187,50 @@
       </div><div class="sheet-foot" style="display:flex;gap:10px;justify-content:flex-end"><button type="button" class="btn" data-close>Later</button><button class="btn btn-primary">Save password</button></div></form>`);
     o.querySelector('form').onsubmit = async e => { e.preventDefault(); try { await api('/api/admin/password', { method: 'POST', body: { next: new FormData(e.target).get('next') } }); o.close(); toast('New password saved', 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
   }
+  // ---------- import a whole menu at once ----------
+  function parseMenu(text) {
+    // One dish per line: Category, Dish, Price, Veg/Non-veg, Description. Also accepts "Dish - 120" lines under a "Category:" heading line.
+    const rows = []; let cat = '';
+    const cells = line => { const out = []; let cur = '', q = false; for (let i = 0; i < line.length; i++) { const ch = line[i]; if (q) { if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; } else if (ch === '"') q = true; else if (ch === ',' || ch === '\t' || ch === ';') { out.push(cur.trim()); cur = ''; } else cur += ch; } out.push(cur.trim()); return out; };
+    for (let raw of String(text).replace(/^﻿/, '').split(/\r?\n/)) {
+      const line = raw.trim(); if (!line) continue;
+      const c = cells(line);
+      if (c.length >= 3 && /^\d+(\.\d+)?$/.test(c[2].replace(/[₹,\s]/g, ''))) { rows.push({ category: c[0], name: c[1], price: c[2].replace(/[₹,\s]/g, ''), diet: c[3] || '', description: c[4] || '' }); continue; }
+      if (/^category\s*,/i.test(line)) continue; // header row
+      const m = /^(?:\d+\s*[.)]\s*)?(.+?)\s*(?:[-–:|]|\s)\s*₹?\s*(\d+(?:\.\d+)?)\s*$/.exec(line);
+      if (m && cat) { rows.push({ category: cat, name: m[1].trim(), price: m[2], diet: '' }); continue; }
+      cat = line.replace(/[:\-–]+$/, '').trim();
+    }
+    return rows;
+  }
+  function importMenu() {
+    const o = modal(`<div class="sheet-head"><h3>Import menu</h3><button class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body form">
+      <p class="muted" style="margin:0;font-size:14px">Add many dishes at once. Nothing is deleted. A dish that already exists in the same category gets the new price instead of a copy.</p>
+      <label class="field"><span>Choose a CSV file (Excel: File › Save as › CSV)</span><input class="input" type="file" id="impFile" accept=".csv,.txt,text/csv,text/plain"></label>
+      <label class="field"><span>Or paste the menu</span><textarea class="input" id="impText" rows="8" placeholder="Category, Dish, Price, Veg or Non-veg, Description&#10;Dosa, Masala Dosa, 60, Veg&#10;Dosa, Mysore Masala Dosa, 120, Veg&#10;&#10;or&#10;&#10;Dosa&#10;Masala Dosa - 60&#10;Mysore Masala Dosa - 120"></textarea></label>
+      <div id="impPrev" class="muted" style="font-size:14px">Paste or choose a file to see what will be added.</div>
+      </div><div class="sheet-foot" style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap"><button type="button" class="btn" id="impSample">${icon('download', 16)} Sample file</button><button class="btn btn-primary" id="impGo" disabled>Import</button></div>`, { wide: true });
+    const ta = o.querySelector('#impText'), prev = o.querySelector('#impPrev'), go = o.querySelector('#impGo');
+    let rows = [];
+    const show = () => {
+      rows = parseMenu(ta.value); go.disabled = !rows.length;
+      if (!rows.length) { prev.innerHTML = ta.value.trim() ? 'No dishes found. Use one dish per line: Category, Dish, Price.' : 'Paste or choose a file to see what will be added.'; return; }
+      const cats = [...new Set(rows.map(r => r.category))];
+      prev.innerHTML = `<b style="color:var(--ink)">${rows.length} dishes in ${cats.length} ${cats.length === 1 ? 'category' : 'categories'}</b>: ${cats.map(c => `${esc(c)} (${rows.filter(r => r.category === c).length})`).join(', ')}`;
+      go.textContent = `Import ${rows.length} dishes`;
+    };
+    ta.oninput = show;
+    o.querySelector('#impFile').onchange = e => { const f = e.target.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => { ta.value = rd.result; show(); }; rd.readAsText(f); };
+    o.querySelector('#impSample').onclick = () => { const csv = 'Category,Dish,Price,Veg or Non-veg,Description\nStarters,Paneer Tikka,249,Veg,Cottage cheese grilled in the tandoor\nMain Course,Butter Chicken,349,Non-veg,\nDrinks,Masala Chaas,59,Veg,\n'; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' })); a.download = 'menu-sample.csv'; document.body.appendChild(a); a.click(); a.remove(); };
+    go.onclick = async () => {
+      go.disabled = true; go.textContent = 'Importing…';
+      try {
+        const r = await api('/api/admin/menu/import', { method: 'POST', body: { rows } });
+        o.close(); S.menu = null; renderTab();
+        toast(`${icon('check', 18)} ${r.added} dishes added${r.updated ? `, ${r.updated} prices updated` : ''}${r.same ? `, ${r.same} already there` : ''}${r.skipped.length ? `. ${r.skipped.length} lines skipped` : ''}`, 'ok');
+      } catch (err) { go.disabled = false; show(); toast(esc(err.message), 'error'); }
+    };
+  }
   // ---------- trial, license, buying ----------
   const inr = n => '₹' + Number(n).toLocaleString('en-IN');
   function buyLink(plan) {
@@ -723,7 +767,7 @@
     const list = items.filter(i => i.categoryId === S.selCat);
     const cat = categories.find(x => x.id === S.selCat);
     c.innerHTML = `<div class="menu-grid">
-      <div class="panel"><div class="panel-head"><h2>Categories</h2><button class="btn btn-sm" id="addCat">${icon('plus', 16)} Add</button></div>
+      <div class="panel"><div class="panel-head"><h2>Categories</h2><div style="display:flex;gap:6px"><button class="btn btn-sm" id="impMenu" title="Add many dishes at once from a list or a CSV file">${icon('download', 16)} Import</button><button class="btn btn-sm" id="addCat">${icon('plus', 16)} Add</button></div></div>
         <div class="cat-list">${categories.map(x => `<button class="cat-item ${x.id === S.selCat ? 'on' : ''}" data-cat="${x.id}"><span>${esc(x.name)}</span><span class="c">${items.filter(i => i.categoryId === x.id).length}</span>
           <span class="mini" data-ren="${x.id}" title="Rename">${icon('edit', 15)}</span><span class="mini" data-delcat="${x.id}" title="Delete">${icon('trash', 15)}</span></button>`).join('') || '<div class="empty" style="padding:20px">Add your first category, like “Starters”.</div>'}</div></div>
       <div class="panel"><div class="panel-head"><h2>${cat ? esc(cat.name) : 'Dishes'} <span class="muted" style="font-weight:600">· ${list.length} dishes</span></h2>${cat ? `<button class="btn btn-primary" id="addItem">${icon('plus', 18)} Add dish</button>` : ''}</div>
@@ -741,6 +785,7 @@
       S.selCat = b.dataset.cat; renderMenu(c);
     });
     document.getElementById('addCat').onclick = () => renameCat(null);
+    document.getElementById('impMenu').onclick = importMenu;
     ['addItem', 'addItem2'].forEach(k => { const b = document.getElementById(k); if (b) b.onclick = () => editItem(null); });
     c.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => editItem(b.dataset.edit));
     c.querySelectorAll('[data-avail]').forEach(i => i.onchange = async () => {

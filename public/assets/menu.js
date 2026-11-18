@@ -108,12 +108,12 @@
           <div class="name-row"><h1>${esc(r.name)}</h1>${r.tagline ? `<p class="tagline">${esc(r.tagline)}</p>` : ''}</div>
           ${D.table ? `<div class="table-chip">${icon('utensils', 18)} You're ordering for ${esc(D.table.name)}</div>` : ''}
           ${socials ? `<div class="socials">${socials}</div>` : ''}
-          ${r.wifi || r.loyalty || r.games ? `<div class="extras">${r.games ? `<button class="pill-btn hot" id="gameBtn">${icon('game', 16)} Play and win</button>` : ''}${r.wifi ? `<button class="pill-btn" id="wifiBtn">${icon('wifi', 16)} WiFi</button>` : ''}${r.loyalty ? `<button class="pill-btn" id="ptsBtn">${icon('star', 16)} My points</button>` : ''}</div>` : ''}
         </div>
       </header>
       ${!D.table ? `<div class="notice">${icon('qr', 18)}<span>You're viewing the menu. To order, scan the QR code on your table.</span></div>` : ''}
       ${D.table && !r.acceptingOrders ? `<div class="notice">${icon('clock', 18)}<span>We're not taking orders on the app right now. Please ask our staff.</span></div>` : ''}
       ${D.table && r.acceptingOrders ? `<div class="together">${icon('utensils', 18)}<span><b>Ordering with friends?</b> Everyone at ${esc(D.table.name)} can scan the QR and add to this same order from their own phone.</span></div>` : ''}
+      ${r.games ? `<a class="gz-promo" href="#games" id="gzPromo">${gzPromoInner(GS)}</a>` : ''}
       ${D.offers && D.offers.length ? `<div class="offers">${D.offers.map(o => `<button class="offer" data-offer="${esc(o.code)}"><span class="tag">${icon('star', 15)}</span><span><b>${esc(o.label)}</b><small>Use code <code>${esc(o.code)}</code>${o.note ? ' · ' + esc(o.note) : ''}</small></span></button>`).join('')}</div>` : ''}
       <div class="tools">
         <label class="search">${icon('search', 18)}<input id="q" type="search" placeholder="Search dishes" value="${esc(query)}" autocomplete="off"></label>
@@ -138,8 +138,8 @@
     const hb = document.getElementById('helpBtn'); if (hb) hb.onclick = openHelp;
     const wb = document.getElementById('wifiBtn'); if (wb) wb.onclick = openWifi;
     const pb = document.getElementById('ptsBtn'); if (pb) pb.onclick = openPoints;
-    const gb = document.getElementById('gameBtn'); if (gb) gb.onclick = () => openGames();
     renderCartBar();
+    if (r.games) { refreshGS(); mountOrbs(); }
   }
 
   function renderSections() {
@@ -161,8 +161,8 @@
         <div class="price">${cur(it.price)}${D.prep && D.prep[it.id] ? `<span class="prep">${icon('clock', 13)} ${D.prep[it.id]} min</span>` : ''}</div>
         ${it.description ? `<p class="desc">${esc(it.description)}</p>` : ''}
       </div>
-      <div class="dish-side ${it.photo ? '' : 'no-photo'}">
-        ${it.photo ? `<img class="dish-photo" src="${esc(it.photo)}" alt="${esc(it.name)}" loading="lazy" data-open="${it.id}">` : ''}
+      <div class="dish-side">
+        ${it.photo ? `<img class="dish-photo" src="${esc(it.photo)}" alt="${esc(it.name)}" loading="lazy" data-open="${it.id}">` : `<div class="dish-ph" data-open="${it.id}" aria-hidden="true"><span>${esc(initials(it.name))}</span></div>`}
         <div class="add-wrap" data-ctl="${it.id}">${control(it)}</div>
       </div>
     </article>`;
@@ -436,7 +436,7 @@
   }
 
   // ---------- mini games: play while the food cooks, top the weekly leaderboard ----------
-  function openGames(start) {
+  function openGames(start, autoplay) {
     const GM = window.VDGames; if (!GM) return;
     const gR = D.restaurant.games || {}; let game = start || load('vd_game', 'stack'), run = null, sid = '', top = null;
     const o = sheet(`<div class="sheet-head"><h2>${icon('game', 22)} Play and win</h2><button class="icon-btn" data-close aria-label="Close">${icon('x', 20)}</button></div>
@@ -453,8 +453,8 @@
       body.querySelector('#gplay').onclick = play;
     }
     async function play() {
-      sid = ''; try { if (tableToken) sid = (await api(`/api/menu/${slug}/games/start`, { method: 'POST', body: { game, table: tableToken } })).sid; } catch (err) { toast(esc(err.message), 'error'); }
-      body.innerHTML = `<div id="gcv"></div>${sid ? '' : '<p class="muted center" style="margin:10px 0 0">Practice game. Scan your table QR to play for the leaderboard.</p>'}`;
+      sid = ''; try { sid = (await api(`/api/menu/${slug}/games/start`, { method: 'POST', body: { game, table: tableToken } })).sid; } catch (err) { toast(esc(err.message), 'error'); o.close(); refreshGS(); return; }
+      body.innerHTML = `<div id="gcv"></div>`;
       run = GM.play(body.querySelector('#gcv'), game, { accent: D.restaurant.brandColor, onOver: over });
     }
     function over(score, ms) {
@@ -472,7 +472,7 @@
         catch (err) { btn.disabled = false; toast(esc(err.message), 'error'); } };
     }
     o.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { game = b.dataset.g; store('vd_game', game); home(); });
-    home(); loadTop().then(() => { if (!run && body.querySelector('#gplay')) home(); });
+    if (autoplay) play(); else { home(); loadTop().then(() => { if (!run && body.querySelector('#gplay')) home(); }); }
   }
   function openPoints() {
     const L = D.restaurant.loyalty, ph = load('vd_phone', '');
@@ -495,6 +495,131 @@
       try { await api(`/api/menu/${slug}/requests`, { method: 'POST', body: { table: tableToken, type: b.dataset.req } }); o.close(); toast(`${icon('check', 18)} Done. The staff has been told.`, 'ok'); }
       catch (err) { toast(esc(err.message), 'error'); }
     });
+  }
+
+
+  // ---------- sections: Menu, Game Zone, Rewards, Info (bottom bar) ----------
+  function initials(n) { const w = String(n).replace(/\(.*?\)/g, '').trim().split(/[\s\-–]+/).filter(Boolean); return ((w[0] || '?')[0] + (w.length > 1 ? w[w.length - 1][0] : (w[0] || '').slice(1, 2))).toUpperCase(); }
+  function renderNav(active) {
+    let n = document.getElementById('gnav');
+    if (!active) { if (n) n.remove(); document.body.classList.remove('has-gnav'); return; }
+    const r = D.restaurant, tabs = [['menu', '#', 'book', 'Menu']];
+    if (r.games) tabs.push(['games', '#games', 'game', 'Game Zone']);
+    if (r.loyalty || (D.offers && D.offers.length)) tabs.push(['rewards', '#rewards', 'gift', 'Rewards']);
+    tabs.push(['info', '#info', 'info', r.wifi ? 'WiFi & info' : 'Info']);
+    if (!n) { n = document.createElement('nav'); n.id = 'gnav'; n.className = 'gnav'; document.body.appendChild(n); }
+    document.body.classList.add('has-gnav');
+    n.style.setProperty('--n', tabs.length);
+    n.innerHTML = tabs.map(([k, href, ic, label]) => `<a href="${href}" class="${k === active ? 'on' : ''} ${k === 'games' ? 'gz' : ''}" ${k === active ? 'aria-current="page"' : ''}>${k === 'games' && GS && GS.open ? '<i class="live"></i>' : ''}${icon(ic, 22)}<span>${label}</span></a>`).join('');
+  }
+  // Game Zone state: open while this table has an order being made
+  let GS = null, gsTimer = null;
+  async function refreshGS() {
+    if (!D.restaurant.games) return;
+    try { GS = tableToken ? await api(`/api/menu/${slug}/games/status?t=${encodeURIComponent(tableToken)}`) : { open: false, table: false }; } catch { return; }
+    const p = document.getElementById('gzPromo'); if (p) p.innerHTML = gzPromoInner(GS);
+    const st = document.getElementById('gzState'); if (st) { st.outerHTML = gzState(); bindGz(); }
+    document.querySelectorAll('.gz-card').forEach(c => c.classList.toggle('locked', !GS.open));
+    const nv = document.querySelector('#gnav .gz'); if (nv) { const has = nv.querySelector('.live'); if (GS.open && !has) nv.insertAdjacentHTML('afterbegin', '<i class="live"></i>'); if (!GS.open && has) has.remove(); }
+    clearTimeout(gsTimer); if (['', '#', '#games'].includes(location.hash) || location.hash === '') gsTimer = setTimeout(refreshGS, GS.open ? 20000 : 30000);
+  }
+  function mountOrbs() { if (window.VDOrb) document.querySelectorAll('[data-gorb]').forEach(el => VDOrb.mount(el, { color: D.restaurant.brandColor })); }
+  function gzPromoInner(s) {
+    const g = D.restaurant.games || {}, open = s && s.open;
+    return `<span class="orb gz-porb" data-gorb aria-hidden="true"></span><span class="gz-art" aria-hidden="true"><i></i><i></i><i></i></span><span class="gz-txt"><small>${open ? '<i class="live"></i> Open now' : `${icon('lock', 13)} Order to unlock`}</small><b>Game Zone</b><em>${g.reward ? `Top scorer this week wins ${esc(g.reward)}` : '3 quick games. Beat the top score.'}</em></span><span class="gz-go">${open ? 'Play' : 'See games'} ${icon('right', 16)}</span>`;
+  }
+  function gzState() {
+    if (GS && GS.open) {
+      const o = GS.order, mins = o && o.readyBy ? Math.round((Date.parse(o.readyBy) - Date.now()) / 60000) : 0;
+      return `<div class="gz-state open" id="gzState"><span class="ico">${icon('game', 22)}</span><span><b><i class="live"></i> The Game Zone is open</b><small>Play as many times as you like until your food is ready${mins > 0 ? ` (about ${mins} min)` : ''}.</small></span></div>`;
+    }
+    if (!D.table) return `<div class="gz-state" id="gzState"><span class="ico">${icon('lock', 22)}</span><span><b>Scan the QR on your table</b><small>Then order, and the Game Zone opens while your food is being made.</small></span></div>`;
+    return `<div class="gz-state" id="gzState"><span class="ico">${icon('lock', 22)}</span><span><b>Order to unlock</b><small>Place your order and the games open right away. Play as often as you like until your food is ready.</small></span>${canOrder() ? '<a class="btn btn-primary btn-sm" href="#">Order now</a>' : ''}</div>`;
+  }
+  function bindGz() {
+    document.querySelectorAll('[data-gplay]').forEach(b => b.onclick = () => {
+      if (!GS || !GS.open) { const st = document.getElementById('gzState'); if (st) { st.classList.remove('shake'); void st.offsetWidth; st.classList.add('shake'); st.scrollIntoView({ behavior: 'smooth', block: 'center' }); } return toast(D.table ? 'Order first. The games open while your food is being made.' : 'Scan the QR on your table and order to play.'); }
+      if (!window.VDGames) return toast('Loading the games, try again in a second.');
+      openGames(b.dataset.gplay, true);
+    });
+  }
+  async function renderGames() {
+    const r = D.restaurant, g = r.games || {}, GM = window.VDGames;
+    const list = GM ? GM.list : [{ id: 'stack', name: 'Chai Stack', how: '' }, { id: 'catch', name: 'Roti Catch', how: '' }, { id: 'tap', name: 'Spice Rush', how: '' }];
+    let board = 'stack';
+    app.innerHTML = `
+      <header class="gz-hero">
+        <span class="orb gz-orb" data-gorb aria-hidden="true"></span>
+        <div class="gz-top">${r.logo ? `<img src="${esc(r.logo)}" alt="">` : ''}<span>${esc(r.name)}</span></div>
+        <h1>Game Zone</h1>
+        <p>Three quick games to play while your food is being made. Free to play, and the best score each week wins.</p>
+        ${g.reward || g.points ? `<div class="gz-prize">${icon('trophy', 20)}<span><small>This week's prize</small><b>${esc(g.reward || '')}${g.reward && g.points ? ' + ' : ''}${g.points ? g.points + ' bonus points' : ''}</b></span></div>` : ''}
+      </header>
+      <div class="gz-body">
+        ${gzState()}
+        <div class="gz-grid">${list.map((x, i) => `<article class="gz-card ${GS && GS.open ? '' : 'locked'}" style="--k:${i}">
+          <div class="gz-pic gp-${x.id}" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div class="gz-info"><h3>${esc(x.name)}</h3><p>${esc(x.how)}</p><div class="gz-best" id="best-${x.id}"></div></div>
+          <button class="btn btn-primary gz-play" data-gplay="${x.id}"><span class="when-open">${icon('game', 18)} Play</span><span class="when-locked">${icon('lock', 16)} Locked</span></button>
+        </article>`).join('')}</div>
+        <section class="gz-board"><div class="gz-bh"><h2>${icon('trophy', 20)} This week's top scores</h2></div>
+          <div class="gz-tabs">${list.map(x => `<button data-bt="${x.id}">${esc(x.name)}</button>`).join('')}</div>
+          <ol class="gm-board" id="gzList"><li class="muted">Loading…</li></ol><p class="muted gm-rec" id="gzRec"></p></section>
+        <p class="gz-rule">${icon('info', 16)} Games are free. Scores count only while an order from your table is being made. First names only on the board.</p>
+      </div>`;
+    bindGz(); mountOrbs();
+    let top = null;
+    const draw = () => {
+      app.querySelectorAll('[data-bt]').forEach(b => b.classList.toggle('on', b.dataset.bt === board));
+      const t = top && top.games[board], l = t ? t.week : [];
+      const ul = document.getElementById('gzList'); if (!ul) return;
+      ul.innerHTML = l.length ? l.map((x, i) => `<li${i < 3 ? ` class="m${i + 1}"` : ''}><span>${i + 1}</span><b>${esc(x.name)}</b><em>${x.score}</em></li>`).join('') : '<li class="empty-li">No scores yet this week. Be the first!</li>';
+      document.getElementById('gzRec').innerHTML = t && t.all[0] ? `All-time record: <b>${t.all[0].score}</b> by ${esc(t.all[0].name)}` : '';
+      list.forEach(x => { const el = document.getElementById('best-' + x.id), w = top && top.games[x.id] && top.games[x.id].week[0]; if (el) el.innerHTML = w ? `${icon('trophy', 14)} Best this week: <b>${w.score}</b> by ${esc(w.name)}` : `${icon('trophy', 14)} No score yet this week`; });
+    };
+    app.querySelectorAll('[data-bt]').forEach(b => b.onclick = () => { board = b.dataset.bt; draw(); });
+    draw();
+    refreshGS();
+    try { top = await api(`/api/menu/${slug}/games/top`); } catch {}
+    if (location.hash === '#games') draw();
+  }
+  function renderRewards() {
+    const r = D.restaurant, L = r.loyalty, ph = load('vd_phone', '');
+    app.innerHTML = `<header class="sub-hero"><span class="ico">${icon('gift', 26)}</span><h1>Rewards</h1><p>${L ? `Collect points every time you eat at ${esc(r.name)}.` : `Offers at ${esc(r.name)}.`}</p></header>
+      <div class="sub-body">
+        ${L ? `<section class="card-s"><h2>${icon('star', 20)} My points</h2>
+          <div class="pts-steps"><div><b>${cur(L.spend)}</b><small>spent = 1 point</small></div><div><b>1 point</b><small>= ${cur(L.value)} off</small></div><div><b>${L.min || 1}+</b><small>points to use them</small></div></div>
+          <form id="pf" class="pts-form"><input class="input" id="pph" inputmode="tel" maxlength="14" placeholder="Your mobile number" value="${esc(ph)}"><button class="btn btn-primary">Check</button></form>
+          <div id="pres"></div><p class="muted" style="margin:10px 0 0;font-size:13.5px">Give your mobile number when you order and the points are added once your food is served.</p></section>` : ''}
+        ${D.offers && D.offers.length ? `<section class="card-s"><h2>${icon('gift', 20)} Offers</h2><div class="offers flat">${D.offers.map(o => `<button class="offer" data-offer="${esc(o.code)}"><span class="tag">${icon('star', 15)}</span><span><b>${esc(o.label)}</b><small>Use code <code>${esc(o.code)}</code>${o.note ? ' · ' + esc(o.note) : ''}</small></span></button>`).join('')}</div></section>` : ''}
+        ${r.games ? `<a class="gz-promo" href="#games" id="gzPromo">${gzPromoInner(GS)}</a>` : ''}
+      </div>`;
+    const f = document.getElementById('pf');
+    if (f) f.onsubmit = async e => { e.preventDefault(); const v = document.getElementById('pph').value; try { const x = await api(`/api/menu/${slug}/points?phone=${encodeURIComponent(v)}`); store('vd_phone', v); document.getElementById('pres').innerHTML = `<div class="pts-card"><b>${x.points}</b><span>points</span><small>${x.points >= x.min ? `Worth ${cur(x.worth)} off. Ask the counter to use them on your bill.` : `${x.min - x.points} more to go before you can use them.`}</small></div>`; } catch (err) { toast(esc(err.message), 'error'); } };
+    renderCartBar();
+  }
+  function renderInfo() {
+    const r = D.restaurant, w = r.wifi;
+    const socials = SOCIALS.filter(([k]) => r.socials[k]).map(([k, label, ic]) => `<a class="soc-row" href="${esc(r.socials[k])}" target="_blank" rel="noopener">${icon(ic, 20)}<span>${label}</span>${icon('right', 16)}</a>`).join('');
+    app.innerHTML = `<header class="sub-hero"><span class="ico">${icon('info', 26)}</span><h1>${w ? 'WiFi & info' : 'Info'}</h1><p>${esc(r.name)}${r.tagline ? ' · ' + esc(r.tagline) : ''}</p></header>
+      <div class="sub-body">
+        ${w ? `<section class="card-s wifi-s"><h2>${icon('wifi', 20)} Free WiFi</h2>
+          <div class="wf-row"><small>Network</small><b>${esc(w.ssid)}</b><button class="btn btn-sm" id="cpS">${icon('copy', 16)} Copy</button></div>
+          <div class="wf-row"><small>Password</small><b class="pw">${w.open ? 'No password' : esc(w.pass)}</b>${w.open ? '' : `<button class="btn btn-sm btn-primary" id="cpP">${icon('copy', 16)} Copy</button>`}</div>
+          <div class="wf-qr"><img alt="WiFi QR code" src="/api/menu/${slug}/wifi-qr" loading="lazy"><small>Friends can scan this with their camera to join in one tap.</small></div></section>` : ''}
+        ${D.table ? `<section class="card-s"><h2>${icon('hand', 20)} Need something?</h2><div class="help-grid">
+          <button class="help-opt" data-req="waiter"><span class="ico">${icon('hand', 22)}</span><span>Call a waiter<small>Someone comes to ${esc(D.table.name)}</small></span></button>
+          <button class="help-opt" data-req="bill"><span class="ico">${icon('receipt', 22)}</span><span>Ask for the bill<small>We bring it to your table</small></span></button>
+          <button class="help-opt" data-req="water"><span class="ico">${icon('water', 22)}</span><span>Bring water<small>Still water for the table</small></span></button></div></section>` : ''}
+        ${r.address || r.phone ? `<section class="card-s"><h2>${icon('pin', 20)} Find us</h2>${r.address ? `<p style="margin:0 0 6px">${esc(r.address)}</p>` : ''}${r.phone ? `<p style="margin:0"><a href="tel:${esc(r.phone.replace(/\s/g, ''))}">${icon('phone', 16)} ${esc(r.phone)}</a></p>` : ''}</section>` : ''}
+        ${socials ? `<section class="card-s"><h2>${icon('globe', 20)} Follow and review</h2><div class="soc-list">${socials}</div></section>` : ''}
+        ${r.footerNote ? `<p class="muted" style="font-size:13.5px;margin:4px 2px 0">${esc(r.footerNote)}</p>` : ''}
+        ${r.poweredBy ? '<div class="powered">Powered by Veyra Dine In</div>' : ''}
+      </div>`;
+    const a = document.getElementById('cpS'); if (a) a.onclick = () => copyText(w.ssid, 'WiFi name copied');
+    const b = document.getElementById('cpP'); if (b) b.onclick = () => copyText(w.pass, 'Password copied');
+    app.querySelectorAll('[data-req]').forEach(x => x.onclick = async () => { try { await api(`/api/menu/${slug}/requests`, { method: 'POST', body: { table: tableToken, type: x.dataset.req } }); toast(`${icon('check', 18)} Done. The staff has been told.`, 'ok'); } catch (err) { toast(esc(err.message), 'error'); } });
+    renderCartBar();
   }
 
   // ---------- order status ----------
@@ -540,7 +665,7 @@
     </div>`;
     const back = () => { location.hash = ''; };
     document.getElementById('back').onclick = back;
-    const gc = document.getElementById('gcta'); if (gc) gc.onclick = () => openGames();
+    const gc = document.getElementById('gcta'); if (gc) gc.onclick = () => { location.hash = '#games'; };
     const more = document.getElementById('more'); if (more) more.onclick = back;
     const h2 = document.getElementById('help2'); if (h2) h2.onclick = openHelp;
     const ip1 = document.getElementById('ipaid1'); if (ip1) ip1.onclick = async () => {
@@ -582,11 +707,16 @@
   }
 
   function route() {
+    document.querySelectorAll('.overlay').forEach(o => { const x = o.querySelector('[data-close]'); x ? x.click() : o.remove(); });
     const m = /^#order=([A-Za-z0-9]+)$/.exec(location.hash);
-    if (m) return showOrder(m[1]);
+    if (m) { renderNav(null); return showOrder(m[1]); }
     if (orderStream) { orderStream.close(); orderStream = null; }
-    if (location.hash === '#bill' && D.table) { window.scrollTo(0, 0); renderCartBar(); return renderBill(); }
-    renderMenu();
+    const h = location.hash;
+    if (h === '#bill' && D.table) { window.scrollTo(0, 0); renderNav('menu'); renderCartBar(); return renderBill(); }
+    if (h === '#games' && D.restaurant.games) { window.scrollTo(0, 0); renderNav('games'); return renderGames(); }
+    if (h === '#rewards' && (D.restaurant.loyalty || (D.offers && D.offers.length))) { window.scrollTo(0, 0); renderNav('rewards'); return renderRewards(); }
+    if (h === '#info') { window.scrollTo(0, 0); renderNav('info'); return renderInfo(); }
+    renderNav('menu'); renderMenu();
   }
 
   // delegated clicks for menu controls

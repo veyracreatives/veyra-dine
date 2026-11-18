@@ -752,7 +752,9 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     }
     return fail(res, 404, 'Not found');
   }
-  if ((mt = /^\/api\/menu\/([a-z0-9-]+)\/games\/(start|score|top)$/.exec(p))) {
+  // Game Zone opens only while this table has an order being made (new or preparing). Once the food is ready, it locks until the next order.
+  const cookingOrder = (r, table) => table && (db.orders || []).filter(o => o.restaurantId === r.id && o.tableId === table.id && ['new', 'preparing'].includes(o.status) && Date.now() - Date.parse(o.createdAt) < 6 * 3600e3).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  if ((mt = /^\/api\/menu\/([a-z0-9-]+)\/games\/(start|score|top|status)$/.exec(p))) {
     const r = db.restaurants.find(x => x.slug === mt[1]); if (!r || !gamesOn(r)) return fail(res, 404, 'Games are off');
     if (!db.scores) db.scores = [];
     if (m === 'GET' && mt[2] === 'top') {
@@ -760,10 +762,16 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       for (const g of Object.keys(GAME_RULES)) { const l = mine.filter(x => x.game === g); out[g] = { week: topScores(l.filter(x => x.week === wk)).map(pubScore), all: topScores(l, 5).map(pubScore) }; }
       return send(res, 200, { games: out, reward: r.games.reward || '', points: loyaltyOn(r) ? (r.games.points || 0) : 0 });
     }
+    if (m === 'GET' && mt[2] === 'status') {
+      const table = db.tables.find(t => t.restaurantId === r.id && t.token === url.searchParams.get('t') && t.active !== false);
+      const o = cookingOrder(r, table);
+      return send(res, 200, { open: !!o, table: !!table, order: o ? { id: o.id, number: o.number, status: o.status, readyBy: o.readyBy || null } : null });
+    }
     if (m === 'POST' && mt[2] === 'start') {
       if (!GAME_RULES[body.game]) return fail(res, 400, 'Unknown game');
       const table = db.tables.find(t => t.restaurantId === r.id && t.token === body.table && t.active !== false);
-      if (!table) return fail(res, 400, 'Scan the QR code on your table to play for the leaderboard.');
+      if (!table) return fail(res, 400, 'Scan the QR code on your table, order, and the Game Zone opens.');
+      if (!cookingOrder(r, table)) return fail(res, 403, 'The Game Zone opens when you order and stays open until your food is ready.');
       const tk = 'game|' + clientIp(req); const t = tries.get(tk) || { n: 0, at: Date.now() }; if (Date.now() - t.at > 3600000) { t.n = 0; t.at = Date.now(); } t.n++; tries.set(tk, t);
       if (t.n > 120) return fail(res, 429, 'That is a lot of games! Take a break and try again in a while.');
       if (gameRuns.size > 5000) { const cut = Date.now() - 3600000; for (const [k, v] of gameRuns) if (v.at < cut) gameRuns.delete(k); }

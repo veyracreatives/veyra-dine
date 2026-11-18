@@ -3,7 +3,7 @@
    Used by the guest menu (scores go to the restaurant's leaderboard) and by the landing page demo. */
 (function () {
   const LIST = [
-    { id: 'stack', name: 'Chai Stack', how: 'Tap to drop each layer. Only the part that lands on the stack stays. It gets faster every layer.' },
+    { id: 'stack', name: 'Chai Stack', how: 'Tap to drop each layer. Only the part that lands on the stack stays. It gets faster every layer. 5 perfect drops in a row make the layer grow back.' },
     { id: 'catch', name: 'Roti Catch', how: 'Slide the plate to catch rotis and laddoos. Dodge the chillies. Miss a roti or catch a chilli and you lose a life.' },
     { id: 'tap', name: 'Spice Rush', how: 'Tap the glowing jar before it fades. Never tap a red chilli jar. Every hit makes the next one quicker.' },
   ];
@@ -45,8 +45,8 @@
   const GAMES = {
     // ---- Chai Stack: timing game, the moving layer gets faster and narrower ----
     stack(ctx, dim, g) {
-      const LH = 22; let blocks, cur, dir, cam, camT, perfect, flash, chips;
-      const reset = () => { const { W } = dim(); const w = W * 0.62; blocks = [{ x: (W - w) / 2, w }]; dir = 1; cam = 0; camT = 0; perfect = 0; flash = 0; chips = []; next(); };
+      const LH = 22; let blocks, cur, dir, cam, camT, perfect, flash, chips, w0, grew;
+      const reset = () => { const { W } = dim(); const w = W * 0.62; w0 = w; grew = 0; blocks = [{ x: (W - w) / 2, w }]; dir = 1; cam = 0; camT = 0; perfect = 0; flash = 0; chips = []; next(); };
       const speed = () => Math.min(11, 2.6 + g.getScore() * 0.32);
       const next = () => { const top = blocks[blocks.length - 1]; const { W } = dim(); dir = blocks.length % 2 ? 1 : -1; cur = { x: dir > 0 ? -top.w : W, w: top.w }; };
       reset();
@@ -61,8 +61,10 @@
           const top = blocks[blocks.length - 1]; const l = Math.max(cur.x, top.x), r = Math.min(cur.x + cur.w, top.x + top.w);
           const { H } = dim(); const yTop = H - 40 - blocks.length * LH + cam;
           if (r - l <= 0) { chips.push({ x: cur.x, w: cur.w, y: yTop, vy: 0 }); g.end(); return; }
-          if (Math.abs(cur.x - top.x) < 4) { cur.x = top.x; perfect++; flash = 1; if (perfect >= 3) { cur.w = Math.min(cur.w + 8, dim().W * 0.62); cur.x = Math.max(0, cur.x - 4); } }
-          else { perfect = 0; const cutX = cur.x < top.x ? cur.x : r; chips.push({ x: cutX, w: cur.w - (r - l), y: yTop, vy: 0 }); cur.x = l; cur.w = r - l; }
+          if (Math.abs(cur.x - top.x) < 4) { cur.x = top.x; perfect++; flash = 1; grew = 0;
+            // combo: every 5 perfect drops in a row, the layer grows back by half of what was cut off (never wider than the first layer)
+            if (perfect % 5 === 0 && cur.w < w0) { const add = Math.min(w0 - cur.w, Math.max(14, (w0 - cur.w) * 0.5)); const { W } = dim(); cur.x = Math.max(0, Math.min(W - (cur.w + add), cur.x - add / 2)); cur.w += add; grew = add; flash = 1.6; } }
+          else { perfect = 0; grew = 0; const cutX = cur.x < top.x ? cur.x : r; chips.push({ x: cutX, w: cur.w - (r - l), y: yTop, vy: 0 }); cur.x = l; cur.w = r - l; }
           blocks.push({ x: cur.x, w: cur.w }); g.setScore(blocks.length - 1);
           if (blocks.length > 8) camT = (blocks.length - 8) * LH;
           try { navigator.vibrate && navigator.vibrate(8); } catch (e) {}
@@ -76,8 +78,8 @@
           ctx.fillStyle = '#3A2F28'; ctx.fillRect(0, base, W, H);
           if (cur) layer(cur, blocks.length, base - (blocks.length + 1) * LH);
           ctx.globalAlpha = .6; chips.forEach(c => { ctx.fillStyle = shade(g.accent, -0.3); ctx.fillRect(c.x, c.y + cam * 0, c.w, LH - 2); }); ctx.globalAlpha = 1;
-          if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash * 0.5})`; ctx.font = '800 18px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.fillText(perfect >= 3 ? 'PERFECT! Wider' : 'PERFECT', W / 2, 70); }
-          g.xEl.textContent = perfect ? `Perfect ×${perfect}` : '';
+          if (flash > 0) { ctx.fillStyle = grew ? `rgba(255,214,120,${Math.min(1, flash * 0.7)})` : `rgba(255,255,255,${flash * 0.5})`; ctx.font = '800 18px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.fillText(grew ? `${perfect} PERFECT! Layer grows` : 'PERFECT', W / 2, 70); }
+          g.xEl.textContent = perfect ? `Perfect ×${perfect}${perfect % 5 ? ` · ${5 - perfect % 5} to grow` : ''}` : '';
         },
         resize() {},
       };

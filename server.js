@@ -939,7 +939,12 @@ async function handle(req, res) {
       }
       const dishes = {}, tables = {}, hours = Array(24).fill(0);
       for (const o of done) {
-        for (const l of o.items) { const d = dishes[l.name] || (dishes[l.name] = { name: l.name, qty: 0, sales: 0 }); d.qty += l.qty; d.sales = money(d.sales + l.qty * l.price); }
+        const seen = new Set();
+        for (const l of o.items) {
+          const it = db.items.find(i => i.id === l.itemId), cat = it && db.categories.find(k => k.id === it.categoryId);
+          const d = dishes[l.name] || (dishes[l.name] = { name: l.name, itemId: l.itemId || null, category: cat ? cat.name : 'Other', diet: l.diet || (it && it.diet) || '', qty: 0, sales: 0, orders: 0 });
+          d.qty += l.qty; d.sales = money(d.sales + l.qty * l.price); if (!seen.has(l.name)) { seen.add(l.name); d.orders++; }
+        }
         const t = tables[o.tableName] || (tables[o.tableName] = { name: o.tableName, orders: 0, sales: 0 }); t.orders++; t.sales = money(t.sales + o.total);
         hours[new Date(Date.parse(o.createdAt) - tz * 60000).getUTCHours()]++;
       }
@@ -947,7 +952,11 @@ async function handle(req, res) {
         from, to, discounts: money(done.reduce((s, o) => s + (o.discount || 0), 0)), orders: done.length, sales, average: done.length ? Math.round(sales / done.length) : 0,
         cancelled: all.length - done.length, items: done.reduce((s, o) => s + o.items.reduce((a, l) => a + l.qty, 0), 0),
         days, hours,
-        dishes: Object.values(dishes).sort((a, b) => b.qty - a.qty || b.sales - a.sales).slice(0, 15),
+        dishes: Object.values(dishes).sort((a, b) => b.qty - a.qty || b.sales - a.sales),
+        // What sells: share of item sales and items sold per category, and menu dishes nobody ordered in this period
+        categories: (() => { const C = {}; for (const d of Object.values(dishes)) { const k = C[d.category] || (C[d.category] = { name: d.category, qty: 0, sales: 0, dishes: 0 }); k.qty += d.qty; k.sales = money(k.sales + d.sales); k.dishes++; } return Object.values(C).sort((a, b) => b.sales - a.sales); })(),
+        itemSales: money(Object.values(dishes).reduce((t, d) => t + d.sales, 0)),
+        notSold: db.items.filter(i => i.restaurantId === r.id && !i.hidden && !Object.values(dishes).some(d => d.itemId === i.id || d.name === i.name)).map(i => { const cat = db.categories.find(k => k.id === i.categoryId); return { name: i.name, category: cat ? cat.name : 'Other', price: i.price }; }),
         tables: Object.values(tables).sort((a, b) => b.sales - a.sales),
         list: all.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 1000).map(publicOrder),
       });

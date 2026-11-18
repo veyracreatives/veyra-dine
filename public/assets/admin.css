@@ -268,3 +268,24 @@ body { background: var(--bg); }
 .wseg { display: inline-grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: var(--bg, #F6F5F3); max-width: 340px; }
 .wseg button { border: 0; background: transparent; padding: 9px 12px; border-radius: 9px; font: inherit; font-weight: 700; font-size: 14px; color: var(--ink-2); cursor: pointer; }
 .wseg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+
+/* What sells report */
+.ws-h { font-size: 15px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+.ws-cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-bottom: 22px; }
+.ws-cat { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; text-align: left; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: #fff; cursor: pointer; font: inherit; color: inherit; }
+.ws-cat.on { border-color: var(--brand); background: var(--brand-soft); }
+.ws-cat .nm { font-weight: 700; }
+.ws-cat b { font-size: 18px; grid-row: 1 / span 2; grid-column: 2; align-self: center; }
+.ws-cat .ws-bar { grid-column: 1; }
+.ws-cat small { grid-column: 1 / -1; color: var(--muted, #6B635B); font-size: 12.5px; }
+.ws-bar { display: block; height: 6px; border-radius: 99px; background: var(--line-2, #EFE9E1); overflow: hidden; margin-top: 6px; max-width: 220px; }
+.ws-bar i { display: block; height: 100%; background: var(--brand); border-radius: 99px; }
+.ws-tools { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.ws-tools .ws-h { margin: 0; }
+.ws-tbl td { vertical-align: top; }
+.ws-zero { display: flex; flex-wrap: wrap; gap: 8px; }
+.ws-zero span { padding: 6px 10px; border-radius: 10px; background: #FEF2F2; color: #991B1B; font-weight: 600; font-size: 13.5px; }
+.ws-zero small { color: #B45353; font-weight: 500; margin-left: 4px; }
+.ws-seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--line-2, #EFE9E1); }
+.ws-seg button { border: 0; background: transparent; padding: 7px 12px; border-radius: 9px; font: inherit; font-weight: 700; font-size: 13.5px; cursor: pointer; color: inherit; }
+.ws-seg button.on { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.08); }

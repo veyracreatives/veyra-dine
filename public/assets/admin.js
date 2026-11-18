@@ -413,9 +413,7 @@
       ${R.orders ? `
       ${!one ? `<div class="panel"><div class="panel-head"><h2>Sales by day</h2><span class="muted">Click a day to open it</span></div>
         <div class="bars ${R.days.length > 16 ? 'dense' : ''}">${R.days.map(d => `<button class="bar" data-day="${d.date}" title="${short(d.date)}: ${cur(d.sales)}, ${d.orders} orders"><span class="v">${d.sales ? cur(d.sales) : ''}</span><span class="f" style="height:${Math.max(d.sales ? 3 : 0, Math.round(d.sales / maxDay * 100))}%"></span><span class="d">${short(d.date)}</span></button>`).join('')}</div></div>` : ''}
-      <div class="two">
-        <div class="panel"><div class="panel-head"><h2>Top dishes</h2></div>
-          <table class="tbl"><thead><tr><th>Dish</th><th class="r">Sold</th><th class="r">Sales</th></tr></thead><tbody>${R.dishes.map(d => `<tr><td>${esc(d.name)}</td><td class="r">${d.qty}</td><td class="r">${cur(d.sales)}</td></tr>`).join('')}</tbody></table></div>
+      <div id="ws"></div>
         <div class="panel"><div class="panel-head"><h2>By table</h2></div>
           <table class="tbl"><thead><tr><th>Table</th><th class="r">Orders</th><th class="r">Sales</th></tr></thead><tbody>${R.tables.map(t => `<tr><td>${esc(t.name)}</td><td class="r">${t.orders}</td><td class="r">${cur(t.sales)}</td></tr>`).join('')}</tbody></table></div>
       </div>` : ''}
@@ -426,12 +424,52 @@
         </tbody><tfoot><tr><td colspan="3" class="hide-sm"></td><td><b>${R.orders} orders</b></td><td class="r"><b>${cur(R.sales)}</b></td></tr></tfoot></table>`
         : `<div class="empty">${icon('receipt', 40)}<div>No orders ${one ? 'on this day' : 'in these dates'}.</div></div>`}</div>`;
     rep.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { setRange(b.dataset.day, b.dataset.day); renderHistory(c); });
+    drawWhatSells(R, one);
     const csv = document.getElementById('csv');
     if (csv) csv.onclick = () => {
       const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
       const rows = [['Order', 'Date', 'Time', 'Table', 'Customer', 'Items', 'Status', 'Total'].map(q).join(',')].concat(R.list.map(o => [o.number, dkey(Date.parse(o.createdAt)), new Date(o.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), o.tableName, o.customerName, o.items.map(l => `${l.qty} x ${l.name}`).join('; '), o.status, o.total].map(q).join(',')));
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv' }));
       a.download = `orders-${S.rFrom}${one ? '' : '-to-' + S.rTo}.csv`; a.click();
+    };
+  }
+
+  // ---------- what sells: share of sales by category and dish, and dishes nobody ordered ----------
+  function drawWhatSells(R, one) {
+    const box = document.getElementById('ws'); if (!box || !R.orders) return;
+    const pct = (a, b) => b ? (a * 100 / b) : 0, fmtP = v => (v >= 10 || v === 0 ? Math.round(v) : v.toFixed(1)) + '%';
+    const totalQty = R.dishes.reduce((t, d) => t + d.qty, 0), base = R.itemSales || 1;
+    S.wsSort = S.wsSort || 'sales'; if (S.wsCat && !R.categories.some(k => k.name === S.wsCat)) S.wsCat = '';
+    let list = R.dishes.filter(d => !S.wsCat || d.category === S.wsCat).slice().sort((a, b) => S.wsSort === 'qty' ? b.qty - a.qty || b.sales - a.sales : b.sales - a.sales || b.qty - a.qty);
+    const shown = S.wsAll ? list : list.slice(0, 12);
+    const top = R.categories[0], low = R.categories.length > 1 ? R.categories[R.categories.length - 1] : null;
+    const bar = (v, max) => `<span class="ws-bar"><i style="width:${Math.max(2, Math.round(v * 100 / (max || 1)))}%"></i></span>`;
+    const maxCat = Math.max(...R.categories.map(k => k.sales), 1), maxDish = Math.max(...list.map(d => S.wsSort === 'qty' ? d.qty : d.sales), 1);
+    box.innerHTML = `<div class="panel"><div class="panel-head"><div><h2>What sells</h2><span class="muted" style="font-size:14px">${one ? 'This day' : 'These dates'}: ${totalQty} items sold across ${R.orders} orders${top ? `. <b>${esc(top.name)}</b> brings ${fmtP(pct(top.sales, base))} of sales${low ? `, <b>${esc(low.name)}</b> only ${fmtP(pct(low.sales, base))}` : ''}.` : ''}</span></div><button class="btn btn-sm" id="wsCsv">${icon('download', 16)} Download (Excel)</button></div>
+      <div class="panel-body">
+        <h3 class="ws-h">By category</h3>
+        <div class="ws-cats">${R.categories.map(k => `<button class="ws-cat ${S.wsCat === k.name ? 'on' : ''}" data-wscat="${esc(k.name)}"><span class="nm">${esc(k.name)}</span>${bar(k.sales, maxCat)}<b>${fmtP(pct(k.sales, base))}</b><small>${cur(k.sales)} · ${k.qty} sold</small></button>`).join('')}</div>
+        <div class="ws-tools"><h3 class="ws-h">${S.wsCat ? esc(S.wsCat) : 'All dishes'}${S.wsCat ? ` <button class="chip" data-wscat="">Show all</button>` : ''}</h3>
+          <div class="ws-seg"><button class="${S.wsSort === 'sales' ? 'on' : ''}" data-wssort="sales">By sales</button><button class="${S.wsSort === 'qty' ? 'on' : ''}" data-wssort="qty">By quantity</button></div></div>
+        <div style="overflow-x:auto"><table class="tbl ws-tbl"><thead><tr><th>Dish</th><th class="hide-sm">Category</th><th class="r">Sold</th><th class="r hide-sm">Share of items</th><th class="r">Sales</th><th class="r">Share of sales</th><th class="r hide-sm" title="How many orders had this dish">In orders</th></tr></thead><tbody>
+          ${shown.map(d => `<tr><td>${dietMark(d.diet)} ${esc(d.name)}${bar(S.wsSort === 'qty' ? d.qty : d.sales, maxDish)}</td><td class="hide-sm muted">${esc(d.category)}</td><td class="r">${d.qty}</td><td class="r hide-sm">${fmtP(pct(d.qty, totalQty))}</td><td class="r">${cur(d.sales)}</td><td class="r"><b>${fmtP(pct(d.sales, base))}</b></td><td class="r hide-sm">${fmtP(pct(d.orders, R.orders))}</td></tr>`).join('')}
+        </tbody></table></div>
+        ${list.length > 12 ? `<button class="btn btn-sm" id="wsAll" style="margin-top:10px">${S.wsAll ? 'Show top 12' : `Show all ${list.length} dishes`}</button>` : ''}
+        ${R.notSold.filter(n => !S.wsCat || n.category === S.wsCat).length ? `<h3 class="ws-h" style="margin-top:22px">Not ordered ${one ? 'on this day' : 'in these dates'} <span class="muted" style="font-weight:600">(0%)</span></h3>
+          <div class="ws-zero">${R.notSold.filter(n => !S.wsCat || n.category === S.wsCat).map(n => `<span>${esc(n.name)} <small>${esc(n.category)}</small></span>`).join('')}</div>
+          <p class="muted" style="font-size:13px;margin:8px 0 0">Think about a better photo, a lower price, a combo, or taking these off the menu.</p>` : ''}
+      </div></div>`;
+    box.querySelectorAll('[data-wscat]').forEach(b => b.onclick = () => { S.wsCat = S.wsCat === b.dataset.wscat ? '' : b.dataset.wscat; S.wsAll = false; drawWhatSells(R, one); });
+    box.querySelectorAll('[data-wssort]').forEach(b => b.onclick = () => { S.wsSort = b.dataset.wssort; drawWhatSells(R, one); });
+    const all = box.querySelector('#wsAll'); if (all) all.onclick = () => { S.wsAll = !S.wsAll; drawWhatSells(R, one); };
+    box.querySelector('#wsCsv').onclick = () => {
+      const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const rows = [['Dish', 'Category', 'Sold', 'Share of items %', 'Sales', 'Share of sales %', 'In orders %'].map(q).join(',')]
+        .concat(R.dishes.map(d => [d.name, d.category, d.qty, pct(d.qty, totalQty).toFixed(1), d.sales, pct(d.sales, base).toFixed(1), pct(d.orders, R.orders).toFixed(1)].map(q).join(',')))
+        .concat(R.notSold.map(n => [n.name, n.category, 0, 0, 0, 0, 0].map(q).join(',')))
+        .concat(['', ['Category', '', 'Sold', '', 'Sales', 'Share of sales %', ''].map(q).join(',')]).concat(R.categories.map(k => [k.name, '', k.qty, '', k.sales, pct(k.sales, base).toFixed(1), ''].map(q).join(',')));
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv' }));
+      a.download = `what-sells-${S.rFrom}${one ? '' : '-to-' + S.rTo}.csv`; a.click();
     };
   }
 

@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const os = require('os');
 const QRCode = require('qrcode');
 const { verifyKey, PUBLIC_KEY: LICENSE_PUBLIC_KEY } = require('./lib/license');
+const siteContent = require('./lib/site-content');
 
 const PORT = Number(process.env.PORT) || 3000;
 const ROOT = __dirname;
@@ -46,12 +47,14 @@ function syncInstaller() {
 if (process.env.DL_MIRROR !== '0' && !process.versions.electron) { setTimeout(syncInstaller, 5000); setInterval(syncInstaller, 6 * 3600 * 1000).unref(); }
 // Plans and where the "Buy" buttons go. Change prices here.
 const PLANS = { trialDays: 30, lifetime: 14999, yearly: 5999 };
+let siteCache = null; // landing page with HQ edits applied
 const BUY_URL = process.env.BUY_URL || 'https://wa.me/918928246726?text=';
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 // ---------- tiny JSON database ----------
 let db = { config: {}, restaurants: [], categories: [], items: [], tables: [], orders: [], requests: [], coupons: [] };
 if (fs.existsSync(DB_FILE)) db = Object.assign(db, JSON.parse(fs.readFileSync(DB_FILE, 'utf8')));
+if (db.siteContent && db.siteContent.prices) for (const k of ['lifetime', 'yearly']) if (Number(db.siteContent.prices[k]) > 0) PLANS[k] = Number(db.siteContent.prices[k]);
 if (!db.coupons) db.coupons = [];
 if (!db.guests) db.guests = [];
 if (!db.config.secret) db.config.secret = crypto.randomBytes(32).toString('hex');
@@ -171,6 +174,7 @@ function hqSigned(msg, sig) { // requests from Veyra HQ are signed with the priv
 function claimLocal(code, rid, name, via, ip) {
   db.licenseCodes = db.licenseCodes || {};
   const L = db.licenseCodes[code];
+  if (L && L.revoked) { const e = new Error('This license key has been stopped. Please contact Veyra on WhatsApp +91 89282 46726.'); e.status = 403; throw e; }
   if (!L) { const e = new Error('This license key was not found. Please check it, or ask Veyra on WhatsApp +91 89282 46726.'); e.status = 404; throw e; }
   L.activations = L.activations || [];
   const other = L.activations.find(a => a.rid !== rid);
@@ -200,14 +204,22 @@ async function claimShort(code, r, req) {
 }
 // Is this restaurant allowed to take orders? (trial running, or paid)
 function access(r) {
+  if (r.suspended) return { plan: 'suspended', active: false, daysLeft: 0 };
   const plan = r.plan || 'lifetime'; // restaurants made before plans existed keep working
   if (plan === 'lifetime') return { plan, active: true };
   const until = plan === 'trial' ? r.trialEnds : r.paidUntil;
   const daysLeft = until ? Math.ceil((Date.parse(until) - Date.now()) / DAY) : 0;
   return { plan, active: daysLeft > 0, daysLeft: Math.max(0, daysLeft), until };
 }
+// Lifetime keys include 1 year of updates (payload.u, or 1 year from the issue date for older keys). Yearly plans get updates while paid.
+function updatesUntilOf(pl) {
+  if (!pl) return null;
+  if (pl.u) return pl.u;
+  if (pl.p === 'yearly') return pl.exp || null;
+  const d = new Date((pl.iat || new Date().toISOString().slice(0, 10)) + 'T00:00:00Z'); d.setUTCFullYear(d.getUTCFullYear() + 1); return d.toISOString().slice(0, 10);
+}
 const BILL_DEFAULT = { width: '80', gstin: '', fssai: '', footer: 'Thank you! Please visit again.', autoKot: false, showUpi: true };
-function adminRestaurant(r) { return { ...publicRestaurant(r), upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}) }; }
+function adminRestaurant(r) { return { ...publicRestaurant(r), upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null) } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}) }; }
 function newRestaurant({ name, slug, password, email, ownerName, phone, plan = 'trial' }) {
   let s = slugify(slug || name), n = 2;
   while (db.restaurants.some(r => r.slug === s)) s = slugify(slug || name) + '-' + n++;
@@ -358,6 +370,35 @@ function verifyGoogle(credential) {
     }).on('error', () => reject(Object.assign(new Error('Could not reach Google. Check the internet.'), { status: 503 })));
   });
 }
+// ---- Website stats (our own, privacy-friendly): daily totals only. No cookies; visitors are counted with a
+// hash of IP + browser + a salt that changes every day, so nobody can be followed from one day to the next.
+const BOT_RE = /bot|crawl|spider|slurp|headless|preview|facebookexternalhit|whatsapp|curl|wget|python|monitor/i;
+const statSalt = { day: '', salt: '', seen: new Set() };
+function statDay() {
+  const d = new Date(Date.now() + 5.5 * 3600000).toISOString().slice(0, 10); // days in India time
+  const A = db.analytics = db.analytics || {};
+  if (!A[d]) { A[d] = { views: 0, visitors: 0, pages: {}, refs: {}, src: {}, dev: {}, events: {} }; for (const k of Object.keys(A).sort().slice(0, -400)) delete A[k]; }
+  if (statSalt.day !== d) { statSalt.day = d; statSalt.salt = crypto.randomBytes(16).toString('hex'); statSalt.seen = new Set(); }
+  return A[d];
+}
+const bump = (o, k, n = 1) => { if (!k) return; k = String(k).slice(0, 120); if (!(k in o) && Object.keys(o).length >= 300) k = '(other)'; o[k] = (o[k] || 0) + n; };
+function trackEvent(name) { bump(statDay().events, name); }
+function trackView(req, b) {
+  const ua = String(req.headers['user-agent'] || ''); if (BOT_RE.test(ua)) return;
+  const D = statDay(), page = String(b.p || '/').replace(/\/(m|admin)\/[^/]+.*/, '/$1/…').slice(0, 80);
+  if (b.e) return bump(D.events, String(b.e).replace(/[^a-z_]/g, '').slice(0, 30));
+  D.views++; bump(D.pages, page);
+  const h = crypto.createHash('sha256').update(statSalt.salt + clientIp(req) + ua).digest('hex').slice(0, 16);
+  if (!statSalt.seen.has(h)) {
+    statSalt.seen.add(h); D.visitors++;
+    let ref = ''; try { ref = b.r ? new URL(b.r).hostname.replace(/^www\./, '') : ''; } catch {}
+    const host = String(req.headers.host || '').replace(/:\d+$/, '');
+    bump(D.refs, !ref || ref === host ? (b.s ? '' : 'Direct') : ref);
+    if (b.s) bump(D.src, String(b.s).toLowerCase().slice(0, 40));
+    bump(D.dev, /Mobi|Android|iPhone/i.test(ua) ? 'Phone' : /iPad|Tablet/i.test(ua) ? 'Tablet' : 'Computer');
+  }
+}
+let statSaveT = null; const saveSoon = () => { if (!statSaveT) statSaveT = setTimeout(() => { statSaveT = null; save(); }, 15000); };
 const clientIp = req => String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '';
 function baseUrl(req) {
   if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, '');
@@ -444,13 +485,20 @@ async function handle(req, res) {
   // ---- pages ----
   // product website (landing page) at the root; restaurants use /admin and /signup
   const SITE_DIR = path.join(PUBLIC_DIR, 'site');
-  if (m === 'GET' && (p === '/' || p === '/index.html')) return serveFile(res, path.join(SITE_DIR, 'index.html'));
+  if (m === 'GET' && (p === '/' || p === '/index.html')) {
+    if (!db.siteContent) return serveFile(res, path.join(SITE_DIR, 'index.html'));
+    if (!siteCache) { const stockFile = path.join(SITE_DIR, 'content.json'); siteCache = siteContent.render(fs.readFileSync(path.join(SITE_DIR, 'index.html'), 'utf8'), db.siteContent, fs.existsSync(stockFile) ? JSON.parse(fs.readFileSync(stockFile, 'utf8')) : null); }
+    return send(res, 200, siteCache, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+  }
+  if (m === 'GET' && /^\/site-media\/[A-Za-z0-9]+\.(png|jpg|webp|svg)$/.test(p)) { const f = safeJoin(path.join(DATA_DIR, 'site-media'), p.slice(11)); return f ? serveFile(res, f, 'public, max-age=31536000, immutable') : fail(res, 404, 'Not found'); }
   if (m === 'GET' && (/^\/img\/[A-Za-z0-9._-]+$/.test(p) || /^\/(og\.jpg|favicon-32\.png|icon-180\.png|icon-512\.png)$/.test(p))) { const f = safeJoin(SITE_DIR, p); return f ? serveFile(res, f, 'public, max-age=86400') : fail(res, 404, 'Not found'); }
   // Windows installer: served from this server (fast in India, with a real file size) when the local copy is ready, else from GitHub Pages.
   if (m === 'GET' && /^\/download\/(Veyra-Dine-In-Setup\.exe|latest\.yml|Veyra-Dine-In-Setup\.exe\.blockmap)$/.test(p)) {
     const name = p.slice(10), f = path.join(DL_DIR, name);
+    if (name.endsWith('.exe') && !/^bytes=[1-9]/.test(req.headers.range || '')) { const d = new Date().toISOString().slice(0, 10), D = db.config.downloads = db.config.downloads || {}; D[d] = (D[d] || 0) + 1; for (const k of Object.keys(D).sort().slice(0, -400)) delete D[k]; save(); }
     if (!fs.existsSync(f)) { res.writeHead(302, { Location: DL_REMOTE + '/' + name }); return res.end(); }
     if (name.endsWith('.exe')) res.setHeader('Content-Disposition', 'attachment; filename="' + name + '"');
+
     return serveFile(res, f, name.endsWith('.yml') ? 'no-cache' : 'public, max-age=3600');
   }
   if (m === 'GET' && p === '/favicon.ico') return serveFile(res, path.join(SITE_DIR, 'favicon-32.png'), 'public, max-age=86400');
@@ -468,6 +516,19 @@ async function handle(req, res) {
   if (m === 'POST' || m === 'PUT' || m === 'PATCH') {
     try { body = await readBody(req); } catch (e) { return fail(res, 400, e.message); }
   }
+  if (m === 'POST' && p === '/api/requests') { // "Suggest a feature" and "Custom build" from the website and the admin
+    const ip = clientIp(req), tk = 'req|' + ip;
+    if (tooMany(tk)) return fail(res, 429, 'Too many messages. Please try again later.');
+    failCount(tk); // max 8 per 10 minutes from one address
+    const type = body.type === 'custom' ? 'custom' : 'feature', ra = adminOf(req);
+    const lead = { id: id(10), type, status: 'new', name: str(body.name, 60) || (ra && ra.ownerName) || '', restaurant: str(body.restaurant, 80) || (ra && ra.name) || '', phone: str(body.phone, 20) || (ra && (ra.ownerPhone || ra.phone)) || '', email: str(body.email, 120) || (ra && ra.email) || '', city: str(body.city, 60), message: str(body.message, 2000), budget: str(body.budget, 40), restaurantId: ra ? ra.id : null, from: ra ? 'admin' : 'website', createdAt: now(), note: '' };
+    if (!lead.message) return fail(res, 400, 'Please write your message.');
+    if (!lead.phone && !lead.email) return fail(res, 400, 'Please add your mobile number.');
+    db.leads = db.leads || []; db.leads.push(lead); if (db.leads.length > 5000) db.leads = db.leads.slice(-5000);
+    trackEvent(type === 'custom' ? 'custom_enquiry' : 'feature_idea'); save();
+    return send(res, 201, { ok: true });
+  }
+  if (m === 'POST' && p === '/api/t') { trackView(req, body && typeof body === 'object' ? body : {}); saveSoon(); res.writeHead(204); return res.end(); }
   let mt;
 
   // ===== guest accounts (log in before ordering) =====
@@ -678,14 +739,14 @@ async function handle(req, res) {
     r.phone = str(body.phone, 30);
     for (const name of ['Starters', 'Main Course', 'Desserts', 'Drinks']) db.categories.push({ id: id(), restaurantId: r.id, name, sort: db.categories.length });
     save();
-    setCookie(res, 'vd_admin', sign(r.id + '|0'));
+    setCookie(res, 'vd_admin', sign(r.id + '|0')); trackEvent('signup'); save();
     return send(res, 201, { ok: true, slug: r.slug });
   }
   if (m === 'POST' && p === '/api/admin/login') {
     const who = str(body.slug, 120).toLowerCase();
     const r = db.restaurants.find(x => (who.includes('@') ? x.email === who : x.slug === slugify(who)));
     if (!r || !checkPassword(body.password || '', r.passwordHash)) return fail(res, 401, 'Wrong email / restaurant ID or password');
-    setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0)));
+    setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0))); trackEvent('login'); saveSoon();
     return send(res, 200, { ok: true, slug: r.slug });
   }
   if (m === 'GET' && p === '/api/auth/config') return send(res, 200, { googleClientId: googleClientId() });
@@ -700,9 +761,10 @@ async function handle(req, res) {
       for (const name of ['Starters', 'Main Course', 'Desserts', 'Drinks']) db.categories.push({ id: id(), restaurantId: r.id, name, sort: db.categories.length });
       save();
       setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0)));
+      trackEvent('signup_google'); save();
       return send(res, 201, { ok: true, slug: r.slug, created: true });
     }
-    setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0)));
+    setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0))); trackEvent('login_google'); saveSoon();
     return send(res, 200, { ok: true, slug: r.slug });
   }
   if (m === 'POST' && p === '/api/admin/logout') { setCookie(res, 'vd_admin', '', 0); return send(res, 200, { ok: true }); }
@@ -724,14 +786,66 @@ async function handle(req, res) {
     try { return send(res, 200, { key: claimLocal(code, 'pc:' + str(body.rid, 80), body.name, 'windows', ip) }); }
     catch (e) { if (e.status === 404) failCount(tk); return fail(res, e.status || 400, e.message); }
   }
-  if (m === 'POST' && (p === '/api/licenses/status' || p === '/api/licenses/reset')) { // HQ only: signed with the private key
-    const ts = Number(body.ts), code = normShort(body.code) || '';
-    if (!(Math.abs(Date.now() - ts) < 10 * 60000) || !hqSigned(`${p}|${code}|${ts}`, body.sig)) return fail(res, 403, 'Not allowed');
+  // ---- Veyra HQ only: every request is signed with Veyra's private license key ----
+  if (m === 'POST' && (p.startsWith('/api/licenses/') || p.startsWith('/api/hq/')) && ['/api/licenses/status', '/api/licenses/reset', '/api/licenses/revoke', '/api/licenses/unrevoke', '/api/hq/overview', '/api/hq/restaurant', '/api/hq/lead', '/api/hq/site', '/api/hq/site/save', '/api/hq/site/preview', '/api/hq/site/media'].includes(p)) {
+    const ts = Number(body.ts), raw = String(body.code || '');
+    const { code: _c, ts: _t, sig: _s, ...rest } = body;
+    const bh = crypto.createHash('sha256').update(JSON.stringify(rest)).digest('hex');
+    if (!(Math.abs(Date.now() - ts) < 10 * 60000) || !hqSigned(`${p}|${raw}|${ts}|${bh}`, body.sig)) return fail(res, 403, 'Not allowed');
     db.licenseCodes = db.licenseCodes || {};
-    if (p === '/api/licenses/reset') { const L = db.licenseCodes[code]; if (!L) return fail(res, 404, 'Not found'); L.activations = []; save(); return send(res, 200, { ok: true }); }
-    const out = {};
-    for (const [c, L] of Object.entries(db.licenseCodes)) out[c] = { id: L.id, n: L.n, at: L.at, activations: (L.activations || []).map(a => ({ name: a.name, via: a.via, at: a.at, lastAt: a.lastAt })) };
-    return send(res, 200, { codes: out });
+    const code = normShort(raw) || '', L = db.licenseCodes[code];
+    const codeView = (c, L) => ({ id: L.id, n: L.n, at: L.at, revoked: L.revoked || null, activations: (L.activations || []).map(a => ({ name: a.name, via: a.via, at: a.at, lastAt: a.lastAt })) });
+    if (p === '/api/licenses/status') { const out = {}; for (const [c, x] of Object.entries(db.licenseCodes)) out[c] = codeView(c, x); return send(res, 200, { codes: out }); }
+    if (p === '/api/licenses/reset' || p === '/api/licenses/revoke' || p === '/api/licenses/unrevoke') {
+      if (!L) return fail(res, 404, 'This key is not on the server yet.');
+      if (p === '/api/licenses/reset') L.activations = [];
+      else {
+        L.revoked = p === '/api/licenses/revoke' ? { at: now(), reason: str(body.reason, 200) } : null;
+        for (const r of db.restaurants) if (r.licenseCode === code) r.suspended = !!L.revoked; // online restaurants stop (or start) taking orders straight away
+      }
+      save(); return send(res, 200, { ok: true });
+    }
+    if (p.startsWith('/api/hq/site')) {
+      const stockFile = path.join(PUBLIC_DIR, 'site', 'content.json');
+      const stock = fs.existsSync(stockFile) ? JSON.parse(fs.readFileSync(stockFile, 'utf8')) : { items: [], prices: {} };
+      if (p === '/api/hq/site') return send(res, 200, { stock, content: db.siteContent || {}, site: baseUrl(req) });
+      if (p === '/api/hq/site/preview') return send(res, 200, { html: siteContent.render(fs.readFileSync(path.join(PUBLIC_DIR, 'site', 'index.html'), 'utf8'), body.content || {}, stock).replace('<head>', `<head><base href="${baseUrl(req)}/">`) });
+      if (p === '/api/hq/site/save') {
+        const c = body.content || {};
+        db.siteContent = { texts: c.texts || {}, images: c.images || {}, prices: c.prices || {}, banner: c.banner || {}, testimonials: (c.testimonials || []).slice(0, 30), testimonialsTitle: str(c.testimonialsTitle, 80), faqs: (c.faqs || []).slice(0, 40), logo: c.logo || '', updatedAt: now() };
+        for (const k of ['lifetime', 'yearly']) if (Number(db.siteContent.prices[k]) > 0) PLANS[k] = Number(db.siteContent.prices[k]); // admin "Buy" buttons use the same prices
+        siteCache = null; save(); return send(res, 200, { ok: true });
+      }
+      if (p === '/api/hq/site/media') { // logo or picture for the landing page
+        const mt2 = /^data:image\/(png|jpe?g|webp|svg\+xml);base64,(.+)$/.exec(String(body.data || ''));
+        if (!mt2) return fail(res, 400, 'Upload a PNG, JPG, WebP or SVG image.');
+        const buf = Buffer.from(mt2[2], 'base64'); if (buf.length > 5 * 1024 * 1024) return fail(res, 400, 'Image is too big (5 MB max).');
+        const dir = path.join(DATA_DIR, 'site-media'); fs.mkdirSync(dir, { recursive: true });
+        const name = id(12) + '.' + ({ 'jpeg': 'jpg', 'svg+xml': 'svg' }[mt2[1]] || mt2[1]);
+        fs.writeFileSync(path.join(dir, name), buf);
+        return send(res, 200, { url: '/site-media/' + name });
+      }
+    }
+    if (p === '/api/hq/lead') {
+      const l = (db.leads || []).find(x => x.id === raw); if (!l) return fail(res, 404, 'Not found');
+      if (['new', 'contacted', 'planned', 'won', 'closed'].includes(body.status)) l.status = body.status;
+      if ('note' in body) l.note = str(body.note, 1000);
+      l.updatedAt = now(); save(); return send(res, 200, { ok: true });
+    }
+    if (p === '/api/hq/restaurant') {
+      const r = db.restaurants.find(x => x.id === raw); if (!r) return fail(res, 404, 'Restaurant not found');
+      if (Number(body.extendTrialDays) > 0) { const base = Math.max(Date.now(), Date.parse(r.trialEnds || 0) || 0); if (r.plan !== 'lifetime' && r.plan !== 'yearly') { r.plan = 'trial'; r.trialEnds = new Date(base + Number(body.extendTrialDays) * DAY).toISOString(); } }
+      if ('suspended' in body) r.suspended = !!body.suspended;
+      if ('note' in body) r.hqNote = str(body.note, 500);
+      save(); return send(res, 200, { ok: true });
+    }
+    // overview: restaurants on the online server, activations and installer downloads
+    const lastOrder = {}, orders = {};
+    for (const o of db.orders) { orders[o.restaurantId] = (orders[o.restaurantId] || 0) + 1; if (!lastOrder[o.restaurantId] || o.createdAt > lastOrder[o.restaurantId]) lastOrder[o.restaurantId] = o.createdAt; }
+    const restaurants = db.restaurants.map(r => ({ id: r.id, slug: r.slug, name: r.name, ownerName: r.ownerName || '', phone: r.ownerPhone || r.phone || '', email: r.email || '', createdAt: r.createdAt, access: access(r), suspended: !!r.suspended, licenseCode: r.licenseCode || null, licensedTo: r.licensedTo || '', updatesUntil: r.updatesUntil || null, google: !!r.google, items: db.items.filter(i => i.restaurantId === r.id).length, tables: db.tables.filter(t => t.restaurantId === r.id).length, orders: orders[r.id] || 0, lastOrderAt: lastOrder[r.id] || null, hqNote: r.hqNote || '' }));
+    const codes = {}; for (const [c, x] of Object.entries(db.licenseCodes)) codes[c] = codeView(c, x);
+    const A = db.analytics || {}, analytics = {}; for (const k of Object.keys(A).sort().slice(-120)) analytics[k] = A[k];
+    return send(res, 200, { at: now(), restaurants, codes, downloads: db.config.downloads || {}, analytics, leads: (db.leads || []).slice(-1000) });
   }
 
   if (p.startsWith('/api/admin/')) {
@@ -755,6 +869,7 @@ async function handle(req, res) {
       r.plan = v.payload.p === 'yearly' ? 'yearly' : 'lifetime';
       r.paidUntil = v.payload.exp ? new Date(v.payload.exp + 'T23:59:59Z').toISOString() : null;
       r.licenseKey = v.key; r.licenseCode = code || v.payload.s || null; r.licensedTo = v.payload.n; r.activatedAt = now();
+      r.updatesUntil = updatesUntilOf(v.payload);
       save();
       return send(res, 200, { ok: true, restaurant: adminRestaurant(r) });
     }

@@ -133,6 +133,21 @@ function sendUpdate(patch) {
   if (win && !win.isDestroyed()) win.webContents.send('vd:update', upd);
   if (tray) createTray();
 }
+// Lifetime licenses include 1 year of updates. After that the app keeps working on its version and stops updating.
+let updatesEndedOn = null;
+async function updatesAllowed() {
+  try {
+    if (!win || win.isDestroyed()) return true;
+    const me = await win.webContents.executeJavaScript("fetch('/api/admin/me').then(r => r.ok ? r.json() : null).catch(() => null)");
+    const r = me && me.restaurant; if (!r) return true;
+    const until = r.license && r.license.updatesUntil;
+    updatesEndedOn = r.access && r.access.plan === 'lifetime' && until && until < new Date().toISOString().slice(0, 10) ? until : null;
+    return !updatesEndedOn;
+  } catch { return true; }
+}
+function updatesEndedBox() {
+  return dialog.showMessageBox(win, { type: 'info', message: 'Updates for your lifetime license have ended', detail: `Your 1 year of updates ended on ${new Date(updatesEndedOn + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}. ${APP_NAME} keeps working as it is.\n\nTo get the newest features, renew updates on WhatsApp +91 89282 46726 and enter the new key under Settings, Plan and license.` });
+}
 function setupUpdates() {
   if (!app.isPackaged || !CONFIG.updateUrl) return;
   try { updater = require('electron-updater').autoUpdater; } catch { return; }
@@ -157,7 +172,7 @@ function setupUpdates() {
     else if (manualCheck) dialog.showMessageBox(win, { type: 'warning', message: 'Could not check for updates right now.', detail: 'Check the internet connection and try again later.' });
     manualCheck = false;
   });
-  const check = () => { if (upd.state === 'none' || upd.state === 'later') updater.checkForUpdates().catch(() => {}); };
+  const check = async () => { if ((upd.state === 'none' || upd.state === 'later') && await updatesAllowed()) updater.checkForUpdates().catch(() => {}); };
   setTimeout(check, 10000);
   setInterval(check, 2 * 60 * 60 * 1000);
 }
@@ -173,6 +188,9 @@ ipcMain.on('vd:update-later', () => { if (upd.state === 'available') sendUpdate(
 function checkUpdatesNow() {
   if (!updater) return dialog.showMessageBox(win, { type: 'info', message: `${APP_NAME} ${app.getVersion()}`, detail: 'Automatic updates are not set up in this copy.' });
   if (upd.state === 'available' || upd.state === 'later' || updateReady) { showWindow(); return startUpdate(); }
+  return updatesAllowed().then(ok => ok ? checkUpdatesNowGo() : updatesEndedBox());
+}
+function checkUpdatesNowGo() {
   manualCheck = true; updater.checkForUpdates().catch(() => {});
 }
 

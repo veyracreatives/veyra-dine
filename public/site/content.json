@@ -1,0 +1,1121 @@
+{
+ "items": [
+  {
+   "k": "te3eb71fe",
+   "type": "text",
+   "tag": "small",
+   "text": "by Veyra Creative & Digital Lab",
+   "section": "Top of page"
+  },
+  {
+   "k": "t1dd6a17c",
+   "type": "text",
+   "tag": "a",
+   "text": "How it works",
+   "section": "Top of page"
+  },
+  {
+   "k": "t6403f2b7",
+   "type": "text",
+   "tag": "span",
+   "text": "New",
+   "section": "Top of page"
+  },
+  {
+   "k": "tfc338f87",
+   "type": "text",
+   "tag": "a",
+   "text": "Features",
+   "section": "Top of page"
+  },
+  {
+   "k": "ta0d9bbad",
+   "type": "text",
+   "tag": "a",
+   "text": "Pricing",
+   "section": "Top of page"
+  },
+  {
+   "k": "t03688ba6",
+   "type": "text",
+   "tag": "a",
+   "text": "FAQ",
+   "section": "Top of page"
+  },
+  {
+   "k": "tf7c400ed",
+   "type": "text",
+   "tag": "a",
+   "text": "Log in",
+   "section": "Top of page"
+  },
+  {
+   "k": "tc7670161",
+   "type": "text",
+   "tag": "a",
+   "text": "Try free for 30 days",
+   "section": "Top of page"
+  },
+  {
+   "k": "hero",
+   "type": "text",
+   "tag": "h1",
+   "text": "Guests scan. You get the order at the counter.",
+   "section": "Top of page"
+  },
+  {
+   "k": "t3c23a670",
+   "type": "text",
+   "tag": "span",
+   "text": "Guests",
+   "section": "Top of page"
+  },
+  {
+   "k": "tc4dc297b",
+   "type": "text",
+   "tag": "span",
+   "text": "scan.",
+   "section": "Top of page"
+  },
+  {
+   "k": "t905cb326",
+   "type": "text",
+   "tag": "span",
+   "text": "You",
+   "section": "Top of page"
+  },
+  {
+   "k": "t783923e5",
+   "type": "text",
+   "tag": "span",
+   "text": "get",
+   "section": "Top of page"
+  },
+  {
+   "k": "tbbccdf2e",
+   "type": "text",
+   "tag": "span",
+   "text": "the",
+   "section": "Top of page"
+  },
+  {
+   "k": "tcce55e43",
+   "type": "text",
+   "tag": "span",
+   "text": "order",
+   "section": "Top of page"
+  },
+  {
+   "k": "t27e90dfa",
+   "type": "text",
+   "tag": "span",
+   "text": "at",
+   "section": "Top of page"
+  },
+  {
+   "k": "t2e9bdd7a",
+   "type": "text",
+   "tag": "span",
+   "text": "counter.",
+   "section": "Top of page"
+  },
+  {
+   "k": "tcb10dcba",
+   "type": "text",
+   "tag": "p",
+   "text": "Put a QR code on every table. Guests see your menu with photos and order from their own phone. Your counter gets each order instantly, with the table number and a sound.",
+   "section": "Top of page"
+  },
+  {
+   "k": "te03d007c",
+   "type": "text",
+   "tag": "a",
+   "text": "Download for Windows",
+   "section": "Top of page"
+  },
+  {
+   "k": "tf7b38f07",
+   "type": "text",
+   "tag": "a",
+   "text": "See how it works",
+   "section": "Top of page"
+  },
+  {
+   "k": "te88a3edd",
+   "type": "text",
+   "tag": "a",
+   "text": "Start free in your browser",
+   "section": "Top of page"
+  },
+  {
+   "k": "t99381aae",
+   "type": "text",
+   "tag": "span",
+   "text": "30 days free",
+   "section": "Top of page"
+  },
+  {
+   "k": "tc8f5ff92",
+   "type": "text",
+   "tag": "span",
+   "text": "No card needed to start",
+   "section": "Top of page"
+  },
+  {
+   "k": "t7f00c78e",
+   "type": "text",
+   "tag": "span",
+   "text": "Guests install nothing",
+   "section": "Top of page"
+  },
+  {
+   "k": "i980326fa",
+   "type": "img",
+   "src": "img/counter.jpg",
+   "alt": "Live orders board in the Veyra Dine In Windows app at the restaurant counter",
+   "section": "Top of page"
+  },
+  {
+   "k": "i9d266e6f",
+   "type": "img",
+   "src": "img/menu-new.jpg",
+   "alt": "QR code menu with photos open on a guest's phone",
+   "section": "Top of page"
+  },
+  {
+   "k": "tc1c40395",
+   "type": "text",
+   "tag": "b",
+   "text": "New order · Table 5",
+   "section": "Top of page"
+  },
+  {
+   "k": "tc6c3716d",
+   "type": "text",
+   "tag": "small",
+   "text": "1× Paneer Butter Masala, 2× Idli Vada Combo",
+   "section": "Top of page"
+  },
+  {
+   "k": "t97dc237b",
+   "type": "text",
+   "tag": "b",
+   "text": "Table 3 · Rahul paid ₹338",
+   "section": "Top of page"
+  },
+  {
+   "k": "t29ef22d8",
+   "type": "text",
+   "tag": "small",
+   "text": "By UPI, straight to your account",
+   "section": "Top of page"
+  },
+  {
+   "k": "t8f6dc145",
+   "type": "text",
+   "tag": "b",
+   "text": "Table 8 asked for the bill",
+   "section": "Top of page"
+  },
+  {
+   "k": "t5e2ea5bc",
+   "type": "text",
+   "tag": "small",
+   "text": "Split 3 ways · 2 paid",
+   "section": "Top of page"
+  },
+  {
+   "k": "ta8439bf3",
+   "type": "text",
+   "tag": "span",
+   "text": "Works on any phone camera",
+   "section": "Top of page"
+  },
+  {
+   "k": "t6de6e58a",
+   "type": "text",
+   "tag": "span",
+   "text": "Live orders with table number",
+   "section": "Top of page"
+  },
+  {
+   "k": "taa6d29ac",
+   "type": "text",
+   "tag": "span",
+   "text": "Call waiter and ask for bill",
+   "section": "Top of page"
+  },
+  {
+   "k": "t860e8095",
+   "type": "text",
+   "tag": "span",
+   "text": "Split the bill by UPI",
+   "section": "Top of page"
+  },
+  {
+   "k": "td089a614",
+   "type": "text",
+   "tag": "h2",
+   "text": "Set up in one afternoon",
+   "section": "Set up in one afternoon"
+  },
+  {
+   "k": "t2143bfb2",
+   "type": "text",
+   "tag": "p",
+   "text": "No new hardware. Use the computer at your counter and the phones your guests already have.",
+   "section": "Set up in one afternoon"
+  },
+  {
+   "k": "t1d8d90a2",
+   "type": "text",
+   "tag": "h3",
+   "text": "Add your menu",
+   "section": "Set up in one afternoon"
+  },
+  {
+   "k": "t5a757265",
+   "type": "text",
+   "tag": "p",
+   "text": "Type in your dishes and prices, add photos, and mark veg or non-veg. Change anything later in seconds.",
+   "section": "Set up in one afternoon"
+  },
+  {
+   "k": "t5f2257ea",
+   "type": "text",
+   "tag": "h3",
+   "text": "Print table QR codes",
+   "section": "Set up in one afternoon"
+  },
+  {
+   "k": "tefb14ed6",
+   "type": "text",
+   "tag": "p",
+   "text": "Add your tables and print ready-made QR cards, four to an A4 page. Each code knows its table.",
+   "section": "Set up in one afternoon"
+  },
+  {
+   "k": "tb02a871c",
+   "type": "text",
+   "tag": "h3",
+   "text": "Take orders live",
+   "section": "Set up in one afternoon"
+  },
+  {
+   "k": "tdfe51f69",
+   "type": "text",
+   "tag": "p",
+   "text": "Guests scan and order. Your counter hears a sound and sees the table number, the dishes and any cooking notes.",
+   "section": "Set up in one afternoon"
+  },
+  {
+   "k": "t94ec7724",
+   "type": "text",
+   "tag": "div",
+   "text": "For your guests",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "tad72f527",
+   "type": "text",
+   "tag": "h2",
+   "text": "A menu they'll enjoy ordering from",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "tc177e1e0",
+   "type": "text",
+   "tag": "p",
+   "text": "No app to download and no login. They scan, browse and order in under a minute.",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "ted168872",
+   "type": "text",
+   "tag": "b",
+   "text": "Photos that sell",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "t1991d501",
+   "type": "text",
+   "tag": "span",
+   "text": "Bestseller and spicy tags, veg and non-veg marks, search and a \"Veg only\" filter.",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "t45e8433d",
+   "type": "text",
+   "tag": "b",
+   "text": "Live order status",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "t4e393018",
+   "type": "text",
+   "tag": "span",
+   "text": "Guests see when the order is received, being prepared, ready and served.",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "te92dce9c",
+   "type": "text",
+   "tag": "b",
+   "text": "Call a waiter, ask for the bill",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "t5ad31dbe",
+   "type": "text",
+   "tag": "span",
+   "text": "One tap. Your staff sees which table needs them.",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "if7b11bb8",
+   "type": "img",
+   "src": "img/phone-status.jpg",
+   "alt": "Live order status",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "i79db71d5",
+   "type": "img",
+   "src": "img/admin-tables.jpg",
+   "alt": "Tables and QR codes in the Windows app",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "tdf6b865e",
+   "type": "text",
+   "tag": "div",
+   "text": "For your counter",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "t459d3e1c",
+   "type": "text",
+   "tag": "h2",
+   "text": "Every order, the moment it's placed",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "te0fab7ec",
+   "type": "text",
+   "tag": "p",
+   "text": "The Windows app shows new orders, what's cooking and what's ready. Nothing gets lost on paper.",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "tbed283a3",
+   "type": "text",
+   "tag": "b",
+   "text": "Sound and pop-up for new orders",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "t3900cd9d",
+   "type": "text",
+   "tag": "span",
+   "text": "Even when the app is minimised.",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "tcc5726d7",
+   "type": "text",
+   "tag": "b",
+   "text": "Sold out in one tap",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "t2def8a9b",
+   "type": "text",
+   "tag": "span",
+   "text": "Switch a dish off when it runs out, or pause all ordering when the kitchen is full.",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "tb4fc717d",
+   "type": "text",
+   "tag": "b",
+   "text": "Today's orders and sales",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "tf5ee5ae3",
+   "type": "text",
+   "tag": "span",
+   "text": "Plus order history for any day.",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "t7c087ef3",
+   "type": "text",
+   "tag": "h2",
+   "text": "Made for tables that order together",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "t45b18302",
+   "type": "text",
+   "tag": "p",
+   "text": "Big groups, shared starters and \"who pays what\". Sorted from the guests' own phones.",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "t6a1b3b83",
+   "type": "text",
+   "tag": "h3",
+   "text": "Order together",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "t39bdc397",
+   "type": "text",
+   "tag": "p",
+   "text": "Everyone who scans the table QR adds to one shared order, live. Each dish shows who added it.",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "id647bf59",
+   "type": "img",
+   "src": "img/together.jpg",
+   "alt": "Table 3's shared order grouped by Asha and Rahul",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "tbdf515fa",
+   "type": "text",
+   "tag": "h3",
+   "text": "Split and pay by UPI",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "td7b8a77e",
+   "type": "text",
+   "tag": "p",
+   "text": "Split by what each ate or equally. GPay or PhonePe opens with the exact share. No fee.",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "i6d4b064a",
+   "type": "img",
+   "src": "img/split.jpg",
+   "alt": "Your share ₹338 and a Pay with UPI button",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "t2ac34fbd",
+   "type": "text",
+   "tag": "h3",
+   "text": "Ready-in time",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "t6d56921d",
+   "type": "text",
+   "tag": "p",
+   "text": "\"Ready in about 24 min\", worked out from how fast your kitchen really cooks each dish.",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "i72cc8caf",
+   "type": "img",
+   "src": "img/eta.jpg",
+   "alt": "Order placed, ready in about 24 minutes",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "t33195991",
+   "type": "text",
+   "tag": "h3",
+   "text": "Coupon codes",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "td65d1c2a",
+   "type": "text",
+   "tag": "p",
+   "text": "WELCOME10 or WEEKDAY50. % or ₹ off, minimum order, expiry and use limit.",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "id879f0e2",
+   "type": "img",
+   "src": "img/coupon.jpg",
+   "alt": "WELCOME10 applied, ₹99 saved",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "ifd173242",
+   "type": "img",
+   "src": "img/counter-split.jpg",
+   "alt": "Table 4 bill split 3 ways at the counter, 2 paid by cash and UPI",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "t98b805d1",
+   "type": "text",
+   "tag": "div",
+   "text": "At the counter",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "td5205f97",
+   "type": "text",
+   "tag": "h2",
+   "text": "Paying at the counter? Split it there too",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "tecd48a61",
+   "type": "text",
+   "tag": "p",
+   "text": "Open any table's bill, split it by person or equally, and mark each share Cash, UPI or Card. When it's all paid, clear the table.",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "t023a68cd",
+   "type": "text",
+   "tag": "b",
+   "text": "Sales by any date",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "te13c9fa9",
+   "type": "text",
+   "tag": "span",
+   "text": "Today, last week or any range, with top dishes and an Excel download.",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "tac2e0595",
+   "type": "text",
+   "tag": "b",
+   "text": "Updates itself",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "taa820b3e",
+   "type": "text",
+   "tag": "span",
+   "text": "New features arrive as a \"New update available\" button.",
+   "section": "Made for tables that order together"
+  },
+  {
+   "k": "t6adb075e",
+   "type": "text",
+   "tag": "div",
+   "text": "Everything included",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t9386efc6",
+   "type": "text",
+   "tag": "h2",
+   "text": "Built for Indian restaurants",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "te8e53ca8",
+   "type": "text",
+   "tag": "h3",
+   "text": "One QR per table",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t32c3fd3c",
+   "type": "text",
+   "tag": "p",
+   "text": "Orders arrive tagged with the table. Make a new code any time if one is misused.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "tfa6313ba",
+   "type": "text",
+   "tag": "h3",
+   "text": "Live order board",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "td1320258",
+   "type": "text",
+   "tag": "p",
+   "text": "New, preparing and ready columns. Move an order along with one click.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "tf6ea6c5b",
+   "type": "text",
+   "tag": "h3",
+   "text": "Easy menu editor",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "tcd53b784",
+   "type": "text",
+   "tag": "p",
+   "text": "Categories, prices, photos and descriptions. Changes show up on guests' phones straight away.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t33f52ba6",
+   "type": "text",
+   "tag": "h3",
+   "text": "Veg and non-veg marks",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t7d7fef3b",
+   "type": "text",
+   "tag": "p",
+   "text": "The green and red symbols guests look for, plus Jain notes and cooking instructions.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "tdb92cb9d",
+   "type": "text",
+   "tag": "h3",
+   "text": "Your brand",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t813e8c31",
+   "type": "text",
+   "tag": "p",
+   "text": "Your logo, cover photo and colour. Links to Instagram, Google reviews, WhatsApp, Zomato and Swiggy.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t6d5c92f7",
+   "type": "text",
+   "tag": "h3",
+   "text": "Waiter and bill requests",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t1387b9bb",
+   "type": "text",
+   "tag": "p",
+   "text": "Guests ask from their phone. Your staff gets an alert with the table number.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t2c09ad7c",
+   "type": "text",
+   "tag": "h3",
+   "text": "Sales at a glance",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "tdd15ca4f",
+   "type": "text",
+   "tag": "p",
+   "text": "Orders and sales for today, and a full history by date.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "ta0d55c5e",
+   "type": "text",
+   "tag": "h3",
+   "text": "Staff phones too",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t105d44ac",
+   "type": "text",
+   "tag": "p",
+   "text": "Waiters can open the same order board on their phone with your password.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "tca97f918",
+   "type": "text",
+   "tag": "h2",
+   "text": "Try it free. Pay once if you love it.",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t02251d6e",
+   "type": "text",
+   "tag": "p",
+   "text": "Every plan includes all features and online hosting for your menu.",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t22357ca6",
+   "type": "text",
+   "tag": "h3",
+   "text": "Free trial",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t7f1ebf97",
+   "type": "text",
+   "tag": "div",
+   "text": "See it working in your restaurant",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t2460a260",
+   "type": "text",
+   "tag": "small",
+   "text": "for 30 days",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "tf136c558",
+   "type": "text",
+   "tag": "li",
+   "text": "All features",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t6dd5e301",
+   "type": "text",
+   "tag": "li",
+   "text": "Unlimited tables and dishes",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t55f805f9",
+   "type": "text",
+   "tag": "li",
+   "text": "No card needed",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t31838b15",
+   "type": "text",
+   "tag": "a",
+   "text": "Download free",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t8173c2a9",
+   "type": "text",
+   "tag": "span",
+   "text": "Best value",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t8d33f31b",
+   "type": "text",
+   "tag": "h3",
+   "text": "Lifetime",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "tdae30237",
+   "type": "text",
+   "tag": "div",
+   "text": "Pay once, use it forever. 1 year of updates included",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t16332a79",
+   "type": "text",
+   "tag": "small",
+   "text": "one time",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "tff6c2920",
+   "type": "text",
+   "tag": "li",
+   "text": "Everything in the trial",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "tc682dc55",
+   "type": "text",
+   "tag": "li",
+   "text": "Online hosting included",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "ta3c957dd",
+   "type": "text",
+   "tag": "li",
+   "text": "Updates and new features for 1 year",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t3f156a6d",
+   "type": "text",
+   "tag": "li",
+   "text": "Setup help on WhatsApp",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t6a6f0373",
+   "type": "text",
+   "tag": "li",
+   "text": "Use on 1 counter computer + staff phones",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t318a8522",
+   "type": "text",
+   "tag": "a",
+   "text": "Buy lifetime",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t7622eb5a",
+   "type": "text",
+   "tag": "h3",
+   "text": "Yearly",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "tef669d70",
+   "type": "text",
+   "tag": "div",
+   "text": "Lower cost to start",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "td412fe96",
+   "type": "text",
+   "tag": "small",
+   "text": "per year",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t891ae582",
+   "type": "text",
+   "tag": "li",
+   "text": "Online hosting and all updates while active",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t5abbd0dc",
+   "type": "text",
+   "tag": "li",
+   "text": "Renew each year, cancel any time",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t160f2fed",
+   "type": "text",
+   "tag": "a",
+   "text": "Buy yearly",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t4046bea7",
+   "type": "text",
+   "tag": "p",
+   "text": "Message us on WhatsApp to buy. Pay by UPI or bank transfer and we send your license key the same day.",
+   "section": "Try it free. Pay once if you love it."
+  },
+  {
+   "k": "t9a1fc173",
+   "type": "text",
+   "tag": "div",
+   "text": "Questions",
+   "section": "Good to know"
+  },
+  {
+   "k": "t79fc372d",
+   "type": "text",
+   "tag": "h2",
+   "text": "Good to know",
+   "section": "Good to know"
+  },
+  {
+   "k": "t4c510465",
+   "type": "text",
+   "tag": "summary",
+   "text": "Do my guests need to download an app?",
+   "section": "Good to know"
+  },
+  {
+   "k": "t5563ce93",
+   "type": "text",
+   "tag": "p",
+   "text": "No. They open the phone camera, scan the QR on the table and the menu opens in their browser. It works on Android and iPhone.",
+   "section": "Good to know"
+  },
+  {
+   "k": "t0f5acc89",
+   "type": "text",
+   "tag": "summary",
+   "text": "What do I need at the restaurant?",
+   "section": "Good to know"
+  },
+  {
+   "k": "t04432f99",
+   "type": "text",
+   "tag": "p",
+   "text": "A Windows 10 or 11 computer (or laptop) at the counter with internet. Keep the app open and you'll hear every new order. Your staff can also open the order board on their phones.",
+   "section": "Good to know"
+  },
+  {
+   "k": "tdce5ecc2",
+   "type": "text",
+   "tag": "summary",
+   "text": "Do guests need to join my Wi-Fi?",
+   "section": "Good to know"
+  },
+  {
+   "k": "t6c6cad3f",
+   "type": "text",
+   "tag": "p",
+   "text": "No. Your menu is hosted online, so it opens on mobile data too.",
+   "section": "Good to know"
+  },
+  {
+   "k": "t6ee9a589",
+   "type": "text",
+   "tag": "summary",
+   "text": "What does the lifetime plan include?",
+   "section": "Good to know"
+  },
+  {
+   "k": "t60a9da49",
+   "type": "text",
+   "tag": "p",
+   "text": "You pay once and the app is yours to use for as long as you like, with online hosting for your menu. Updates and new features are included for the first year. After that your app keeps working as it is, and you can renew updates whenever you want them.",
+   "section": "Good to know"
+  },
+  {
+   "k": "t82f51c0c",
+   "type": "text",
+   "tag": "summary",
+   "text": "What happens after the 30-day free trial?",
+   "section": "Good to know"
+  },
+  {
+   "k": "t0335e67e",
+   "type": "text",
+   "tag": "p",
+   "text": "The app asks for a license key. Buy the lifetime or yearly plan here and enter the key. Your menu, tables and QR codes stay exactly as they were, so there's nothing to set up again.",
+   "section": "Good to know"
+  },
+  {
+   "k": "t575ef8f0",
+   "type": "text",
+   "tag": "summary",
+   "text": "Can I change my menu and prices any time?",
+   "section": "Good to know"
+  },
+  {
+   "k": "tef67b49e",
+   "type": "text",
+   "tag": "p",
+   "text": "Yes. Edit dishes, prices and photos, or mark something sold out. Guests see the change straight away and your QR codes stay the same.",
+   "section": "Good to know"
+  },
+  {
+   "k": "tfbf21ecf",
+   "type": "text",
+   "tag": "summary",
+   "text": "Do you work with restaurants near me?",
+   "section": "Good to know"
+  },
+  {
+   "k": "tf7c1a4a9",
+   "type": "text",
+   "tag": "p",
+   "text": "We work with restaurants, cafés and cloud kitchens across Navi Mumbai, Thane and Mumbai, and with restaurants anywhere in India over WhatsApp and video call.",
+   "section": "Good to know"
+  },
+  {
+   "k": "tf16d4a3e",
+   "type": "text",
+   "tag": "summary",
+   "text": "Can you set it up for me?",
+   "section": "Good to know"
+  },
+  {
+   "k": "t311c2805",
+   "type": "text",
+   "tag": "p",
+   "text": "Yes. Send us your menu and we'll add the dishes and photos and help you print the QR cards. Message us on WhatsApp.",
+   "section": "Good to know"
+  },
+  {
+   "k": "tb2aec363",
+   "type": "text",
+   "tag": "div",
+   "text": "Tell us",
+   "section": "Want something more?"
+  },
+  {
+   "k": "te2a51ebd",
+   "type": "text",
+   "tag": "h2",
+   "text": "Want something more?",
+   "section": "Want something more?"
+  },
+  {
+   "k": "tc601f669",
+   "type": "text",
+   "tag": "p",
+   "text": "Tell us what we should add next, or ask for a version built just for your restaurant or chain.",
+   "section": "Want something more?"
+  },
+  {
+   "k": "tcd5e3fdb",
+   "type": "text",
+   "tag": "span",
+   "text": "What should we add?",
+   "section": "Want something more?"
+  },
+  {
+   "k": "tfe58dfe2",
+   "type": "text",
+   "tag": "h2",
+   "text": "Start taking orders from the table",
+   "section": "Start taking orders from the table"
+  },
+  {
+   "k": "t721247ab",
+   "type": "text",
+   "tag": "a",
+   "text": "sign up in your browser",
+   "section": "Start taking orders from the table"
+  },
+  {
+   "k": "ta33d42b8",
+   "type": "text",
+   "tag": "b",
+   "text": "Veyra Dine In",
+   "section": "Footer"
+  },
+  {
+   "k": "tb77aa8e1",
+   "type": "text",
+   "tag": "a",
+   "text": "Suggest a feature",
+   "section": "Footer"
+  },
+  {
+   "k": "t22643982",
+   "type": "text",
+   "tag": "a",
+   "text": "Custom build",
+   "section": "Footer"
+  },
+  {
+   "k": "t908e482c",
+   "type": "text",
+   "tag": "span",
+   "text": "+91 89282 46726",
+   "section": "Footer"
+  },
+  {
+   "k": "t36424cfc",
+   "type": "text",
+   "tag": "a",
+   "text": "@veyralab.in",
+   "section": "Footer"
+  }
+ ],
+ "prices": {
+  "lifetime": 14999,
+  "yearly": 5999
+ }
+}

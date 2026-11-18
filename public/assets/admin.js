@@ -186,7 +186,7 @@
     const a = S.me.restaurant.access;
     const kf = keyForm(renderActivated);
     app.innerHTML = `<div class="activate-page"><div class="act-card"><div class="big-ic">${icon('clock', 32)}</div>
-      <h2>${a.plan === 'trial' ? 'Your free trial has ended' : 'Your plan has ended'}</h2>
+      <h2>${a.plan === 'trial' ? 'Your free trial has ended' : a.plan === 'suspended' ? 'Your license is paused' : 'Your plan has ended'}</h2>${a.plan === 'suspended' ? '<p class="muted">Please contact Veyra on WhatsApp +91 89282 46726.</p>' : ''}
       <p class="muted">Your menu, tables and QR codes are all saved. Enter your license key to start taking orders again.</p>
       ${kf.html}${buyOptions()}
       <div class="small-link" style="text-align:left"><a href="#" id="lo2">Log out</a></div></div></div>`;
@@ -634,10 +634,16 @@
     const planTxt = a.plan === 'lifetime' ? 'Lifetime' : a.plan === 'yearly' ? `Yearly, until ${new Date(a.until).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}` : `Free trial, ${a.daysLeft} day${a.daysLeft === 1 ? '' : 's'} left`;
     const keyTxt = lic ? (lic.code || lic.key.slice(0, 18) + '…') : '';
     c.innerHTML = `<div style="display:grid;gap:18px;max-width:720px">
-      <div class="panel" id="planPanel"><div class="panel-head"><h2>Plan and license</h2>${a.plan === 'trial' || (a.plan === 'yearly' && a.daysLeft <= 30) ? '<button class="btn btn-sm btn-primary" data-license>Enter license key</button>' : ''}</div><div class="panel-body form">
-        <div class="lic-box" style="margin:0"><span>Plan</span><b>${esc(planTxt)}</b>${lic ? `<span>Licensed to</span><b>${esc(lic.to)}</b><span>License key</span><b style="font-family:ui-monospace,Consolas,monospace;word-break:break-all">${esc(keyTxt)}</b>${lic.at ? `<span>Activated</span><b>${new Date(lic.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</b>` : ''}` : ''}<span>Updates</span><b>${a.plan === 'trial' ? 'Included after you buy' : 'Included'}</b></div>
+      <div class="panel" id="planPanel"><div class="panel-head"><h2>Plan and license</h2>${a.plan === 'trial' || (a.plan === 'yearly' && a.daysLeft <= 30) || (lic && lic.updatesUntil && lic.updatesUntil < new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10)) ? '<button class="btn btn-sm btn-primary" data-license>Enter license key</button>' : ''}</div><div class="panel-body form">
+        <div class="lic-box" style="margin:0"><span>Plan</span><b>${esc(planTxt)}</b>${lic ? `<span>Licensed to</span><b>${esc(lic.to)}</b><span>License key</span><b style="font-family:ui-monospace,Consolas,monospace;word-break:break-all">${esc(keyTxt)}</b>${lic.at ? `<span>Activated</span><b>${new Date(lic.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</b>` : ''}` : ''}<span>Updates</span><b>${a.plan === 'trial' ? 'Included after you buy' : lic && lic.updatesUntil ? (lic.updatesUntil >= new Date().toISOString().slice(0, 10) ? 'Included until ' : 'Ended on ') + new Date(lic.updatesUntil + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Included'}</b></div>
+        ${a.plan === 'lifetime' && lic && lic.updatesUntil && lic.updatesUntil < new Date().toISOString().slice(0, 10) ? `<p class="muted" style="margin:0">Your app keeps working. To get the newest features again, renew updates on <a href="https://wa.me/918928246726?text=${encodeURIComponent('Hi Veyra, I want to renew Veyra Dine In updates for ' + r.name)}" target="_blank">WhatsApp +91 89282 46726</a> and enter the new key above.</p>` : ''}
         <div style="display:flex;gap:8px;flex-wrap:wrap">${lic ? `<button class="btn" id="cpyKey">${icon('copy', 18)} Copy license key</button>` : `<a class="btn btn-primary" href="${esc(buyLink('lifetime'))}" target="_blank">Buy lifetime ${inr(S.me.plans.lifetime)}</a><a class="btn" href="${esc(buyLink('yearly'))}" target="_blank">Buy yearly ${inr(S.me.plans.yearly)}</a>`}<a class="btn" href="https://dinein.veyracreatives.com/download/Veyra-Dine-In-Setup.exe">${icon('download', 18)} Download Windows app</a></div>
       </div></div>
+      <form class="panel" id="ideaF"><div class="panel-head"><div><h2>Suggest a feature or ask for custom work</h2><span class="muted" style="font-size:14px">Tell Veyra what you'd like next, or what you need built for your restaurant. We reply on WhatsApp.</span></div></div><div class="panel-body form">
+        <div class="wseg" style="display:flex;gap:8px;flex-wrap:wrap"><label class="switch"><input type="radio" name="type" value="feature" checked> Feature idea</label><label class="switch"><input type="radio" name="type" value="custom"> Custom build</label></div>
+        <label class="field"><span>Your message</span><textarea class="input" name="message" rows="3" maxlength="2000" required placeholder="E.g. a kitchen screen, or 3 outlets with one dashboard"></textarea></label>
+        <button class="btn btn-primary" style="justify-self:start">Send to Veyra</button>
+      </div></form>
       <div class="panel"><div class="panel-head"><h2>Your restaurant</h2></div><div class="panel-body form">
         <label class="field"><span>Restaurant ID (used to log in)</span><input class="input" value="${esc(r.slug)}" readonly></label>
         <label class="field"><span>Menu link without a table (view only, for Instagram bio or Google)</span><div style="display:flex;gap:8px"><input class="input" value="${esc(menuUrl)}" readonly><button class="btn" id="cpy">${icon('copy', 18)}</button></div></label>
@@ -670,6 +676,7 @@
     </div>`;
     const ck = document.getElementById('cpyKey'); if (ck) ck.onclick = async () => { const k = lic.code || lic.key; try { await navigator.clipboard.writeText(k); toast('License key copied'); } catch { prompt('Your license key', k); } };
     c.querySelectorAll('[data-license]').forEach(b => b.onclick = licenseModal);
+    document.getElementById('ideaF').onsubmit = async e => { e.preventDefault(); const f = new FormData(e.target); try { await api('/api/requests', { method: 'POST', body: { type: f.get('type'), message: f.get('message') } }); e.target.reset(); toast(`${icon('check', 18)} Sent. Thank you!`, 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
     document.getElementById('cpy').onclick = async () => { try { await navigator.clipboard.writeText(menuUrl); toast('Link copied'); } catch { prompt('Copy this link', menuUrl); } };
     document.getElementById('toHist').onclick = () => go('history');
     document.getElementById('toOffers').onclick = () => go('offers');

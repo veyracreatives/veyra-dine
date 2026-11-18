@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Veyra Dine In · Platform</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="/assets/base.css">
+<link rel="stylesheet" href="/assets/admin.css">
+<style>
+  :root { --brand: #0B0B0C; --on-brand: #fff; --brand-soft: #F1EDE4; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 28px 20px 60px; }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .head h1 { margin: 0; font-size: 26px; }
+  .gold { color: #8A6A2F; }
+  .rlist { display: grid; gap: 12px; }
+  .rrow { display: flex; align-items: center; gap: 16px; padding: 16px; background: #fff; border: 1px solid var(--line); border-radius: 16px; flex-wrap: wrap; }
+  .rrow .lg { width: 52px; height: 52px; border-radius: 14px; background: var(--bg); overflow: hidden; display: grid; place-items: center; font-weight: 800; flex: none; }
+  .rrow .lg img { width: 100%; height: 100%; object-fit: cover; }
+  .rrow .grow { flex: 1; min-width: 180px; }
+  .rrow .grow small { color: var(--ink-3); }
+  .nums { display: flex; gap: 18px; font-size: 13px; color: var(--ink-2); }
+  .nums b { display: block; font-size: 17px; color: var(--ink); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toasts" id="toasts"></div>
+<script src="/assets/icons.js"></script>
+<script>
+(function () {
+  const app = document.getElementById('app');
+  const toast = (m, t = '') => { const e = document.createElement('div'); e.className = 'toast ' + t; e.innerHTML = m; document.getElementById('toasts').appendChild(e); setTimeout(() => e.remove(), 3500); };
+  async function api(p, o = {}) {
+    const r = await fetch(p, { headers: { 'Content-Type': 'application/json' }, ...o, body: o.body ? JSON.stringify(o.body) : undefined });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 401 && !p.endsWith('/login')) { login(); throw new Error('Please log in'); }
+    if (!r.ok) throw new Error(d.error || 'Something went wrong'); return d;
+  }
+  function modal(html) { const o = document.createElement('div'); o.className = 'overlay center'; o.innerHTML = `<div class="sheet">${html}</div>`; o.onclick = e => { if (e.target === o || e.target.closest('[data-close]')) o.remove(); }; document.body.appendChild(o); return o; }
+  function login() {
+    app.innerHTML = `<div class="login"><form class="login-card" id="f"><div class="lg">${icon('store', 28)}</div><h1>Veyra platform</h1><p class="muted" style="margin:0 0 20px">Add restaurants and manage their logins.</p>
+      <div class="form"><label class="field"><span>Platform password</span><input class="input" type="password" name="p" required></label><button class="btn btn-primary btn-lg btn-block">Log in</button></div>
+      <p class="muted" style="font-size:13px;margin-top:16px">The first password is printed in the terminal when the server starts.</p></form></div>`;
+    document.getElementById('f').onsubmit = async e => { e.preventDefault(); try { await api('/api/platform/login', { method: 'POST', body: { password: new FormData(e.target).get('p') } }); list(); } catch (err) { toast(esc(err.message), 'error'); } };
+  }
+  const planBadge = a => a.plan === 'lifetime' ? '<span class="badge badge-green">Lifetime</span>' : a.active ? `<span class="badge ${a.plan === 'trial' ? 'badge-amber' : 'badge-blue'}">${a.plan === 'trial' ? 'Trial' : 'Yearly'} · ${a.daysLeft} days left</span>` : `<span class="badge badge-red">${a.plan === 'trial' ? 'Trial ended' : 'Expired'}</span>`;
+  async function list() {
+    const rs = await api('/api/platform/restaurants');
+    app.innerHTML = `<div class="wrap"><div class="head"><div><h1>Restaurants <span class="gold">· ${rs.length}</span></h1><span class="muted">Every restaurant gets its own menu, admin login, tables and branding.</span></div>
+      <div style="display:flex;gap:8px"><button class="btn" id="pw">${icon('lock', 18)} Platform password</button><button class="btn btn-primary" id="add">${icon('plus', 18)} Add restaurant</button></div></div>
+      <div class="rlist">${rs.map(r => `<div class="rrow"><div class="lg" style="color:${r.brandColor}">${r.logo ? `<img src="${esc(r.logo)}" alt="">` : esc(r.name[0])}</div>
+        <div class="grow"><b>${esc(r.name)}</b> ${planBadge(r.access)}<br><small>ID: ${esc(r.slug)}${r.email ? ' · ' + esc(r.email) : ''}${r.ownerPhone ? ' · ' + esc(r.ownerPhone) : ''} · added ${new Date(r.createdAt).toLocaleDateString()}</small></div>
+        <div class="nums"><span><b>${r.tables}</b>tables</span><span><b>${r.items}</b>dishes</span><span><b>${r.orders}</b>orders</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn btn-sm" href="/m/${r.slug}" target="_blank">${icon('eye', 16)} Menu</a><a class="btn btn-sm" href="/admin/${r.slug}" target="_blank">${icon('settings', 16)} Admin</a>${r.access.plan !== 'lifetime' ? `<button class="btn btn-sm" data-extend="${r.id}">+7 days trial</button><button class="btn btn-sm" data-life="${r.id}" data-name="${esc(r.name)}">Mark paid (lifetime)</button>` : ''}<button class="btn btn-sm" data-reset="${r.id}" data-name="${esc(r.name)}">${icon('lock', 16)} Reset password</button>
+        <label class="switch" title="Show “Powered by Veyra Dine In” at the bottom of the menu"><input type="checkbox" data-pb="${r.id}" ${r.poweredBy ? 'checked' : ''}><span class="track"></span><span style="font-size:13px">Veyra credit</span></label></div></div>`).join('') || '<div class="empty">No restaurants yet.</div>'}</div></div>`;
+    document.getElementById('add').onclick = () => {
+      const o = modal(`<form><div class="sheet-head"><h3>Add a restaurant</h3><button type="button" class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body form">
+        <label class="field"><span>Restaurant name</span><input class="input" name="name" required></label>
+        <label class="field"><span>Restaurant ID (for login and the menu link)</span><input class="input" name="slug" placeholder="made from the name if empty"></label>
+        <label class="field"><span>Admin password for the restaurant</span><input class="input" name="password" minlength="6" required><small>Share it with the owner. They can change it later.</small></label></div>
+        <div class="sheet-foot"><button class="btn btn-primary btn-lg btn-block">Create restaurant</button></div></form>`);
+      o.querySelector('form').onsubmit = async e => { e.preventDefault(); const f = new FormData(e.target); try { const r = await api('/api/platform/restaurants', { method: 'POST', body: Object.fromEntries(f) }); o.remove(); toast(`Created. Login ID: <b>${esc(r.slug)}</b>`, 'ok'); list(); } catch (err) { toast(esc(err.message), 'error'); } };
+    };
+    document.getElementById('pw').onclick = () => {
+      const o = modal(`<form><div class="sheet-head"><h3>Change platform password</h3><button type="button" class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body"><label class="field"><span>New password</span><input class="input" type="password" name="next" minlength="8" required></label></div><div class="sheet-foot"><button class="btn btn-primary btn-lg btn-block">Save</button></div></form>`);
+      o.querySelector('form').onsubmit = async e => { e.preventDefault(); try { await api('/api/platform/password', { method: 'POST', body: { next: new FormData(e.target).get('next') } }); o.remove(); toast('Password changed', 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
+    };
+    app.querySelectorAll('[data-reset]').forEach(b => b.onclick = () => {
+      const o = modal(`<form><div class="sheet-head"><h3>New password for ${b.dataset.name}</h3><button type="button" class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body"><label class="field"><span>New password</span><input class="input" name="password" minlength="6" required></label></div><div class="sheet-foot"><button class="btn btn-primary btn-lg btn-block">Set password</button></div></form>`);
+      o.querySelector('form').onsubmit = async e => { e.preventDefault(); try { await api(`/api/platform/restaurants/${b.dataset.reset}/password`, { method: 'POST', body: { password: new FormData(e.target).get('password') } }); o.remove(); toast('Password updated', 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
+    });
+    app.querySelectorAll('[data-extend]').forEach(b => b.onclick = async () => { await api('/api/platform/restaurants/' + b.dataset.extend, { method: 'PUT', body: { extendTrialDays: 7 } }); toast('Trial extended by 7 days', 'ok'); list(); });
+    app.querySelectorAll('[data-life]').forEach(b => b.onclick = async () => { if (!confirm(`Mark ${b.dataset.name} as paid (lifetime)?`)) return; await api('/api/platform/restaurants/' + b.dataset.life, { method: 'PUT', body: { plan: 'lifetime' } }); toast('Marked as lifetime', 'ok'); list(); });
+    app.querySelectorAll('[data-pb]').forEach(i => i.onchange = () => api('/api/platform/restaurants/' + i.dataset.pb, { method: 'PUT', body: { poweredBy: i.checked } }).then(() => toast('Saved')));
+  }
+  api('/api/platform/restaurants').then(list, () => {});
+})();
+</script>
+</body>
+</html>

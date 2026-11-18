@@ -1,0 +1,7 @@
+node_modules/
+dist/
+data/
+*.pem
+licenses-issued.csv
+hq-data.json
+.env

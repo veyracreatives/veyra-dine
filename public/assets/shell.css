@@ -1,0 +1,120 @@
+/* Windows app shell screens: sign-up, trial, activate. Uses base.css tokens. */
+:root { --brand: #E4572E; --on-brand: #fff; --cream: #FBF6EE; --ink: #1B1714; }
+.win { width: 1280px; height: 800px; background: #fff; border: 1px solid #CFC8BE; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.18); font-family: var(--font); }
+.titlebar { height: 34px; flex: none; background: #F3F1EE; border-bottom: 1px solid #E5E1DA; display: flex; align-items: center; padding-left: 12px; gap: 8px; font-size: 12.5px; font-weight: 600; color: #4A433C; }
+.titlebar .appicon { width: 18px; height: 18px; border-radius: 5px; background: var(--brand); display: grid; place-items: center; color: #fff; }
+.titlebar .ctl { margin-left: auto; display: flex; height: 100%; }
+.titlebar .ctl span { width: 46px; display: grid; place-items: center; color: #4A433C; font-size: 13px; }
+.win-body { flex: 1; min-height: 0; display: flex; position: relative; }
+
+/* sign up */
+.brand-side { width: 520px; flex: none; background: var(--ink); color: #F5EFE6; padding: 54px 52px; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+.brand-side .logo { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 22px; }
+.brand-side .logo .mark { width: 44px; height: 44px; border-radius: 12px; background: var(--brand); display: grid; place-items: center; color: #fff; }
+.brand-side h1 { font-family: "Fraunces", Georgia, serif; font-size: 44px; line-height: 1.08; margin: 54px 0 16px; letter-spacing: -.015em; }
+.brand-side h1 em { color: #F8A97F; }
+.brand-side p { color: #CFC5B8; font-size: 16.5px; margin: 0; }
+.ticks { list-style: none; padding: 0; margin: 30px 0 0; display: grid; gap: 14px; font-weight: 600; }
+.ticks li { display: flex; gap: 12px; align-items: center; }
+.ticks .ic { color: #6EE7A0; }
+.brand-side .foot { margin-top: auto; color: #8C8278; font-size: 13px; }
+.form-side { flex: 1; display: grid; place-items: center; padding: 40px; background: var(--cream); }
+.form-card { width: 440px; }
+.form-card h2 { font-size: 28px; margin: 0 0 6px; letter-spacing: -.01em; }
+.form-card .muted { margin: 0 0 26px; }
+.trial-chip { display: inline-flex; gap: 8px; align-items: center; padding: 6px 12px; border-radius: 99px; background: #DCFCE7; color: #166534; font-weight: 700; font-size: 13px; margin-bottom: 14px; }
+.small-link { text-align: center; margin-top: 18px; font-size: 14.5px; color: var(--ink-2); }
+.small-link a { color: var(--brand); font-weight: 700; text-decoration: none; }
+
+/* trial banner inside the admin */
+.trial-bar { display: flex; align-items: center; gap: 14px; padding: 10px 20px; background: #FFF4E5; border-bottom: 1px solid #FCD9A8; font-size: 14.5px; color: #7C2D12; font-weight: 600; }
+.trial-bar .days { background: #fff; border: 1px solid #FCD9A8; border-radius: 99px; padding: 3px 12px; font-weight: 800; }
+.trial-bar .btn { margin-left: auto; min-height: 36px; }
+.trial-bar .btn + .btn { margin-left: 0; }
+
+/* activate */
+.center-stage { flex: 1; display: grid; place-items: center; background: var(--cream); padding: 30px; }
+.act-card { width: 620px; background: #fff; border-radius: 24px; box-shadow: 0 20px 60px rgba(60,40,20,.12); padding: 40px 44px; }
+.act-card .big-ic { width: 64px; height: 64px; border-radius: 18px; background: #FFF4E5; color: #B45309; display: grid; place-items: center; margin-bottom: 18px; }
+.act-card h2 { font-size: 28px; margin: 0 0 8px; letter-spacing: -.01em; }
+.act-card .muted { margin: 0 0 24px; font-size: 16px; }
+.key-row { display: flex; gap: 10px; }
+.key-row .input { font-family: ui-monospace, Consolas, monospace; letter-spacing: .02em; }
+.or { display: flex; align-items: center; gap: 14px; color: var(--ink-3); font-size: 13px; font-weight: 700; margin: 28px 0 18px; text-transform: uppercase; letter-spacing: .08em; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.buy-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.buy { border: 1.5px solid var(--line); border-radius: 16px; padding: 16px 18px; text-decoration: none; display: block; }
+.buy.best { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 6%, #fff); }
+.buy b { display: block; font-size: 15px; }
+.buy .pr { font-size: 24px; font-weight: 800; margin-top: 4px; letter-spacing: -.01em; }
+.buy small { color: var(--ink-3); }
+.help { margin-top: 22px; display: flex; align-items: center; gap: 10px; color: var(--ink-2); font-size: 14.5px; }
+.help a { color: #15803D; font-weight: 700; text-decoration: none; }
+.success .big-ic { background: #DCFCE7; color: #15803D; }
+.lic-box { display: grid; grid-template-columns: auto 1fr; gap: 8px 22px; padding: 18px 20px; border-radius: 14px; background: var(--bg); font-size: 15px; margin-bottom: 24px; }
+.lic-box span { color: var(--ink-3); }
+
+/* desktop + notification */
+.desktop { width: 1280px; height: 800px; border-radius: 10px; overflow: hidden; position: relative; background: linear-gradient(135deg, #1E3A5F, #0F1F33 60%, #2B1B33); font-family: var(--font); }
+.desktop .win-mini { position: absolute; left: 60px; top: 50px; width: 820px; height: 560px; transform: none; }
+.taskbar { position: absolute; left: 0; right: 0; bottom: 0; height: 48px; background: rgba(32,32,36,.92); display: flex; align-items: center; justify-content: center; gap: 8px; }
+.taskbar .tb { width: 38px; height: 38px; border-radius: 8px; display: grid; place-items: center; color: #fff; }
+.taskbar .tb.app { background: rgba(255,255,255,.12); position: relative; }
+.taskbar .tb.app::after { content: ""; position: absolute; bottom: 2px; width: 14px; height: 3px; border-radius: 2px; background: #F8A97F; }
+.taskbar .tray { position: absolute; right: 14px; display: flex; align-items: center; gap: 14px; color: #fff; font-size: 12px; text-align: right; }
+.wtoast { position: absolute; right: 14px; bottom: 62px; width: 380px; background: #F9F9F9; border-radius: 10px; box-shadow: 0 16px 40px rgba(0,0,0,.4); padding: 14px 16px 16px; font-family: "Segoe UI", var(--font); }
+.wtoast .h { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #444; }
+.wtoast .h .appicon { width: 16px; height: 16px; border-radius: 4px; background: var(--brand); display: grid; place-items: center; color: #fff; }
+.wtoast .h .x { margin-left: auto; color: #777; }
+.wtoast .b { display: flex; gap: 14px; margin-top: 12px; }
+.wtoast .b .img { width: 54px; height: 54px; border-radius: 12px; background: var(--brand); color: #fff; display: grid; place-items: center; flex: none; }
+.wtoast b { display: block; font-size: 15px; color: #111; }
+.wtoast p { margin: 3px 0 0; font-size: 13.5px; color: #444; }
+.wtoast .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.wtoast .acts span { height: 34px; border-radius: 6px; background: #E8E8E8; display: grid; place-items: center; font-size: 13px; font-weight: 600; color: #222; }
+.wtoast .acts span:first-child { background: var(--brand); color: #fff; }
+.tray-pop { position: absolute; right: 120px; bottom: 56px; width: 250px; background: #2B2B2F; border-radius: 10px; padding: 6px; color: #eee; font-size: 13.5px; box-shadow: 0 16px 40px rgba(0,0,0,.4); }
+.tray-pop div { padding: 9px 12px; border-radius: 6px; }
+.tray-pop div:first-child { background: rgba(255,255,255,.08); font-weight: 600; }
+.tray-pop .sep { height: 1px; background: #444; padding: 0; margin: 4px 6px; }
+.closing { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 460px; background: #fff; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.4); padding: 24px; }
+
+/* real pages (not the Figma frames) */
+.auth { display: flex; min-height: 100vh; }
+.auth .brand-side { width: 44%; max-width: 560px; }
+.auth .form-side { min-height: 100vh; }
+.tabs2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px; background: #fff; border: 1px solid var(--line); border-radius: 14px; margin-bottom: 24px; }
+.tabs2 button { height: 42px; border: 0; border-radius: 10px; background: none; font-weight: 750; color: var(--ink-2); }
+.tabs2 button.on { background: var(--ink); color: #fff; }
+.activate-page { min-height: 100vh; display: grid; place-items: center; background: var(--cream); padding: 24px; }
+.act-card { max-width: 100%; }
+.trial-bar.ended { background: var(--red-soft); border-color: #F5B5AE; color: var(--red); }
+@media (max-width: 860px) {
+  .auth .brand-side { display: none; }
+  .auth .form-side { padding: 28px 18px; place-items: start center; }
+  .form-card { width: 100%; max-width: 440px; }
+  .trial-bar { flex-wrap: wrap; padding: 10px 16px; }
+  .trial-bar .btn { margin-left: 0; }
+  .act-card { padding: 28px 22px; }
+  .buy-row { grid-template-columns: 1fr; }
+  .key-row { flex-direction: column; }
+}
+html, body { overflow-x: hidden; }
+.auth .brand-side { flex: 0 0 44%; min-width: 0; }
+.auth .form-side { min-width: 0; }
+
+/* "New update available" bar in the Windows app */
+.upd-bar { position: relative; z-index: 50; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: #1C1917; color: #fff; padding: 10px 20px; animation: updIn .3s ease-out; }
+.upd-bar[hidden] { display: none; }
+.upd-bar .upd-ico { width: 34px; height: 34px; border-radius: 12px; background: var(--brand, #E4572E); display: grid; place-items: center; flex: none; }
+.upd-bar .upd-txt { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.upd-bar .upd-prog { max-width: 420px; }
+.upd-bar .upd-txt b { font-size: 15px; }
+.upd-bar .upd-txt span { font-size: 13px; color: #D6D3D1; line-height: 1.4; }
+.upd-bar .btn { min-height: 38px; }
+.upd-bar .upd-later { background: transparent; color: #fff; border-color: #57534E; }
+.upd-bar .upd-go { flex: none; }
+.upd-bar .upd-prog { height: 6px; background: #44403C; border-radius: 99px; overflow: hidden; margin-top: 6px; }
+.upd-bar .upd-prog i { display: block; height: 100%; background: var(--brand, #E4572E); transition: width .3s; }
+@keyframes updIn { from { opacity: 0; } }
+@media (max-width: 860px) { .upd-bar { padding: 10px 16px; } }

@@ -1,0 +1,71 @@
+{
+  "name": "veyra-dine",
+  "version": "1.0.5",
+  "description": "QR table ordering for restaurants. White-label, built by Veyra Creative & Digital Lab.",
+  "main": "desktop/main.js",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node seed.js",
+    "desktop": "electron .",
+    "dist:win": "electron-builder --win nsis --x64 --publish never"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "electron-updater": "6.3.9",
+    "qrcode": "1.5.4"
+  },
+  "author": "Veyra Creative & Digital Lab",
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "in.veyralab.dine",
+    "productName": "Veyra Dine In",
+    "copyright": "Veyra Creative & Digital Lab",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "server.js",
+      "lib/**",
+      "public/**",
+      "desktop/main.js",
+      "desktop/preload.js",
+      "desktop/config.json",
+      "desktop/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "desktop/icon.png",
+      "signAndEditExecutable": true
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Veyra Dine In",
+      "artifactName": "Veyra-Dine-In-Setup-${version}.exe",
+      "installerIcon": "desktop/icon.ico",
+      "uninstallerIcon": "desktop/icon.ico"
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://github.com/veyracreatives/veyra-dine/releases/latest/download"
+      }
+    ]
+  }
+}

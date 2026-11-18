@@ -1,0 +1,4 @@
+# Free automatic HTTPS. Replace the domain with yours.
+dinein.example.com {
+  reverse_proxy localhost:3000
+}

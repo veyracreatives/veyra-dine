@@ -1,0 +1,14 @@
+[Unit]
+Description=Veyra Dine In server
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/veyra-dine
+ExecStart=/usr/bin/node server.js
+Environment=PORT=3000
+Environment=PUBLIC_URL=https://dinein.example.com
+Restart=always
+User=veyra
+
+[Install]
+WantedBy=multi-user.target

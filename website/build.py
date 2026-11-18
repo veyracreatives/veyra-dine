@@ -4,7 +4,7 @@ t = open('template.html').read()
 wa = 'https://wa.me/918928246726?text='
 rep = {
  '{{NAME}}': name,
- '{{DOWNLOAD}}': 'https://github.com/veyracreatives/veyra-dine/releases/latest',
+ '{{DOWNLOAD}}': 'https://veyracreatives.github.io/dine-in/download/Veyra-Dine-In-Setup.exe',
  '{{WA}}': wa + urllib.parse.quote(f'Hi, I want a free demo of {name} for my restaurant'),
  '{{WA_LIFE}}': wa + urllib.parse.quote(f'Hi, I want to buy {name} Lifetime (₹14,999)'),
  '{{WA_YEAR}}': wa + urllib.parse.quote(f'Hi, I want to buy {name} Yearly (₹5,999)'),
@@ -18,6 +18,7 @@ from PIL import Image
 SITE = (sys.argv[2] if len(sys.argv) > 2 else 'https://veyracreatives.github.io/dine-in').rstrip('/')
 os.makedirs('site/img', exist_ok=True)
 page = open('index.html').read()
+page = page.replace(f'href="{rep["{{DOWNLOAD}}"]}" target="_blank" rel="noopener"', f'href="{rep["{{DOWNLOAD}}"]}" download')
 # image width/height (stops layout jumps) + lazy loading below the hero
 def sized(m):
     tag, src = m.group(0), m.group(1)

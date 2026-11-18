@@ -108,7 +108,7 @@
           <div class="name-row"><h1>${esc(r.name)}</h1>${r.tagline ? `<p class="tagline">${esc(r.tagline)}</p>` : ''}</div>
           ${D.table ? `<div class="table-chip">${icon('utensils', 18)} You're ordering for ${esc(D.table.name)}</div>` : ''}
           ${socials ? `<div class="socials">${socials}</div>` : ''}
-          ${r.wifi || r.loyalty ? `<div class="extras">${r.wifi ? `<button class="pill-btn" id="wifiBtn">${icon('wifi', 16)} WiFi</button>` : ''}${r.loyalty ? `<button class="pill-btn" id="ptsBtn">${icon('star', 16)} My points</button>` : ''}</div>` : ''}
+          ${r.wifi || r.loyalty || r.games ? `<div class="extras">${r.games ? `<button class="pill-btn hot" id="gameBtn">${icon('game', 16)} Play and win</button>` : ''}${r.wifi ? `<button class="pill-btn" id="wifiBtn">${icon('wifi', 16)} WiFi</button>` : ''}${r.loyalty ? `<button class="pill-btn" id="ptsBtn">${icon('star', 16)} My points</button>` : ''}</div>` : ''}
         </div>
       </header>
       ${!D.table ? `<div class="notice">${icon('qr', 18)}<span>You're viewing the menu. To order, scan the QR code on your table.</span></div>` : ''}
@@ -138,6 +138,7 @@
     const hb = document.getElementById('helpBtn'); if (hb) hb.onclick = openHelp;
     const wb = document.getElementById('wifiBtn'); if (wb) wb.onclick = openWifi;
     const pb = document.getElementById('ptsBtn'); if (pb) pb.onclick = openPoints;
+    const gb = document.getElementById('gameBtn'); if (gb) gb.onclick = () => openGames();
     renderCartBar();
   }
 
@@ -433,6 +434,46 @@
     o.querySelector('#cpS').onclick = () => copyText(w.ssid, 'WiFi name copied');
     const cp = o.querySelector('#cpP'); if (cp) cp.onclick = () => copyText(w.pass, 'Password copied');
   }
+
+  // ---------- mini games: play while the food cooks, top the weekly leaderboard ----------
+  function openGames(start) {
+    const GM = window.VDGames; if (!GM) return;
+    const gR = D.restaurant.games || {}; let game = start || load('vd_game', 'stack'), run = null, sid = '', top = null;
+    const o = sheet(`<div class="sheet-head"><h2>${icon('game', 22)} Play and win</h2><button class="icon-btn" data-close aria-label="Close">${icon('x', 20)}</button></div>
+      <div class="sheet-body gm"><div class="gm-tabs">${GM.list.map(g => `<button data-g="${g.id}">${esc(g.name)}</button>`).join('')}</div><div id="gmb"></div></div>`, 'gm-sheet');
+    o.addEventListener('click', e => { if (e.target === o || e.target.closest('[data-close]')) run && run.stop(); });
+    const body = o.querySelector('#gmb');
+    const reward = () => gR.reward || gR.points ? `<div class="gm-reward">${icon('star', 18)}<span><b>This week's top scorer wins${gR.reward ? ': ' + esc(gR.reward) : ''}</b>${gR.points ? `<small>${gR.reward ? 'plus ' : ''}${gR.points} loyalty points</small>` : ''}</span></div>` : '';
+    const board = () => { const t = top && top.games[game]; const l = t ? t.week : []; return `<h3 class="gm-h">Top scores this week</h3>${l.length ? `<ol class="gm-board">${l.map((x, i) => `<li${i < 3 ? ` class="m${i + 1}"` : ''}><span>${i + 1}</span><b>${esc(x.name)}</b><em>${x.score}</em></li>`).join('')}</ol>` : '<p class="muted" style="margin:6px 0 0">No scores yet this week. Be the first!</p>'}${t && t.all[0] ? `<p class="muted gm-rec">All-time record: <b>${t.all[0].score}</b> by ${esc(t.all[0].name)}</p>` : ''}`; };
+    const tabs = () => o.querySelectorAll('[data-g]').forEach(b => b.classList.toggle('on', b.dataset.g === game));
+    const loadTop = async () => { try { top = await api(`/api/menu/${slug}/games/top`); } catch {} };
+    function home() {
+      run && run.stop(); run = null; tabs(); const g = GM.list.find(x => x.id === game);
+      body.innerHTML = `${reward()}<p class="gm-how">${esc(g.how)}</p><button class="btn btn-primary btn-lg btn-block" id="gplay">${icon('game', 20)} Play ${esc(g.name)}</button>${board()}`;
+      body.querySelector('#gplay').onclick = play;
+    }
+    async function play() {
+      sid = ''; try { if (tableToken) sid = (await api(`/api/menu/${slug}/games/start`, { method: 'POST', body: { game, table: tableToken } })).sid; } catch (err) { toast(esc(err.message), 'error'); }
+      body.innerHTML = `<div id="gcv"></div>${sid ? '' : '<p class="muted center" style="margin:10px 0 0">Practice game. Scan your table QR to play for the leaderboard.</p>'}`;
+      run = GM.play(body.querySelector('#gcv'), game, { accent: D.restaurant.brandColor, onOver: over });
+    }
+    function over(score, ms) {
+      run && run.stop(); run = null;
+      const canPost = sid && score > 0; const nm = load('vd_gname', '') || myName();
+      body.innerHTML = `<div class="gm-over"><small>Your score</small><b>${score}</b>${canPost ? `<form id="gform"><input class="input" id="gname" maxlength="14" placeholder="Your name or nickname" value="${esc(nm)}" required>
+        ${gR.reward || gR.points ? `<input class="input" id="gph" inputmode="tel" maxlength="14" placeholder="Mobile number, to get the reward (not shown)" value="${esc(load('vd_phone', ''))}">` : ''}
+        <button class="btn btn-primary btn-lg btn-block">Post my score</button></form>` : ''}
+        <button class="btn btn-lg btn-block" id="gagain">Play again</button><button class="btn btn-ghost btn-block" id="gboard">See the leaderboard</button></div>`;
+      body.querySelector('#gagain').onclick = play; body.querySelector('#gboard').onclick = async () => { await loadTop(); home(); };
+      const f = body.querySelector('#gform');
+      if (f) f.onsubmit = async e => { e.preventDefault(); const name = f.querySelector('#gname').value.trim(), ph = f.querySelector('#gph'); const btn = f.querySelector('button'); btn.disabled = true;
+        try { const x = await api(`/api/menu/${slug}/games/score`, { method: 'POST', body: { sid, score, name, phone: ph ? ph.value.trim() : '' } }); store('vd_gname', name); if (ph && ph.value.trim()) store('vd_phone', ph.value.trim()); sid = '';
+          f.outerHTML = `<div class="gm-rank">${x.rank === 1 ? `${icon('star', 20)} You're number 1 this week!` : `You're number ${x.rank} this week`}${x.best > score ? `<small>Your best is still ${x.best}</small>` : ''}</div>`; await loadTop(); }
+        catch (err) { btn.disabled = false; toast(esc(err.message), 'error'); } };
+    }
+    o.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { game = b.dataset.g; store('vd_game', game); home(); });
+    home(); loadTop().then(() => { if (!run && body.querySelector('#gplay')) home(); });
+  }
   function openPoints() {
     const L = D.restaurant.loyalty, ph = load('vd_phone', '');
     const o = sheet(`<div class="sheet-head"><h2>${icon('star', 22)} My points</h2><button class="icon-btn" data-close aria-label="Close">${icon('x', 20)}</button></div>
@@ -488,6 +529,7 @@
         <small class="muted center">Opens GPay, PhonePe, Paytm or any UPI app. Paid to ${esc(r.upi.name)}.</small>
         <button class="btn btn-block" id="ipaid1">${icon('check', 18)} I've paid</button></div>`) : ''}
       ${r.loyalty && load('vd_phone', '') && Math.floor(order.total / r.loyalty.spend) && order.status !== 'cancelled' ? `<div class="pts-earn">${icon('star', 18)}<span>You earn <b>${Math.floor(order.total / r.loyalty.spend)} points</b> on this order${order.status === 'served' ? '' : ' when it is served'}.</span></div>` : ''}
+      ${r.games && order.status !== 'served' && order.status !== 'cancelled' ? `<button class="gm-cta" id="gcta">${icon('game', 26)}<span><b>Waiting for your food? Play and win</b><small>${r.games.reward ? 'Top scorer this week wins ' + esc(r.games.reward) : 'Beat the top score at ' + esc(r.name)}</small></span></button>` : ''}
       <div class="stack">
         ${canOrder() ? `<button class="btn btn-primary btn-lg btn-block" id="more">${icon('plus', 20)} Order more</button>` : ''}
         ${D.table ? `<a class="btn btn-lg btn-block" href="#bill">${icon('list', 20)} Split the bill and pay</a>` : ''}
@@ -498,6 +540,7 @@
     </div>`;
     const back = () => { location.hash = ''; };
     document.getElementById('back').onclick = back;
+    const gc = document.getElementById('gcta'); if (gc) gc.onclick = () => openGames();
     const more = document.getElementById('more'); if (more) more.onclick = back;
     const h2 = document.getElementById('help2'); if (h2) h2.onclick = openHelp;
     const ip1 = document.getElementById('ipaid1'); if (ip1) ip1.onclick = async () => {

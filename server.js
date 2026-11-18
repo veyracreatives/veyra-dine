@@ -140,8 +140,25 @@ function publicRestaurant(r) {
     payFirst: !!(r.service && r.service.payFirst && r.upiId),
     wifi: r.wifi && r.wifi.on && r.wifi.ssid ? { ssid: r.wifi.ssid, pass: r.wifi.pass || '', open: !r.wifi.pass } : null,
     loyalty: loyaltyOn(r) ? { spend: r.loyalty.spend, value: r.loyalty.value, min: r.loyalty.min } : null,
+    games: gamesOn(r) ? { reward: r.games.reward || '', points: loyaltyOn(r) ? (r.games.points || 0) : 0 } : null,
   };
 }
+
+// ---------- mini games for guests (owner turns them on in Settings) ----------
+// Free to play. Scores need a table QR and a server-timed session, and are checked against the fastest
+// a real player could score, so a typed-in score is refused. Weeks run Monday to Sunday, India time.
+const GAMES_DEFAULT = { on: false, reward: '', points: 0 };
+const gamesOn = r => !!(r.games && r.games.on);
+const GAME_RULES = { stack: { name: 'Chai Stack', msPer: 230, max: 600 }, catch: { name: 'Roti Catch', msPer: 110, max: 4000 }, tap: { name: 'Spice Rush', msPer: 140, max: 800 } };
+const gameRuns = new Map(); // sid -> { rid, game, at, table }
+const weekKey = (t = Date.now()) => { const d = new Date(t + 330 * 60000); const day = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - day); return d.toISOString().slice(0, 10); };
+const BAD_WORDS = /(fuck|shit|bitch|chut|bhosd|madarch|behench|bhench|lund|gaand|randi|harami|kutt[ae]|cunt|dick|porn|sex)/i;
+function gameName(v) { const n = String(v || '').replace(/[^\p{L}\p{N} ._-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 14); return !n || BAD_WORDS.test(n) ? '' : n; }
+function topScores(list, n = 10) { // best score per player name, highest first
+  const best = new Map(); for (const x of list) { const k = x.name.toLowerCase(); const b = best.get(k); if (!b || x.score > b.score || (x.score === b.score && x.at < b.at)) best.set(k, x); }
+  return [...best.values()].sort((a, b) => b.score - a.score || a.at.localeCompare(b.at)).slice(0, n);
+}
+const pubScore = x => ({ name: x.name, score: x.score, at: x.at });
 // ---------- loyalty points by phone number (owner turns it on in Settings) ----------
 const LOYALTY_DEFAULT = { on: false, spend: 100, value: 1, min: 50 };
 const loyaltyOn = r => !!(r.loyalty && r.loyalty.on);
@@ -248,7 +265,7 @@ function updatesUntilOf(pl) {
   const d = new Date((pl.iat || new Date().toISOString().slice(0, 10)) + 'T00:00:00Z'); d.setUTCFullYear(d.getUTCFullYear() + 1); return d.toISOString().slice(0, 10);
 }
 const BILL_DEFAULT = { width: '80', gstin: '', fssai: '', footer: 'Thank you! Please visit again.', autoKot: false, showUpi: true };
-function adminRestaurant(r) { return { ...publicRestaurant(r), upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null) } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}), service: Object.assign({ autoAccept: false, payFirst: false }, r.service || {}), loyaltyCfg: Object.assign({}, LOYALTY_DEFAULT, r.loyalty || {}), wifiCfg: Object.assign({ on: false, ssid: '', pass: '' }, r.wifi || {}) }; }
+function adminRestaurant(r) { return { ...publicRestaurant(r), upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null) } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}), service: Object.assign({ autoAccept: false, payFirst: false }, r.service || {}), loyaltyCfg: Object.assign({}, LOYALTY_DEFAULT, r.loyalty || {}), wifiCfg: Object.assign({ on: false, ssid: '', pass: '' }, r.wifi || {}), gamesCfg: Object.assign({}, GAMES_DEFAULT, r.games || {}) }; }
 function newRestaurant({ name, slug, password, email, ownerName, phone, plan = 'trial' }) {
   let s = slugify(slug || name), n = 2;
   while (db.restaurants.some(r => r.slug === s)) s = slugify(slug || name) + '-' + n++;
@@ -716,6 +733,53 @@ self.addEventListener('notificationclick', e => {
       return send(res, 201, billView(r, table));
     }
     return fail(res, 404, 'Not found');
+  }
+  if ((mt = /^\/api\/menu\/([a-z0-9-]+)\/games\/(start|score|top)$/.exec(p))) {
+    const r = db.restaurants.find(x => x.slug === mt[1]); if (!r || !gamesOn(r)) return fail(res, 404, 'Games are off');
+    if (!db.scores) db.scores = [];
+    if (m === 'GET' && mt[2] === 'top') {
+      const wk = weekKey(), mine = db.scores.filter(x => x.restaurantId === r.id && !x.hidden), out = {};
+      for (const g of Object.keys(GAME_RULES)) { const l = mine.filter(x => x.game === g); out[g] = { week: topScores(l.filter(x => x.week === wk)).map(pubScore), all: topScores(l, 5).map(pubScore) }; }
+      return send(res, 200, { games: out, reward: r.games.reward || '', points: loyaltyOn(r) ? (r.games.points || 0) : 0 });
+    }
+    if (m === 'POST' && mt[2] === 'start') {
+      if (!GAME_RULES[body.game]) return fail(res, 400, 'Unknown game');
+      const table = db.tables.find(t => t.restaurantId === r.id && t.token === body.table && t.active !== false);
+      if (!table) return fail(res, 400, 'Scan the QR code on your table to play for the leaderboard.');
+      const tk = 'game|' + clientIp(req); const t = tries.get(tk) || { n: 0, at: Date.now() }; if (Date.now() - t.at > 3600000) { t.n = 0; t.at = Date.now(); } t.n++; tries.set(tk, t);
+      if (t.n > 120) return fail(res, 429, 'That is a lot of games! Take a break and try again in a while.');
+      if (gameRuns.size > 5000) { const cut = Date.now() - 3600000; for (const [k, v] of gameRuns) if (v.at < cut) gameRuns.delete(k); }
+      const sid = id(18); gameRuns.set(sid, { rid: r.id, game: body.game, at: Date.now(), table: table.id });
+      return send(res, 200, { sid });
+    }
+    if (m === 'POST' && mt[2] === 'score') {
+      const run = gameRuns.get(str(body.sid, 40)); if (!run || run.rid !== r.id) return fail(res, 400, 'This game has expired. Play again to post a score.');
+      gameRuns.delete(str(body.sid, 40));
+      const rule = GAME_RULES[run.game], score = Math.floor(Number(body.score) || 0), took = Date.now() - run.at;
+      if (score < 1) return fail(res, 400, 'Score at least 1 point to get on the board.');
+      if (score > rule.max || took < score * rule.msPer || took > 3 * 3600000) return fail(res, 400, 'That score could not be checked. Play again.');
+      const name = gameName(body.name); if (!name) return fail(res, 400, 'Enter a name or nickname (letters and numbers).');
+      const ph = normPhone(body.phone) || '';
+      const x = { id: id(12), restaurantId: r.id, game: run.game, name, phone: ph, score, at: now(), week: weekKey(), tableId: run.table };
+      db.scores.push(x);
+      const same = db.scores.filter(y => y.restaurantId === r.id && y.game === run.game);
+      if (same.length > 400) { const keep = new Set(same.sort((a, b) => b.score - a.score).slice(0, 250).map(y => y.id)); const wk = weekKey(); db.scores = db.scores.filter(y => y.restaurantId !== r.id || y.game !== run.game || keep.has(y.id) || y.week === wk); }
+      save();
+      const wk = weekKey(), list = topScores(db.scores.filter(y => y.restaurantId === r.id && y.game === run.game && y.week === wk && !y.hidden), 1000);
+      const rank = list.findIndex(y => y.name.toLowerCase() === name.toLowerCase()) + 1;
+      emit(r.id, 'game', { game: run.game, name, score });
+      return send(res, 201, { rank, best: list[rank - 1] ? list[rank - 1].score : score });
+    }
+    return fail(res, 404, 'Not found');
+  }
+  if (m === 'GET' && p === '/api/public/top-scores') { // live "Top players" on the Veyra Dine In website: names, restaurant and score only
+    const on = new Map(db.restaurants.filter(gamesOn).map(r => [r.id, r]));
+    const wk = weekKey(); let list = (db.scores || []).filter(x => on.has(x.restaurantId) && !x.hidden);
+    const week = list.filter(x => x.week === wk);
+    const pick = l => { const best = new Map(); for (const x of l) { const k = x.restaurantId + '|' + x.game + '|' + x.name.toLowerCase(); const b = best.get(k); if (!b || x.score > b.score) best.set(k, x); } return [...best.values()].sort((a, b) => b.score / GAME_RULES[b.game].max - a.score / GAME_RULES[a.game].max).slice(0, 10); };
+    const rows = pick(week.length >= 3 ? week : list).map(x => ({ name: x.name, restaurant: on.get(x.restaurantId).name, game: GAME_RULES[x.game].name, gameId: x.game, score: x.score, at: x.at }));
+    const totals = Object.fromEntries(Object.keys(GAME_RULES).map(g => [g, pick(list.filter(x => x.game === g)).slice(0, 1).map(x => ({ name: x.name, restaurant: on.get(x.restaurantId).name, score: x.score }))[0] || null]));
+    return send(res, 200, { thisWeek: week.length >= 3, rows, best: totals, restaurants: on.size, plays: (db.scores || []).filter(x => on.has(x.restaurantId)).length }, { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=30' });
   }
   if (m === 'GET' && (mt = /^\/api\/menu\/([a-z0-9-]+)\/wifi-qr$/.exec(p))) { // other guests can scan this to join the WiFi
     const r = db.restaurants.find(x => x.slug === mt[1]); if (!r || !r.wifi || !r.wifi.on || !r.wifi.ssid) return fail(res, 404, 'Not found');
@@ -1231,6 +1295,20 @@ self.addEventListener('notificationclick', e => {
     // branding & settings
     if (m === 'GET' && p === '/api/admin/customers') return send(res, 200, (db.customers || []).filter(c => c.restaurantId === r.id).sort((a, b) => (b.lastAt || '').localeCompare(a.lastAt || '')).map(customerView));
     if (m === 'GET' && p === '/api/admin/customers/lookup') { const ph = normPhone(url.searchParams.get('phone')); if (!ph) return fail(res, 400, 'Enter a 10-digit mobile number'); const c = customerOf(r, ph); return send(res, 200, c ? customerView(c) : { phone: ph, name: '', points: 0, spent: 0, visits: 0, history: [], isNew: true }); }
+    if (m === 'GET' && p === '/api/admin/games') {
+      const wk = weekKey(), prev = weekKey(Date.now() - 7 * DAY), mine = (db.scores || []).filter(x => x.restaurantId === r.id && !x.hidden), out = {};
+      const view = x => ({ id: x.id, name: x.name, phone: x.phone || '', score: x.score, at: x.at, rewarded: x.rewarded || null });
+      for (const g of Object.keys(GAME_RULES)) { const l = mine.filter(x => x.game === g); out[g] = { name: GAME_RULES[g].name, week: topScores(l.filter(x => x.week === wk)).map(view), last: topScores(l.filter(x => x.week === prev), 3).map(view), plays: l.filter(x => x.week === wk).length }; }
+      return send(res, 200, { cfg: Object.assign({}, GAMES_DEFAULT, r.games || {}), loyalty: loyaltyOn(r), games: out });
+    }
+    if (m === 'POST' && p === '/api/admin/games/reward') {
+      const x = (db.scores || []).find(y => y.id === body.id && y.restaurantId === r.id); if (!x) return fail(res, 404, 'Score not found');
+      if (x.rewarded) return fail(res, 400, 'Already rewarded');
+      const pts = Math.round(Number(body.points) || 0);
+      if (pts > 0) { if (!loyaltyOn(r)) return fail(res, 400, 'Turn on loyalty points first'); if (!x.phone) return fail(res, 400, 'This player did not give a mobile number. Give the reward at the counter.'); const c = customerOf(r, x.phone, true, x.name); c.points += pts; pointsLog(c, 'adjust', pts, `Game winner, ${GAME_RULES[x.game].name}`); }
+      x.rewarded = { at: now(), points: pts > 0 ? pts : 0 }; save(); return send(res, 200, { ok: true });
+    }
+    if (m === 'POST' && p === '/api/admin/games/hide') { const x = (db.scores || []).find(y => y.id === body.id && y.restaurantId === r.id); if (!x) return fail(res, 404, 'Score not found'); x.hidden = true; save(); return send(res, 200, { ok: true }); }
     if (m === 'POST' && p === '/api/admin/customers/adjust') {
       const ph = normPhone(body.phone); if (!ph) return fail(res, 400, 'Enter a 10-digit mobile number');
       const c = customerOf(r, ph, true, body.name), d = Math.round(Number(body.points) || 0);
@@ -1302,6 +1380,13 @@ self.addEventListener('notificationclick', e => {
           if (body.loyalty.value != null) L.value = n(body.loyalty.value, 0.01, 10000);
           if (body.loyalty.min != null) L.min = Math.round(n(body.loyalty.min, 0, 1000000));
           r.loyalty = L;
+        }
+        if (body.games && typeof body.games === 'object') {
+          const Gm = Object.assign({}, GAMES_DEFAULT, r.games || {});
+          if (body.games.on != null) Gm.on = !!body.games.on;
+          if (body.games.reward != null) Gm.reward = str(body.games.reward, 80);
+          if (body.games.points != null) Gm.points = Math.min(100000, Math.max(0, Math.round(Number(body.games.points) || 0)));
+          r.games = Gm;
         }
         if (body.socials) { r.socials = {}; for (const k of SOCIAL_KEYS) if (str(body.socials[k], 300)) r.socials[k] = str(body.socials[k], 300); }
       } catch (e) { return fail(res, 400, e.message); }

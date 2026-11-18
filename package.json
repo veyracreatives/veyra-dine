@@ -1,6 +1,6 @@
 {
   "name": "veyra-dine",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "QR table ordering for restaurants. White-label, built by Veyra Creative & Digital Lab.",
   "main": "desktop/main.js",
   "scripts": {

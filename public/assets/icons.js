@@ -48,6 +48,7 @@
     refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/>',
     lock: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
     chef: '<path d="M7 14a4 4 0 1 1 1.4-7.8 4 4 0 0 1 7.2 0A4 4 0 1 1 17 14"/><path d="M7 14v6h10v-6M7 17h10"/>',
+    game: '<rect x="2.5" y="7" width="19" height="11" rx="5.5"/><path d="M7.5 10.5v4M5.5 12.5h4"/><circle cx="15.5" cy="11.5" r="1" fill="currentColor"/><circle cx="17.5" cy="14" r="1" fill="currentColor"/>',
     wifi: '<path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor"/><path d="M2 9a14.5 14.5 0 0 1 20 0"/>',
   };
   window.icon = function (name, size = 20, cls = '') {

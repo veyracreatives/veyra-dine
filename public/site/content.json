@@ -22,6 +22,13 @@
    "section": "Top of page"
   },
   {
+   "k": "t398ed329",
+   "type": "text",
+   "tag": "a",
+   "text": "Games",
+   "section": "Top of page"
+  },
+  {
    "k": "tfc338f87",
    "type": "text",
    "tag": "a",
@@ -820,6 +827,69 @@
    "section": "Made for tables that order together"
   },
   {
+   "k": "t6319dea0",
+   "type": "text",
+   "tag": "span",
+   "text": "New · Games",
+   "section": "Waiting for food? Guests play and win"
+  },
+  {
+   "k": "t16ab9db9",
+   "type": "text",
+   "tag": "h2",
+   "text": "Waiting for food? Guests play and win",
+   "section": "Waiting for food? Guests play and win"
+  },
+  {
+   "k": "t2eb6bffd",
+   "type": "text",
+   "tag": "p",
+   "text": "Three quick games on your menu: Chai Stack, Roti Catch and Spice Rush. They are free to play and get harder every round. The week's top scorer wins the prize you choose, like a free dessert or bonus points, so guests come back to defend their spot.",
+   "section": "Waiting for food? Guests play and win"
+  },
+  {
+   "k": "t9f833fca",
+   "type": "text",
+   "tag": "b",
+   "text": "Top players this week",
+   "section": "Waiting for food? Guests play and win"
+  },
+  {
+   "k": "tb2fd518d",
+   "type": "text",
+   "tag": "div",
+   "text": "Loading the leaderboard…",
+   "section": "Waiting for food? Guests play and win"
+  },
+  {
+   "k": "td31b5602",
+   "type": "text",
+   "tag": "p",
+   "text": "Scores from restaurants that use Veyra Dine In. First names only.",
+   "section": "Waiting for food? Guests play and win"
+  },
+  {
+   "k": "t35eeb424",
+   "type": "text",
+   "tag": "b",
+   "text": "Try it now",
+   "section": "Waiting for food? Guests play and win"
+  },
+  {
+   "k": "tcd1ac105",
+   "type": "text",
+   "tag": "p",
+   "text": "Tap to drop each layer. Only the part that lands on the stack stays.",
+   "section": "Waiting for food? Guests play and win"
+  },
+  {
+   "k": "t0084d99e",
+   "type": "text",
+   "tag": "span",
+   "text": "Demo only. Real scores are posted from the table.",
+   "section": "Waiting for food? Guests play and win"
+  },
+  {
    "k": "t6adb075e",
    "type": "text",
    "tag": "div",
@@ -1321,6 +1391,20 @@
    "type": "text",
    "tag": "p",
    "text": "Only if you want them to. Add your network name and password in Settings and turn it on. Guests then see a WiFi button on the menu with the password, a copy button and a QR code that joins the network.",
+   "section": "Good to know"
+  },
+  {
+   "k": "t6bba63f1",
+   "type": "text",
+   "tag": "summary",
+   "text": "How do the games and leaderboard work?",
+   "section": "Good to know"
+  },
+  {
+   "k": "t9bfbf956",
+   "type": "text",
+   "tag": "p",
+   "text": "Turn on Games in Settings. Guests tap \"Play and win\" on the menu while they wait. The best scores each week show on your menu, and the week's winner gets the prize you set, like a free dessert or bonus loyalty points. Games are always free to play. Only first names and scores are shown, never phone numbers.",
    "section": "Good to know"
   },
   {

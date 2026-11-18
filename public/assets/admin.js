@@ -379,6 +379,20 @@
   }
 
   // ---------- loyalty customers ----------
+  async function gameBoard() {
+    const o = modal(`<div class="sheet-head"><h3>Game leaderboard</h3><button class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body"><div class="empty">Loading…</div></div>`, { wide: true });
+    let d; const ld = async () => { d = await api('/api/admin/games'); };
+    const row = (x, i, g, last) => `<tr><td>${i + 1}</td><td><b>${esc(x.name)}</b>${x.phone ? `<br><small class="muted">${esc(x.phone)}</small>` : ''}</td><td class="r"><b>${x.score}</b></td><td class="r">${x.rewarded ? `<span class="badge badge-green">Rewarded${x.rewarded.points ? ' +' + x.rewarded.points + ' pts' : ''}</span>` : `${i === 0 ? `<button class="btn btn-sm btn-primary" data-rw="${x.id}">Give reward</button> ` : ''}`}<button class="btn btn-sm btn-ghost" data-hide="${x.id}" title="Remove this score">${icon('trash', 16)}</button></td></tr>`;
+    const draw = () => {
+      const c = d.cfg; o.querySelector('.sheet-body').innerHTML = `<p class="muted" style="margin:0 0 12px;font-size:14px">Weeks run Monday to Sunday. ${c.reward || c.points ? `Reward: <b>${esc(c.reward || '')}${c.reward && c.points ? ' + ' : ''}${c.points ? c.points + ' points' : ''}</b>. Give it to last week's winner when they visit.` : 'Set a weekly reward in Settings › Games to bring players back.'}</p>
+        ${Object.entries(d.games).map(([g, x]) => `<h4 style="margin:18px 0 6px">${esc(x.name)} <small class="muted">· ${x.plays} scores this week</small></h4>
+          ${x.last.length ? `<div class="muted" style="font-size:13px;margin:0 0 6px">Last week's winner</div><table class="tbl"><tbody>${row(x.last[0], 0, g, true)}</tbody></table>` : ''}
+          <div class="muted" style="font-size:13px;margin:8px 0 6px">This week</div>${x.week.length ? `<div style="overflow-x:auto"><table class="tbl"><tbody>${x.week.map((y, i) => row(y, i, g)).join('')}</tbody></table></div>` : '<p class="muted" style="margin:0">No scores yet.</p>'}`).join('')}`;
+      o.querySelectorAll('[data-rw]').forEach(b => b.onclick = async () => { try { await api('/api/admin/games/reward', { method: 'POST', body: { id: b.dataset.rw, points: d.loyalty ? d.cfg.points : 0 } }); toast(d.loyalty && d.cfg.points ? 'Reward given and points added' : 'Marked as rewarded', 'ok'); await ld(); draw(); } catch (err) { toast(esc(err.message), 'error'); } });
+      o.querySelectorAll('[data-hide]').forEach(b => b.onclick = async () => { if (!(await confirmBox('Remove this score?', 'It will no longer show on the leaderboard.', 'Remove'))) return; try { await api('/api/admin/games/hide', { method: 'POST', body: { id: b.dataset.hide } }); await ld(); draw(); } catch (err) { toast(esc(err.message), 'error'); } });
+    };
+    try { await ld(); draw(); } catch (err) { o.querySelector('.sheet-body').innerHTML = `<div class="empty">${esc(err.message)}</div>`; }
+  }
   async function customers() {
     const L = S.me.restaurant.loyaltyCfg; let list = [], q = '';
     const o = modal(`<div class="sheet-head"><h3>Loyalty customers</h3><button class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body"><div class="empty">Loading…</div></div>`, { wide: true });
@@ -891,6 +905,15 @@
         </div>
         <button class="btn btn-primary" style="justify-self:start">Save WiFi</button>
       </div></form>
+      <form class="panel" id="gameF"><div class="panel-head"><div><h2>Games for guests</h2><span class="muted" style="font-size:14px">Three free mini games guests play while the food cooks. The best scores each week go on a leaderboard on your menu and on the Veyra Dine In website (first name and score only, never phone numbers).</span></div>${r.gamesCfg && r.gamesCfg.on ? `<button type="button" class="btn btn-sm" id="gbBtn">${icon('star', 16)} Leaderboard</button>` : ''}</div><div class="panel-body form">
+        <label class="switch"><input type="checkbox" name="on" ${r.gamesCfg && r.gamesCfg.on ? 'checked' : ''}><span class="track"></span>Show games on the menu</label>
+        <div class="loy-rules" style="grid-template-columns:1fr 1fr">
+          <label class="field"><span>Weekly prize for the top scorer (optional)</span><input class="input" name="reward" maxlength="80" value="${esc((r.gamesCfg || {}).reward || '')}" placeholder="E.g. Free gulab jamun"></label>
+          <label class="field"><span>Bonus loyalty points for the winner</span><input class="input" name="points" type="number" min="0" step="1" value="${(r.gamesCfg || {}).points || 0}" ${r.loyaltyCfg && r.loyaltyCfg.on ? '' : 'disabled title="Turn on loyalty points to use this"'}></label>
+        </div>
+        <p class="muted" style="margin:0;font-size:13px">Games are free to play. Never charge guests to play for a prize.</p>
+        <button class="btn btn-primary" style="justify-self:start">Save games</button>
+      </div></form>
       <form class="panel" id="loyF"><div class="panel-head"><div><h2>Loyalty points</h2><span class="muted" style="font-size:14px">Customers collect points with their mobile number. No app or card needed. You choose the rules.</span></div>${r.loyaltyCfg && r.loyaltyCfg.on ? `<button type="button" class="btn btn-sm" id="custBtn">${icon('user', 16)} Customers</button>` : ''}</div><div class="panel-body form">
         <label class="switch"><input type="checkbox" name="on" ${r.loyaltyCfg && r.loyaltyCfg.on ? 'checked' : ''}><span class="track"></span>Give loyalty points</label>
         <div class="loy-rules">
@@ -946,6 +969,9 @@
     loyF.oninput = loyEx; loyEx();
     loyF.onsubmit = async e => { e.preventDefault(); const f = new FormData(loyF); try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { loyalty: { on: !!f.get('on'), spend: f.get('spend'), value: f.get('value'), min: f.get('min') } } }); saveCache(); toast('Loyalty rules saved', 'ok'); renderSettings(c); } catch (err) { toast(esc(err.message), 'error'); } };
     const cb = document.getElementById('custBtn'); if (cb) cb.onclick = customers;
+    const gbb = document.getElementById('gbBtn'); if (gbb) gbb.onclick = gameBoard;
+    const gameF = document.getElementById('gameF');
+    gameF.onsubmit = async e => { e.preventDefault(); const f = new FormData(gameF); try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { games: { on: !!f.get('on'), reward: f.get('reward'), ...(f.get('points') != null ? { points: f.get('points') } : {}) } } }); saveCache(); toast('Games saved', 'ok'); renderTab(); } catch (err) { toast(esc(err.message), 'error'); } };
     const ck = document.getElementById('cpyKey'); if (ck) ck.onclick = async () => { const k = lic.code || lic.key; try { await navigator.clipboard.writeText(k); toast('License key copied'); } catch { prompt('Your license key', k); } };
     c.querySelectorAll('[data-license]').forEach(b => b.onclick = licenseModal);
     document.getElementById('ideaF').onsubmit = async e => { e.preventDefault(); const f = new FormData(e.target); try { await api('/api/requests', { method: 'POST', body: { type: f.get('type'), message: f.get('message') } }); e.target.reset(); toast(`${icon('check', 18)} Sent. Thank you!`, 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };

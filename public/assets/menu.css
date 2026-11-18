@@ -269,3 +269,19 @@ button.pl:hover { background: var(--bg); }
 .gm-rank small { font-weight: 600; }
 .gm-cta { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; border: 0; border-radius: 16px; padding: 14px 16px; margin: 0 0 14px; background: linear-gradient(120deg, #1B1714, #3A2A20); color: #fff; font: inherit; cursor: pointer; }
 .gm-cta svg { color: #FFB48F; flex: none; } .gm-cta b { display: block; } .gm-cta small { display: block; opacity: .8; font-weight: 600; }
+/* QA 2026-11-18 */
+.coupon-in .input::placeholder { text-transform: none; }
+a.help-opt, a.help-opt:hover { text-decoration: none; color: inherit; }
+.cartbar > span:first-child { min-width: 0; }
+.cartbar small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cartbar .go { flex: none; white-space: nowrap; }
+#place { white-space: normal; line-height: 1.2; text-align: center; }
+@media (max-width: 380px) {
+  .line { gap: 10px; }
+  .line .stepper { min-width: 84px; }
+  .line-total { width: auto; min-width: 48px; }
+  .cartbar { padding-left: 14px; }
+  .cartbar .go { padding: 0 10px; }
+}
+#lpf > span svg { vertical-align: -2px; margin-right: 4px; }
+.follow .ig, a.ig { height: auto; min-height: 48px; padding-top: 10px; padding-bottom: 10px; line-height: 1.25; text-align: center; }

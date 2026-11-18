@@ -305,6 +305,7 @@ function openStream(req, res, map, key) {
   req.on('close', () => { const s = map.get(key); if (s) { s.delete(res); if (!s.size) map.delete(key); } });
 }
 
+const adminOrder = o => ({ ...publicOrder(o), tableId: o.tableId || null }); // the counter needs the table to open its bill
 const publicOrder = o => ({ id: o.id, number: o.number, tableName: o.tableName, items: o.items, note: o.note, customerName: o.customerName, total: o.total, subtotal: o.subtotal || o.total, discount: o.discount || 0, coupon: o.coupon || '', status: o.status, createdAt: o.createdAt, updatedAt: o.updatedAt, readyBy: o.readyBy || null, readyAt: o.readyAt || null });
 
 // ---------- wait-time promise: learn how long each dish really takes in this kitchen ----------
@@ -710,7 +711,7 @@ async function handle(req, res) {
       cartOf(table.id).lines = [];
     }
     db.orders.push(order); save();
-    emit(r.id, 'order', publicOrder(order));
+    emit(r.id, 'order', adminOrder(order));
     if (shared) emitTable(table.id, 'placed', { id: order.id, number: order.number, createdAt: order.createdAt, by: str(body.name, 40) || 'Someone', gid: body.gid });
     tableChanged(r, table, shared);
     return send(res, 201, publicOrder(order));
@@ -909,7 +910,7 @@ async function handle(req, res) {
         const tz = Number(url.searchParams.get('tz')) || 0; // minutes, from getTimezoneOffset()
         if (day) list = list.filter(o => new Date(Date.parse(o.createdAt) - tz * 60000).toISOString().slice(0, 10) === day);
       }
-      return send(res, 200, list.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 500).map(publicOrder));
+      return send(res, 200, list.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 500).map(adminOrder));
     }
     if (m === 'GET' && p === '/api/admin/stats') {
       const tz = Number(url.searchParams.get('tz')) || 0;
@@ -960,7 +961,7 @@ async function handle(req, res) {
       if (body.status === 'served' && !o.readyAt) o.readyAt = now();
       o.status = body.status; o.updatedAt = now(); save();
       { const t = db.tables.find(x => x.id === o.tableId); if (t) tableChanged(r, t, false); }
-      emit(r.id, 'order', publicOrder(o)); emitOrder(o);
+      emit(r.id, 'order', adminOrder(o)); emitOrder(o);
       return send(res, 200, publicOrder(o));
     }
     // service requests

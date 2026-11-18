@@ -309,7 +309,7 @@
       <div class="o-items">${o.items.map(l => `<div class="o-line"><span class="q">${l.qty}×</span>${dietMark(l.diet)}<span class="nm">${esc(l.name)}${l.note ? `<small>${esc(l.note)}</small>` : ''}${l.by && new Set(o.items.map(x => x.by)).size > 1 ? `<small class="by">for ${esc(l.by)}</small>` : ''}</span></div>`).join('')}</div>
       ${o.note ? `<div class="o-note">${icon('edit', 16)} ${esc(o.note)}</div>` : ''}
       <div class="o-foot"><span class="total">${cur(o.total)}${o.coupon ? `<small class="cpn">${esc(o.coupon)} −${cur(o.discount)}</small>` : ''}</span>
-<button class="btn btn-sm btn-ghost" data-kot="${o.id}" title="Print KOT">${icon('printer', 16)}</button>
+<button class="btn btn-sm btn-ghost" data-kot="${o.id}" title="Print kitchen ticket (KOT)">${icon('printer', 16)} KOT</button>${o.tableId ? `<button class="btn btn-sm btn-ghost" data-obill="${o.tableId}" title="See, split and print the bill for this table">${icon('receipt', 16)} Bill</button>` : ''}
                 ${o.status === 'new' ? `<button class="btn btn-sm btn-ghost btn-danger" data-id="${o.id}" data-status="cancelled">Cancel</button>` : ''}
         <button class="btn btn-primary" data-id="${o.id}" data-status="${next[0]}">${next[1]}</button></div>
     </article>`;

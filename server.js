@@ -15,6 +15,35 @@ const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const PUBLIC_DIR = path.join(ROOT, 'public');
+
+// ---- Installer mirror: keeps a copy of the Windows installer from GitHub Pages in data/downloads ----
+const DL_DIR = path.join(DATA_DIR, 'downloads');
+const DL_REMOTE = process.env.DL_REMOTE || 'https://veyracreatives.github.io/dine-in/download';
+function dlFetch(url, dest, cb, hops = 0) {
+  require('https').get(url, r => {
+    if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location && hops < 5) { r.resume(); return dlFetch(new URL(r.headers.location, url).href, dest, cb, hops + 1); }
+    if (r.statusCode !== 200) { r.resume(); return cb(new Error('HTTP ' + r.statusCode)); }
+    const tmp = dest + '.part', out = fs.createWriteStream(tmp);
+    r.pipe(out); out.on('finish', () => out.close(() => fs.rename(tmp, dest, cb))); r.on('error', cb); out.on('error', cb);
+  }).on('error', cb);
+}
+function syncInstaller() {
+  try { fs.mkdirSync(DL_DIR, { recursive: true }); } catch {}
+  const yml = path.join(DL_DIR, 'latest.yml'), newYml = yml + '.new';
+  dlFetch(DL_REMOTE + '/latest.yml', newYml, err => {
+    if (err) return console.log('[download] check failed:', err.message);
+    const fresh = fs.readFileSync(newYml, 'utf8'), old = fs.existsSync(yml) ? fs.readFileSync(yml, 'utf8') : '';
+    if (fresh === old && fs.existsSync(path.join(DL_DIR, 'Veyra-Dine-In-Setup.exe'))) return fs.unlink(newYml, () => {});
+    console.log('[download] fetching installer from GitHub Pages');
+    dlFetch(DL_REMOTE + '/Veyra-Dine-In-Setup.exe', path.join(DL_DIR, 'Veyra-Dine-In-Setup.exe'), e1 => {
+      if (e1) return console.log('[download] installer failed:', e1.message);
+      dlFetch(DL_REMOTE + '/Veyra-Dine-In-Setup.exe.blockmap', path.join(DL_DIR, 'Veyra-Dine-In-Setup.exe.blockmap'), () => {
+        fs.rename(newYml, yml, () => console.log('[download] installer ready'));
+      });
+    });
+  });
+}
+if (process.env.DL_MIRROR !== '0' && !process.versions.electron) { setTimeout(syncInstaller, 5000); setInterval(syncInstaller, 6 * 3600 * 1000).unref(); }
 // Plans and where the "Buy" buttons go. Change prices here.
 const PLANS = { trialDays: 30, lifetime: 14999, yearly: 5999 };
 const BUY_URL = process.env.BUY_URL || 'https://wa.me/918928246726?text=';
@@ -358,6 +387,13 @@ async function handle(req, res) {
   const SITE_DIR = path.join(PUBLIC_DIR, 'site');
   if (m === 'GET' && (p === '/' || p === '/index.html')) return serveFile(res, path.join(SITE_DIR, 'index.html'));
   if (m === 'GET' && (/^\/img\/[A-Za-z0-9._-]+$/.test(p) || /^\/(og\.jpg|favicon-32\.png|icon-180\.png|icon-512\.png)$/.test(p))) { const f = safeJoin(SITE_DIR, p); return f ? serveFile(res, f, 'public, max-age=86400') : fail(res, 404, 'Not found'); }
+  // Windows installer: served from this server (fast in India, with a real file size) when the local copy is ready, else from GitHub Pages.
+  if (m === 'GET' && /^\/download\/(Veyra-Dine-In-Setup\.exe|latest\.yml|Veyra-Dine-In-Setup\.exe\.blockmap)$/.test(p)) {
+    const name = p.slice(10), f = path.join(DL_DIR, name);
+    if (!fs.existsSync(f)) { res.writeHead(302, { Location: DL_REMOTE + '/' + name }); return res.end(); }
+    if (name.endsWith('.exe')) res.setHeader('Content-Disposition', 'attachment; filename="' + name + '"');
+    return serveFile(res, f, name.endsWith('.yml') ? 'no-cache' : 'public, max-age=3600');
+  }
   if (m === 'GET' && p === '/favicon.ico') return serveFile(res, path.join(SITE_DIR, 'favicon-32.png'), 'public, max-age=86400');
   if (m === 'GET' && /^\/m\/[a-z0-9-]+\/?$/.test(p)) return serveMenuPage(req, res, url, p.split('/')[2]);
   if (m === 'GET' && p === '/robots.txt') return send(res, 200, `User-agent: *\nDisallow: /admin\nDisallow: /platform\nDisallow: /api/\nDisallow: /print-qr\nAllow: /m/\n\nSitemap: ${baseUrl(req)}/sitemap.xml\n`, { 'Content-Type': 'text/plain; charset=utf-8' });

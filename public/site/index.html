@@ -236,7 +236,7 @@
   .toasts .toast { position: absolute; inset: 0 0 auto auto; }
   .toasts .toast + .toast { display: none; }
   .ph-only, .ph-only-b { display: none !important; }
-  @media (max-width: 760px) { .pc-only, .pc-only-b { display: none !important; } .ph-only { display: inline-flex !important; } .ph-only-b { display: block !important; } }
+  @media (max-width: 760px), (hover: none) and (pointer: coarse) { .pc-only, .pc-only-b { display: none !important; } .ph-only { display: inline-flex !important; } .ph-only-b { display: block !important; } }
   @media (max-width: 560px) { .logo small { display: none; } .logo { font-size: 17px; gap: 8px; white-space: nowrap; flex: none; } .logo .mark { width: 34px; height: 34px; border-radius: 10px; } .nav .wrap { gap: 10px; } .login-link { margin: 0 0 0 auto; font-size: 15px; } .nav .btn { padding: 0 16px; font-size: 14px; flex: none; } .xs-hide { display: none; } .hero { padding-top: 26px; } .eyebrow { font-size: 13px; padding: 6px 12px; white-space: nowrap; max-width: 100%; } .toasts { width: 250px; bottom: -10px; } }
   .hand { position: absolute; z-index: 4; left: 120px; bottom: 150px; width: 34px; height: 34px; border-radius: 50%; background: rgba(228,87,46,.35); border: 2px solid #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); opacity: 0; }
   .count { font-variant-numeric: tabular-nums; }

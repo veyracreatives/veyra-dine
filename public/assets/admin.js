@@ -272,7 +272,7 @@
   }
   // ---------- phone app (install to home screen) ----------
   const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
-  const isPhone = () => window.innerWidth < 760 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isPhone = () => window.innerWidth < 760 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || (window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches); // phones and tablets
   const isPhoneApp = () => isStandalone() && isPhone();
   const isIOS = () => /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); S.installEvt = e; if (S.me && (S.tab === 'orders' || S.tab === 'settings')) renderShell(); });

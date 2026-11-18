@@ -506,8 +506,15 @@ async function handle(req, res) {
   if (m === 'GET' && p === '/favicon.ico') return serveFile(res, path.join(SITE_DIR, 'favicon-32.png'), 'public, max-age=86400');
   if (m === 'GET' && /^\/m\/[a-z0-9-]+\/?$/.test(p)) return serveMenuPage(req, res, url, p.split('/')[2]);
   if (m === 'GET' && p === '/robots.txt') return send(res, 200, `User-agent: *\nDisallow: /admin\nDisallow: /platform\nDisallow: /api/\nDisallow: /print-qr\nAllow: /m/\n\nSitemap: ${baseUrl(req)}/sitemap.xml\n`, { 'Content-Type': 'text/plain; charset=utf-8' });
-  if (m === 'GET' && p === '/sitemap.xml') return send(res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${baseUrl(req)}/</loc><changefreq>monthly</changefreq><priority>1.0</priority></url>\n${db.restaurants.filter(r => access(r).active).map(r => `  <url><loc>${baseUrl(req)}/m/${r.slug}</loc><changefreq>weekly</changefreq></url>`).join('\n')}\n</urlset>\n`, { 'Content-Type': 'application/xml; charset=utf-8' });
-  if (m === 'GET' && (p === '/signup' || /^\/admin(\/[a-z0-9-]+)?\/?$/.test(p))) return serveFile(res, path.join(PUBLIC_DIR, 'admin.html'));
+  if (m === 'GET' && p === '/sitemap.xml') { const b = baseUrl(req), d = new Date().toISOString().slice(0, 10), u = (loc, freq, pri) => `  <url><loc>${b}${loc}</loc><lastmod>${d}</lastmod><changefreq>${freq}</changefreq><priority>${pri}</priority></url>`;
+    return send(res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[u('/', 'weekly', '1.0'), u('/signup', 'monthly', '0.8'), ...['contact', 'privacy', 'terms', 'refund'].map(x => u('/' + x, 'yearly', '0.3')), ...db.restaurants.filter(r => access(r).active).map(r => u('/m/' + r.slug, 'weekly', '0.6'))].join('\n')}\n</urlset>\n`, { 'Content-Type': 'application/xml; charset=utf-8' }); }
+  if (m === 'GET' && p === '/signup') { // the sign-up page is public, so search engines may index it (the admin pages stay hidden)
+    const b = baseUrl(req), h = fs.readFileSync(path.join(PUBLIC_DIR, 'admin.html'), 'utf8')
+      .replace('<meta name="robots" content="noindex, nofollow">', `<meta name="robots" content="index, follow"><meta name="description" content="Start your free 10-day trial of Veyra Dine In, the QR code menu and table ordering system for restaurants, cafés and dhabas in India. No card needed."><link rel="canonical" href="${b}/signup"><meta property="og:title" content="Start your free trial · Veyra Dine In"><meta property="og:image" content="${b}/og.jpg">`)
+      .replace(/<title>[^<]*<\/title>/, '<title>Free trial: QR Code Ordering for Restaurants · Veyra Dine In</title>');
+    return send(res, 200, h, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+  }
+  if (m === 'GET' && /^\/admin(\/[a-z0-9-]+)?\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'admin.html'));
   if (m === 'GET' && p === '/platform') return serveFile(res, path.join(PUBLIC_DIR, 'platform.html'));
   if (m === 'GET' && p === '/print-qr') return serveFile(res, path.join(PUBLIC_DIR, 'print-qr.html'));
   if (m === 'GET' && p.startsWith('/uploads/')) { const f = safeJoin(UPLOAD_DIR, p.slice(9)); return f ? serveFile(res, f, 'public, max-age=31536000, immutable') : fail(res, 404, 'Not found'); }

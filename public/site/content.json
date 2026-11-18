@@ -1072,6 +1072,62 @@
    "section": "Good to know"
   },
   {
+   "k": "te6ee8fdb",
+   "type": "text",
+   "tag": "summary",
+   "text": "What is a QR code ordering system?",
+   "section": "Good to know"
+  },
+  {
+   "k": "t7281c870",
+   "type": "text",
+   "tag": "p",
+   "text": "It is a digital menu that guests open by scanning a QR code on the table. They see dishes with photos and prices, place the order from their own phone, and the order reaches your counter with the table number. No waiter has to write it down, so orders are faster and there are fewer mistakes.",
+   "section": "Good to know"
+  },
+  {
+   "k": "t30b3b4e7",
+   "type": "text",
+   "tag": "summary",
+   "text": "Can it print KOT and bills?",
+   "section": "Good to know"
+  },
+  {
+   "k": "t7ca4a570",
+   "type": "text",
+   "tag": "p",
+   "text": "Yes. Veyra Dine In prints kitchen order tickets (KOT) and customer bills on 58 mm and 80 mm thermal printers, with your GSTIN, FSSAI number and a UPI QR code on the bill. You can also print KOTs automatically for every new order.",
+   "section": "Good to know"
+  },
+  {
+   "k": "t4f09a3d6",
+   "type": "text",
+   "tag": "summary",
+   "text": "Can guests pay by UPI and split the bill?",
+   "section": "Good to know"
+  },
+  {
+   "k": "td48c1f93",
+   "type": "text",
+   "tag": "p",
+   "text": "Yes. Guests at the same table can order together, then split the bill equally or by what each person ate, and pay their share by UPI to your own account. You see who has paid at the counter.",
+   "section": "Good to know"
+  },
+  {
+   "k": "t640af673",
+   "type": "text",
+   "tag": "summary",
+   "text": "How much does a QR menu for a restaurant cost?",
+   "section": "Good to know"
+  },
+  {
+   "k": "t4c24287d",
+   "type": "text",
+   "tag": "p",
+   "text": "Veyra Dine In is free for 10 days. After that it is ₹799 a month, ₹5,999 a year, or ₹24,999 one time for lifetime use with 1 year of updates. Every plan includes all features and online hosting for your menu.",
+   "section": "Good to know"
+  },
+  {
    "k": "tb2aec363",
    "type": "text",
    "tag": "div",

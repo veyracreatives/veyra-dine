@@ -354,7 +354,7 @@ async function handle(req, res) {
   const m = req.method;
 
   // ---- pages ----
-  if (m === 'GET' && (p === '/' )) return serveFile(res, path.join(PUBLIC_DIR, 'index.html'));
+  if (m === 'GET' && p === '/') { res.writeHead(302, { Location: process.env.HOME_URL || 'https://veyracreatives.github.io/dine-in/' }); return res.end(); } // product website; restaurants use /admin and /signup
   if (m === 'GET' && /^\/m\/[a-z0-9-]+\/?$/.test(p)) return serveMenuPage(req, res, url, p.split('/')[2]);
   if (m === 'GET' && p === '/robots.txt') return send(res, 200, `User-agent: *\nDisallow: /admin\nDisallow: /platform\nDisallow: /api/\nDisallow: /print-qr\nAllow: /m/\n\nSitemap: ${baseUrl(req)}/sitemap.xml\n`, { 'Content-Type': 'text/plain; charset=utf-8' });
   if (m === 'GET' && p === '/sitemap.xml') return send(res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${db.restaurants.filter(r => access(r).active).map(r => `  <url><loc>${baseUrl(req)}/m/${r.slug}</loc><changefreq>weekly</changefreq></url>`).join('\n')}\n</urlset>\n`, { 'Content-Type': 'application/xml; charset=utf-8' });

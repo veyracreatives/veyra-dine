@@ -4,6 +4,7 @@ t = open('template.html').read()
 wa = 'https://wa.me/918928246726?text='
 rep = {
  '{{NAME}}': name,
+ '{{APP}}': 'https://dinein.veyracreatives.com',
  '{{DOWNLOAD}}': 'https://veyracreatives.github.io/dine-in/download/Veyra-Dine-In-Setup.exe',
  '{{WA}}': wa + urllib.parse.quote(f'Hi, I want a free demo of {name} for my restaurant'),
  '{{WA_LIFE}}': wa + urllib.parse.quote(f'Hi, I want to buy {name} Lifetime (₹14,999)'),

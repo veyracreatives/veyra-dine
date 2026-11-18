@@ -1,6 +1,6 @@
 {
   "appName": "Veyra Dine In",
   "appId": "in.veyralab.dine",
-  "serverUrl": "",
-  "updateUrl": "https://github.com/veyracreatives/veyra-dine/releases/latest/download"
+  "serverUrl": "https://dinein.veyracreatives.com",
+  "updateUrl": "https://veyracreatives.github.io/dine-in/download"
 }

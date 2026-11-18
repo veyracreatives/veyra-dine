@@ -1,6 +1,8 @@
 // Veyra Dine In for Windows: the counter app.
-// - If config.json has a serverUrl, it opens that online server (guests' phones work on any network).
-// - If not, it runs the server on this computer (guests must be on the restaurant Wi-Fi).
+// - Online mode (default when config.json has a serverUrl): opens the online server, guests order on any network,
+//   and the owner can also log in from any browser.
+// - This-computer mode: runs the server here (guests must be on the restaurant Wi-Fi). Installs that already
+//   have restaurants saved on this computer stay in this mode so nothing is lost. The tray menu switches modes.
 'use strict';
 const { app, BrowserWindow, Tray, Menu, Notification, dialog, shell, ipcMain, nativeImage } = require('electron');
 const path = require('path');
@@ -78,6 +80,7 @@ function createTray() {
     { label: 'Start with Windows', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin, click: i => app.setLoginItemSettings({ openAtLogin: i.checked, args: ['--hidden'] }) },
     { label: updateReady ? `Restart to update to ${updateReady}` : (upd.state === 'available' || upd.state === 'later') ? `Update to ${upd.version}` : 'Check for updates', click: checkUpdatesNow },
     { label: `Version ${app.getVersion()}`, enabled: false },
+    ...(CONFIG.serverUrl ? [{ label: baseUrl.startsWith('http://localhost') ? 'Use the online server…' : 'Run on this computer only…', click: () => switchMode(baseUrl.startsWith('http://localhost') ? 'online' : 'local') }] : []),
     { type: 'separator' },
     { label: 'Quit', click: () => { quitting = true; app.quit(); } },
   ]);
@@ -173,9 +176,27 @@ function checkUpdatesNow() {
   manualCheck = true; updater.checkForUpdates().catch(() => {});
 }
 
+const MODE_FILE = () => path.join(app.getPath('userData'), 'mode.json');
+function runMode() {
+  if (!CONFIG.serverUrl) return 'local';
+  try { const m = JSON.parse(fs.readFileSync(MODE_FILE(), 'utf8')).mode; if (m === 'local' || m === 'online') return m; } catch {}
+  let mode = 'online';
+  try { const d = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'data', 'db.json'), 'utf8')); if (d.restaurants && d.restaurants.length) mode = 'local'; } catch {}
+  try { fs.writeFileSync(MODE_FILE(), JSON.stringify({ mode, at: new Date().toISOString() })); } catch {}
+  return mode;
+}
+async function switchMode(mode) {
+  const { response } = await dialog.showMessageBox(win, { type: 'question', buttons: ['Switch and restart', 'Cancel'], defaultId: 0, cancelId: 1, title: APP_NAME,
+    message: mode === 'online' ? 'Use the online server?' : 'Run on this computer only?',
+    detail: mode === 'online' ? `Your restaurant will run on ${CONFIG.serverUrl}. Guests can order on mobile data and you can log in from any browser. Restaurants saved on this computer stay here and you can switch back any time.` : 'Guests will need to be on your Wi-Fi to order. Your online account is not deleted and you can switch back any time.' });
+  if (response !== 0) return;
+  fs.writeFileSync(MODE_FILE(), JSON.stringify({ mode, at: new Date().toISOString() }));
+  quitting = true; app.relaunch(); app.exit(0);
+}
+
 app.whenReady().then(async () => {
   try {
-    baseUrl = CONFIG.serverUrl ? CONFIG.serverUrl.replace(/\/$/, '') : await startLocalServer();
+    baseUrl = runMode() === 'online' ? CONFIG.serverUrl.replace(/\/$/, '') : await startLocalServer();
   } catch (err) {
     dialog.showErrorBox(APP_NAME, `Could not start: ${err.message}`); app.quit(); return;
   }

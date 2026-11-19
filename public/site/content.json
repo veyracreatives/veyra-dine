@@ -1,6 +1,20 @@
 {
  "items": [
   {
+   "k": "hero",
+   "type": "text",
+   "tag": "h1",
+   "text": "Guests scan. You get the order at the counter.",
+   "section": "Top of page"
+  },
+  {
+   "k": "if7b11bb8",
+   "type": "img",
+   "src": "img/phone-status.jpg",
+   "alt": "Live order status",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
    "k": "te3eb71fe",
    "type": "text",
    "tag": "small",
@@ -36,6 +50,13 @@
    "section": "Top of page"
   },
   {
+   "k": "t929a28d2",
+   "type": "text",
+   "tag": "a",
+   "text": "Guides",
+   "section": "Top of page"
+  },
+  {
    "k": "ta0d9bbad",
    "type": "text",
    "tag": "a",
@@ -68,13 +89,6 @@
    "type": "text",
    "tag": "span",
    "text": "· works without internet",
-   "section": "Top of page"
-  },
-  {
-   "k": "hero",
-   "type": "text",
-   "tag": "h1",
-   "text": "Guests scan. You get the order at the counter.",
    "section": "Top of page"
   },
   {
@@ -400,13 +414,6 @@
    "section": "A menu they'll enjoy ordering from"
   },
   {
-   "k": "if7b11bb8",
-   "type": "img",
-   "src": "img/phone-status.jpg",
-   "alt": "Live order status",
-   "section": "A menu they'll enjoy ordering from"
-  },
-  {
    "k": "i79db71d5",
    "type": "img",
    "src": "img/admin-tables.jpg",
@@ -671,6 +678,132 @@
    "tag": "span",
    "text": "Takeaway · 1× Veg Biryani",
    "section": "No waiter needed. Never stops, even without internet."
+  },
+  {
+   "k": "i25f15f52",
+   "type": "img",
+   "src": "img/waiter-tables.jpg",
+   "alt": "Waiter app: every table with its status, bill amount and a call from Table 8",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "i63c9d088",
+   "type": "img",
+   "src": "img/waiter-order.jpg",
+   "alt": "Taking an order for Table 1: 2 Paneer Tikka and 1 Punjabi Samosa, send to kitchen",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "t52f82aed",
+   "type": "text",
+   "tag": "span",
+   "text": "New · Waiter app",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "t016d41ab",
+   "type": "text",
+   "tag": "h2",
+   "text": "Have waiters? Give them the app",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "t93658b26",
+   "type": "text",
+   "tag": "p",
+   "text": "Your staff take orders on their own phones. No new device and no extra cost. They log in with your restaurant ID, their name and a PIN you set.",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "td29b906b",
+   "type": "text",
+   "tag": "b",
+   "text": "Every table at a glance",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "t2c170fa5",
+   "type": "text",
+   "tag": "span",
+   "text": "Free, to accept, cooking or food ready, with the bill so far. Calls from tables ring on their phone.",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "t75d14132",
+   "type": "text",
+   "tag": "b",
+   "text": "An order in a few taps",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "t5baf73c6",
+   "type": "text",
+   "tag": "span",
+   "text": "Search the menu, add dishes, write a note for the kitchen and send. The KOT prints at the counter.",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "t3171664d",
+   "type": "text",
+   "tag": "b",
+   "text": "Safe on weak signal",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "t4db90450",
+   "type": "text",
+   "tag": "span",
+   "text": "If the network drops, the order waits on the phone and goes the moment it is back. Never sent twice.",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "t58b8a272",
+   "type": "text",
+   "tag": "div",
+   "text": "WiFi backup",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "tadbe5c5d",
+   "type": "text",
+   "tag": "h3",
+   "text": "Internet down? Keep taking orders on your own WiFi",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "tf69a5d17",
+   "type": "text",
+   "tag": "p",
+   "text": "The Windows app keeps a copy of your menu and tables. If the internet goes, it takes over in about a minute. Guests scan the backup QR, waiters keep ordering, and every order goes online by itself when the internet is back.",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "t2d76efd2",
+   "type": "text",
+   "tag": "span",
+   "text": "Internet goes down",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "tf4bb54f5",
+   "type": "text",
+   "tag": "span",
+   "text": "Your laptop takes over",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "ta4497275",
+   "type": "text",
+   "tag": "span",
+   "text": "Guests and waiters order on your WiFi",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "t1916915d",
+   "type": "text",
+   "tag": "span",
+   "text": "Internet back, every order synced",
+   "section": "Have waiters? Give them the app"
   },
   {
    "k": "t7c087ef3",
@@ -1037,18 +1170,550 @@
    "section": "Built for Indian restaurants"
   },
   {
-   "k": "ta0d55c5e",
+   "k": "t3c3d7921",
    "type": "text",
    "tag": "h3",
-   "text": "Staff phones too",
+   "text": "Waiter app",
    "section": "Built for Indian restaurants"
   },
   {
-   "k": "t105d44ac",
+   "k": "tcfc800e3",
    "type": "text",
    "tag": "p",
-   "text": "Waiters can open the same order board on their phone with your password.",
+   "text": "Waiters take orders on their own phones with a PIN. Tables, calls and food-ready alerts included.",
    "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t6ed92985",
+   "type": "text",
+   "tag": "h3",
+   "text": "Kitchen online status",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "ta7f27338",
+   "type": "text",
+   "tag": "p",
+   "text": "Guests see if your kitchen is online. If it is offline, ordering pauses and guests are asked to call staff.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t10d5e907",
+   "type": "text",
+   "tag": "p",
+   "text": "No internet? The Windows app takes over on your own WiFi and sends every order online later.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t81849f4a",
+   "type": "text",
+   "tag": "h3",
+   "text": "Google login and email code",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t8419ca88",
+   "type": "text",
+   "tag": "p",
+   "text": "Log in with Google in one tap. Forgot the password? Get a 6-digit code by email.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t81f903f3",
+   "type": "text",
+   "tag": "h3",
+   "text": "Split bill and UPI",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "tbf422890",
+   "type": "text",
+   "tag": "p",
+   "text": "Split by person or equally and pay by GPay or PhonePe with the exact share.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "tdd45fd3f",
+   "type": "text",
+   "tag": "div",
+   "text": "How to use",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t0ad07e03",
+   "type": "text",
+   "tag": "h2",
+   "text": "Step-by-step guides",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t5526215b",
+   "type": "text",
+   "tag": "p",
+   "text": "Every main feature in four simple steps. Pick one to see how it works.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t90e40d50",
+   "type": "text",
+   "tag": "span",
+   "text": "Get started",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "te9fb1e19",
+   "type": "text",
+   "tag": "span",
+   "text": "Guests order",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tc7d1699c",
+   "type": "text",
+   "tag": "span",
+   "text": "Kitchen online",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "ta92e6a80",
+   "type": "text",
+   "tag": "span",
+   "text": "Loyalty and coupons",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t46d69925",
+   "type": "text",
+   "tag": "span",
+   "text": "Login and password",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tf3534216",
+   "type": "text",
+   "tag": "b",
+   "text": "Get the app",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t8e955fbe",
+   "type": "text",
+   "tag": "p",
+   "text": "Download the Windows app for your counter, or sign up on the website and use your phone.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tf889b8db",
+   "type": "text",
+   "tag": "p",
+   "text": "Menu tab: add categories, dishes, prices and photos. Mark veg or non-veg.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tdb2f951d",
+   "type": "text",
+   "tag": "p",
+   "text": "Tables & QR tab: add your tables and print the QR cards, four to an A4 page.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tec51f77d",
+   "type": "text",
+   "tag": "b",
+   "text": "Keep the admin open",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t433da6ad",
+   "type": "text",
+   "tag": "p",
+   "text": "New orders ring and pop up. The green Online dot means guests can order.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tf9f90c39",
+   "type": "text",
+   "tag": "b",
+   "text": "Scan the table QR",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tc37e2458",
+   "type": "text",
+   "tag": "p",
+   "text": "Guests open the phone camera and scan. The menu opens with no app to install.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t9f0c677e",
+   "type": "text",
+   "tag": "b",
+   "text": "Add dishes together",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t6bfb531d",
+   "type": "text",
+   "tag": "p",
+   "text": "Everyone at the table can add to one shared order, with notes like less spicy.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tf5dba701",
+   "type": "text",
+   "tag": "b",
+   "text": "Pay their way",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t3dd0cb02",
+   "type": "text",
+   "tag": "p",
+   "text": "Pay by UPI from the phone, split the bill, or pay at the counter.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tf24cd6de",
+   "type": "text",
+   "tag": "b",
+   "text": "Call, ask, play",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "te989bf31",
+   "type": "text",
+   "tag": "p",
+   "text": "Tap to call a waiter or ask for the bill, and play games while the food cooks.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "te54375b7",
+   "type": "text",
+   "tag": "b",
+   "text": "Set a waiter PIN",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t0e73a2fa",
+   "type": "text",
+   "tag": "p",
+   "text": "Settings › Waiters: choose a 4 to 6 digit PIN.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tdfb541e8",
+   "type": "text",
+   "tag": "b",
+   "text": "Share the waiter link",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t6d806e75",
+   "type": "text",
+   "tag": "p",
+   "text": "Waiters scan the QR shown there, or you send them the link.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t1c4ef918",
+   "type": "text",
+   "tag": "b",
+   "text": "Waiters log in",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t6bc5d20e",
+   "type": "text",
+   "tag": "p",
+   "text": "Restaurant ID, their name and the PIN. Works on any phone.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t7d42d4ac",
+   "type": "text",
+   "tag": "b",
+   "text": "Tap a table and send",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t83563a52",
+   "type": "text",
+   "tag": "p",
+   "text": "Add dishes, add a note and tap Send. The KOT reaches the kitchen.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t6e9ecc88",
+   "type": "text",
+   "tag": "p",
+   "text": "On the computer, phone or a waiter phone. The top shows a green Online dot.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t431f3214",
+   "type": "text",
+   "tag": "b",
+   "text": "Guests see the status",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t40d70c7c",
+   "type": "text",
+   "tag": "p",
+   "text": "The menu shows Kitchen online, so guests know the order will be seen.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t15e5258e",
+   "type": "text",
+   "tag": "b",
+   "text": "Offline? Orders pause",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "td2795186",
+   "type": "text",
+   "tag": "p",
+   "text": "If nobody has the admin open, the menu stops taking orders and asks guests to call staff.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t361aee0a",
+   "type": "text",
+   "tag": "b",
+   "text": "Pause any time",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t583cb839",
+   "type": "text",
+   "tag": "p",
+   "text": "Switch Taking orders off when the kitchen is closed or too busy.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tf3c259b5",
+   "type": "text",
+   "tag": "b",
+   "text": "Use the Windows app",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t5e47b9be",
+   "type": "text",
+   "tag": "p",
+   "text": "Install it on the counter laptop and log in to your online account.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t4e7f91af",
+   "type": "text",
+   "tag": "b",
+   "text": "Print backup QR cards",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tbd25f75d",
+   "type": "text",
+   "tag": "p",
+   "text": "Settings › WiFi backup › Print backup QR cards. Put one on each table.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t3441f6c6",
+   "type": "text",
+   "tag": "b",
+   "text": "Set up the laptop once",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tbe8502f8",
+   "type": "text",
+   "tag": "p",
+   "text": "Give it a fixed address on your router and tap Allow when Windows asks about the firewall.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tf7fe18b1",
+   "type": "text",
+   "tag": "b",
+   "text": "Internet down? Keep going",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t75c7477f",
+   "type": "text",
+   "tag": "p",
+   "text": "The app switches by itself. When the internet is back, every order goes online.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tb5865f05",
+   "type": "text",
+   "tag": "b",
+   "text": "Set your rules",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tee3f0517",
+   "type": "text",
+   "tag": "p",
+   "text": "Settings › Loyalty: how much a guest spends for one point and what a point is worth.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t97a43ac4",
+   "type": "text",
+   "tag": "b",
+   "text": "Guests add their number",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "td10e0f50",
+   "type": "text",
+   "tag": "p",
+   "text": "They enter their phone number when they order. Points are added when the table is cleared.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t7c25f7ec",
+   "type": "text",
+   "tag": "b",
+   "text": "Use points at billing",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t946a97a0",
+   "type": "text",
+   "tag": "p",
+   "text": "Look up the number on the bill and use the points as payment.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "te48975f3",
+   "type": "text",
+   "tag": "b",
+   "text": "Make coupon codes",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tb455778d",
+   "type": "text",
+   "tag": "p",
+   "text": "Coupons tab: % or ₹ off, minimum order, expiry and use limit.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t336e0a5a",
+   "type": "text",
+   "tag": "b",
+   "text": "Turn on games",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tbb9d5af4",
+   "type": "text",
+   "tag": "p",
+   "text": "Settings › Games: switch them on and choose this week's prize.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t5ed4049e",
+   "type": "text",
+   "tag": "b",
+   "text": "Guests play while waiting",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tb253d981",
+   "type": "text",
+   "tag": "p",
+   "text": "They tap Play and win on the menu. Games are always free.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tad577b38",
+   "type": "text",
+   "tag": "b",
+   "text": "Weekly leaderboard",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t4f2b6748",
+   "type": "text",
+   "tag": "p",
+   "text": "The best scores show on your menu, first names only.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t840b05ed",
+   "type": "text",
+   "tag": "b",
+   "text": "Give the prize",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "te7d01a79",
+   "type": "text",
+   "tag": "p",
+   "text": "The week's top player shows the screen and gets the prize.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tf8ce4ace",
+   "type": "text",
+   "tag": "b",
+   "text": "Log in with Google",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "ta20125fa",
+   "type": "text",
+   "tag": "p",
+   "text": "Tap Continue with Google. In the Windows app it opens your browser to sign in.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t0f20fe9d",
+   "type": "text",
+   "tag": "b",
+   "text": "Or use your password",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t2021e963",
+   "type": "text",
+   "tag": "p",
+   "text": "Your restaurant ID or email and your password.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t60737e3e",
+   "type": "text",
+   "tag": "b",
+   "text": "Forgot the password?",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "td13f8c30",
+   "type": "text",
+   "tag": "p",
+   "text": "Tap Forgot password and enter your email. We send a 6-digit code.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t1e83ae49",
+   "type": "text",
+   "tag": "b",
+   "text": "Set a new password",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t06963bab",
+   "type": "text",
+   "tag": "p",
+   "text": "Type the code within 10 minutes and choose a new password.",
+   "section": "Step-by-step guides"
   },
   {
    "k": "tca97f918",
@@ -1352,6 +2017,20 @@
    "section": "Good to know"
   },
   {
+   "k": "t30a795f0",
+   "type": "text",
+   "tag": "summary",
+   "text": "Can my waiters take orders on their phones?",
+   "section": "Good to know"
+  },
+  {
+   "k": "t64e0e81e",
+   "type": "text",
+   "tag": "p",
+   "text": "Yes. Set a waiter PIN in Settings and share the waiter link. Waiters log in with your restaurant ID, their name and the PIN, then see every table, take orders, hear calls from tables and know when food is ready. It works on any Android phone or iPhone, with no app to install.",
+   "section": "Good to know"
+  },
+  {
    "k": "tf58affff",
    "type": "text",
    "tag": "summary",
@@ -1359,10 +2038,10 @@
    "section": "Good to know"
   },
   {
-   "k": "t61ccb31b",
+   "k": "t950da65e",
    "type": "text",
    "tag": "p",
-   "text": "Your counter keeps working. You can take counter orders, print KOTs and bills, change order status and mark payments while offline. Everything is saved on the device and sent to the server by itself when the internet is back. Guests with mobile data can still order from the table menu, and those orders show up at the counter once you reconnect.",
+   "text": "Your counter keeps working. You can take counter orders, print KOTs and bills, change order status and mark payments while offline, and everything is sent to the server by itself when the internet is back. With the Windows app, WiFi backup goes further: the laptop takes over in about a minute, guests scan the backup QR on the table and waiters keep taking orders on your own WiFi. Keep the laptop on and connected to your WiFi.",
    "section": "Good to know"
   },
   {

@@ -42,7 +42,7 @@
   function login() {
     app.innerHTML = `<div class="login"><form class="login-card" id="f"><div class="lg">${icon('store', 28)}</div><h1>Veyra platform</h1><p class="muted" style="margin:0 0 20px">Add restaurants and manage their logins.</p>
       <div class="form"><label class="field"><span>Platform password</span><input class="input" type="password" name="p" required></label><button class="btn btn-primary btn-lg btn-block">Log in</button></div>
-      <p class="muted" style="font-size:13px;margin-top:16px">The first password is printed in the terminal when the server starts.</p></form></div>`;
+      <p class="muted" style="font-size:13px;margin-top:16px">Forgot the password? Open your server in hPanel › Browser terminal to see it or make a new one.</p></form></div>`;
     document.getElementById('f').onsubmit = async e => { e.preventDefault(); try { await api('/api/platform/login', { method: 'POST', body: { password: new FormData(e.target).get('p') } }); list(); } catch (err) { toast(esc(err.message), 'error'); } };
   }
   const planBadge = a => a.plan === 'lifetime' ? '<span class="badge badge-green">Lifetime</span>' : a.active ? `<span class="badge ${a.plan === 'trial' ? 'badge-amber' : 'badge-blue'}">${a.plan === 'trial' ? 'Trial' : a.plan === 'monthly' ? 'Monthly' : 'Yearly'} · ${a.daysLeft} days left</span>` : `<span class="badge badge-red">${a.plan === 'trial' ? 'Trial ended' : 'Expired'}</span>`;

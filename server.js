@@ -272,7 +272,7 @@ function updatesUntilOf(pl) {
   const d = new Date((pl.iat || new Date().toISOString().slice(0, 10)) + 'T00:00:00Z'); d.setUTCFullYear(d.getUTCFullYear() + 1); return d.toISOString().slice(0, 10);
 }
 const BILL_DEFAULT = { width: '80', gstin: '', fssai: '', footer: 'Thank you! Please visit again.', autoKot: false, showUpi: true };
-function adminRestaurant(r) { return { ...publicRestaurant(r), upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null) } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}), service: Object.assign({ autoAccept: false, payFirst: false }, r.service || {}), loyaltyCfg: Object.assign({}, LOYALTY_DEFAULT, r.loyalty || {}), wifiCfg: Object.assign({ on: false, ssid: '', pass: '' }, r.wifi || {}), gamesCfg: Object.assign({}, GAMES_DEFAULT, r.games || {}) }; }
+function adminRestaurant(r) { return { ...publicRestaurant(r), hasWaiterPin: !!r.waiterPin, upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null) } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}), service: Object.assign({ autoAccept: false, payFirst: false }, r.service || {}), loyaltyCfg: Object.assign({}, LOYALTY_DEFAULT, r.loyalty || {}), wifiCfg: Object.assign({ on: false, ssid: '', pass: '' }, r.wifi || {}), gamesCfg: Object.assign({}, GAMES_DEFAULT, r.games || {}) }; }
 function newRestaurant({ name, slug, password, email, ownerName, phone, plan = 'trial' }) {
   let s = slugify(slug || name), n = 2;
   while (db.restaurants.some(r => r.slug === s)) s = slugify(slug || name) + '-' + n++;
@@ -360,7 +360,7 @@ function openStream(req, res, map, key) {
   req.on('close', () => { const s = map.get(key); if (s) { s.delete(res); if (!s.size) map.delete(key); } });
 }
 
-const adminOrder = o => ({ ...publicOrder(o), tableId: o.tableId || null, source: o.source || 'qr', offline: !!o.offline, points: o.points || 0, phone: o.loyaltyPhone || '' }); // the counter needs the table to open its bill
+const adminOrder = o => ({ ...publicOrder(o), tableId: o.tableId || null, source: o.source || 'qr', waiter: o.waiter || '', offline: !!o.offline, points: o.points || 0, phone: o.loyaltyPhone || '' }); // the counter needs the table to open its bill
 const publicOrder = o => ({ id: o.id, number: o.number, tableName: o.tableName, items: o.items, note: o.note, customerName: o.customerName, total: o.total, subtotal: o.subtotal || o.total, discount: o.discount || 0, coupon: o.coupon || '', status: o.status, createdAt: o.createdAt, updatedAt: o.updatedAt, readyBy: o.readyBy || null, readyAt: o.readyAt || null });
 
 // ---------- wait-time promise: learn how long each dish really takes in this kitchen ----------
@@ -543,6 +543,14 @@ function adminOf(req) {
   const r = db.restaurants.find(x => x.id === rid);
   return r && String(r.sessionVer || 0) === ver ? r : null;
 }
+// Waiters log in on their own phones with the restaurant's waiter PIN. They can take orders, see tables and calls, and mark food served.
+function waiterOf(req) {
+  const v = unsign(cookies(req).vd_waiter); if (!v) return null;
+  const [w, rid, ver, ...nm] = v.split('|'); if (w !== 'w') return null;
+  const r = db.restaurants.find(x => x.id === rid);
+  return r && r.waiterPin && String(r.waiterVer || 0) === ver ? { r, name: nm.join('|') || 'Waiter' } : null;
+}
+const WAITER_OK = [['GET', /^\/api\/admin\/orders$/], ['POST', /^\/api\/admin\/orders$/], ['PATCH', /^\/api\/admin\/orders\/[A-Za-z0-9]+$/], ['GET', /^\/api\/admin\/requests$/], ['PATCH', /^\/api\/admin\/requests\/[A-Za-z0-9]+$/], ['GET', /^\/api\/admin\/menu$/], ['GET', /^\/api\/admin\/stream$/], ['POST', /^\/api\/admin\/ping$/], ['GET', /^\/api\/admin\/waiter\/me$/]];
 function isPlatform(req) { return unsign(cookies(req).vd_platform) === 'platform|' + (db.config.platformVer || 0); }
 
 // ---------- routes ----------
@@ -626,6 +634,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     return send(res, 200, h, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
   }
   if (m === 'GET' && p !== '/admin/google-link' && /^\/admin(\/[a-z0-9-]+)?\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'admin.html'));
+  if (m === 'GET' && /^\/waiter(\/[a-z0-9-]+)?\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'waiter.html'));
   if (m === 'GET' && p === '/platform') return serveFile(res, path.join(PUBLIC_DIR, 'platform.html'));
   if (m === 'GET' && p === '/print-qr') return serveFile(res, path.join(PUBLIC_DIR, 'print-qr.html'));
   if (m === 'GET' && p.startsWith('/uploads/')) { const f = safeJoin(UPLOAD_DIR, p.slice(9)); return f ? serveFile(res, f, 'public, max-age=31536000, immutable') : fail(res, 404, 'Not found'); }
@@ -1116,9 +1125,25 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     return send(res, 200, { at: now(), restaurants, codes, downloads: db.config.downloads || {}, analytics, leads: (db.leads || []).slice(-1000) });
   }
 
+  if (m === 'POST' && p === '/api/waiter/login') {
+    const r = db.restaurants.find(x => x.slug === slugify(str(body.slug, 80)));
+    const tk = 'wpin|' + clientIp(req); if (tooMany(tk)) return fail(res, 429, 'Too many tries. Please wait 10 minutes.');
+    if (!r || !r.waiterPin) return fail(res, 400, r ? 'The owner has not set a waiter PIN yet. Ask them to set it in Settings › Waiters.' : 'Restaurant not found');
+    if (!checkPassword(str(body.pin, 12), r.waiterPin)) { failCount(tk); return fail(res, 401, 'Wrong PIN'); }
+    const name = str(body.name, 30).replace(/\|/g, ' ') || 'Waiter';
+    setCookie(res, 'vd_waiter', sign(['w', r.id, r.waiterVer || 0, name].join('|')));
+    return send(res, 200, { ok: true });
+  }
+  if (m === 'POST' && p === '/api/waiter/logout') { setCookie(res, 'vd_waiter', '', 0); return send(res, 200, { ok: true }); }
   if (p.startsWith('/api/admin/')) {
-    const r = adminOf(req);
+    let r = adminOf(req), waiter = null;
+    if (!r) { waiter = waiterOf(req); if (waiter && WAITER_OK.some(([mm, rx]) => mm === m && rx.test(p))) r = waiter.r; }
     if (!r) return fail(res, 401, 'Please log in');
+    adminSeen.set(r.id, Date.now()); // any staff request means someone is at work, so guests see "Kitchen online"
+    if (m === 'GET' && p === '/api/admin/waiter/me') {
+      const tables = db.tables.filter(t => t.restaurantId === r.id && t.active !== false).sort((a, b) => a.sort - b.sort).map(t => ({ id: t.id, name: t.name }));
+      return send(res, 200, { name: waiter ? waiter.name : 'Owner', owner: !waiter, restaurant: { name: r.name, slug: r.slug, logo: r.logo || '', currency: r.currency || '₹', brandColor: r.brandColor }, tables });
+    }
     const mine = list => list.filter(x => x.restaurantId === r.id);
 
     if (m === 'GET' && p === '/api/admin/me') {
@@ -1141,7 +1166,6 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       save();
       return send(res, 200, { ok: true, restaurant: adminRestaurant(r) });
     }
-    adminSeen.set(r.id, Date.now()); // any admin request means someone is at the counter
     if (m === 'POST' && p === '/api/admin/ping') return send(res, 200, { ok: true });
     if (m === 'GET' && p === '/api/admin/stream') return openStream(req, res, streams, r.id);
 
@@ -1485,13 +1509,21 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       const lp = loyaltyOn(r) ? normPhone(body.phone) : '';
       r.orderSeq = (r.orderSeq || 100) + 1;
       const order = { id: id(16), restaurantId: r.id, number: r.orderSeq, tableId: table ? table.id : null, tableName: table ? table.name : (str(body.label, 40) || 'Counter'),
-        items: lines, note: str(body.note, 300), customerName: str(body.name, 60), total, subtotal: total, discount: 0, coupon: '', status: st, source: 'counter',
+        items: lines, note: str(body.note, 300), customerName: str(body.name, 60), total, subtotal: total, discount: 0, coupon: '', status: st, source: waiter ? 'waiter' : 'counter', ...(waiter ? { waiter: waiter.name } : {}),
         createdAt: new Date(at).toISOString(), updatedAt: now(), readyBy: estimateReady(r, lines), ...(st !== 'new' ? { preparingAt: now() } : {}),
         ...(cid ? { clientId: cid } : {}), ...(body.offline ? { offline: true } : {}), ...(lp ? { loyaltyPhone: lp } : {}) };
       if (lp) customerOf(r, lp, true, body.name);
       db.orders.push(order); if (st === 'served') earnFor(r, order); save();
       emit(r.id, 'order', adminOrder(order)); if (table) tableChanged(r, table, false);
       return send(res, 201, adminOrder(order));
+    }
+    if (m === 'GET' && p === '/api/admin/waiter-link') { const link = baseUrl(req) + '/waiter/' + r.slug; return send(res, 200, { link, qr: await QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }) }); }
+    if (m === 'POST' && p === '/api/admin/waiter-pin') { // owner sets the PIN waiters use; a new PIN logs every waiter phone out
+      const pin = str(body.pin, 12);
+      if (!pin) { delete r.waiterPin; r.waiterVer = (r.waiterVer || 0) + 1; save(); return send(res, 200, adminRestaurant(r)); }
+      if (!/^\d{4,6}$/.test(pin)) return fail(res, 400, 'Use 4 to 6 numbers for the PIN');
+      r.waiterPin = hashPassword(pin); r.waiterVer = (r.waiterVer || 0) + 1; save();
+      return send(res, 200, adminRestaurant(r));
     }
     if (m === 'PUT' && p === '/api/admin/settings') {
       try {

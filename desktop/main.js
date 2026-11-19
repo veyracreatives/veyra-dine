@@ -247,6 +247,7 @@ function setupUpdates() {
   try { updater = require('electron-updater').autoUpdater; } catch { return; }
   updater.setFeedURL({ provider: 'generic', url: CONFIG.updateUrl });
   updater.autoDownload = false;
+  updater.disableDifferentialDownload = true; // the update host ignores multi-range requests, so 'differential' downloads re-fetch the whole file many times
   updater.autoInstallOnAppQuit = true;
   updater.on('update-available', info => {
     if (upd.state === 'downloading' || upd.state === 'ready') return;

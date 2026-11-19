@@ -9,6 +9,7 @@ const path = require('path');
 const fs = require('fs');
 
 const CONFIG = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8')); } catch { return {}; } })();
+if (process.env.VD_SERVER_URL) CONFIG.serverUrl = process.env.VD_SERVER_URL; // testing against another server
 const APP_NAME = CONFIG.appName || 'Veyra Dine In';
 const ICON = path.join(__dirname, 'icon.png');
 app.setName(APP_NAME);
@@ -38,6 +39,91 @@ async function startLocalServer() {
 }
 
 let startQuery = '';
+
+// ---------- WiFi backup hub (online mode only) ----------
+// The app keeps a copy of the restaurant on this computer and serves it on the restaurant WiFi. When the internet
+// goes down, the window switches to that copy: guests (backup QR) and waiters on the WiFi keep ordering. When the
+// internet is back, the orders go to the online server (no doubles) and the window switches back.
+const hub = { base: '', lanUrl: '', port: 0, on: false, slug: '', lastPull: 0, lastOk: Date.now(), fails: 0, busy: false };
+const HUB_PORT = Number(CONFIG.hubPort) || 8787;
+async function startHub() {
+  process.env.DATA_DIR = path.join(app.getPath('userData'), 'hub');
+  process.env.HUB_MODE = '1';
+  const S = require('../server');
+  let srv = null, port = HUB_PORT;
+  for (let i = 0; i < 10 && !srv; i++, port++) { try { srv = await S.start(port, '0.0.0.0'); } catch (e) { if (e.code !== 'EADDRINUSE') throw e; } }
+  if (!srv) return;
+  hub.port = srv.address().port; hub.base = `http://localhost:${hub.port}`;
+  const ip = S.lanAddresses()[0]; hub.lanUrl = ip ? `http://${ip}:${hub.port}` : '';
+  process.env.PUBLIC_URL = hub.lanUrl || hub.base; // backup QR codes point to this computer on the WiFi
+  try { hub.slug = (await (await fetch(hub.base + '/api/hub/status')).json()).slug || ''; } catch {}
+  setTimeout(hubTick, 4000); setInterval(hubTick, 30000);
+}
+const cloud = () => CONFIG.serverUrl.replace(/\/$/, '');
+async function cloudCookie() {
+  try { const c = await win.webContents.session.cookies.get({ url: cloud(), name: 'vd_admin' }); return c[0] ? 'vd_admin=' + c[0].value : ''; } catch { return ''; }
+}
+async function tfetch(url, opts = {}, ms = 8000) {
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), ms);
+  try { return await fetch(url, { ...opts, signal: ac.signal }); } finally { clearTimeout(t); }
+}
+async function cloudUp() { try { const r = await tfetch(cloud() + '/api/auth/config', {}, 6000); return r.ok; } catch { return false; } }
+async function pullCopy(cookie) {
+  const r = await tfetch(cloud() + '/api/admin/hub/snapshot', { headers: { cookie } }, 20000);
+  if (!r.ok) return false;
+  const snap = await r.json();
+  const ok = await tfetch(hub.base + '/api/hub/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(snap) }, 20000);
+  if (!ok.ok) return false;
+  hub.slug = snap.restaurant.slug; hub.lastPull = Date.now();
+  // pictures: copy dish photos, logo and cover so the WiFi menu shows them without internet
+  const dir = path.join(app.getPath('userData'), 'hub', 'uploads'); fs.mkdirSync(dir, { recursive: true });
+  const pics = [snap.restaurant.logo, snap.restaurant.cover, ...snap.items.map(i => i.photo)].filter(u => typeof u === 'string' && /^\/uploads\/[A-Za-z0-9._-]+$/.test(u));
+  for (const u of pics) {
+    const f = path.join(dir, u.slice(9)); if (fs.existsSync(f)) continue;
+    try { const pr = await tfetch(cloud() + u, {}, 15000); if (pr.ok) fs.writeFileSync(f, Buffer.from(await pr.arrayBuffer())); } catch {}
+  }
+  return true;
+}
+async function pushOrders(cookie) {
+  const p = await (await tfetch(hub.base + '/api/hub/pending')).json();
+  if (!p.orders.length) return 0;
+  const r = await tfetch(cloud() + '/api/admin/hub/sync', { method: 'POST', headers: { 'Content-Type': 'application/json', cookie }, body: JSON.stringify({ orders: p.orders }) }, 20000);
+  if (!r.ok) throw new Error('sync ' + r.status);
+  const d = await r.json();
+  await tfetch(hub.base + '/api/hub/synced', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: d.done }) });
+  return d.done.length;
+}
+function hubNote(title, body) { if (Notification.isSupported()) { const n = new Notification({ title, body, icon: ICON }); n.on('click', showWindow); n.show(); } }
+async function hubTick() {
+  if (hub.busy || !hub.base || !win) return; hub.busy = true;
+  try {
+    if (await cloudUp()) {
+      hub.fails = 0; hub.lastOk = Date.now();
+      const cookie = hub.on ? hub.cookie : await cloudCookie();
+      if (cookie) {
+        hub.cookie = cookie;
+        const sent = await pushOrders(cookie).catch(() => -1);
+        if (hub.on && sent >= 0) { // back online: everything sent, go back to the online server
+          hub.on = false; win.loadURL(`${baseUrl}/admin`);
+          hubNote('Internet is back', sent ? `${sent} order${sent > 1 ? 's' : ''} from the WiFi backup were sent online.` : 'Back on the online server.');
+        }
+        if (!hub.on && Date.now() - hub.lastPull > 5 * 60000) await pullCopy(cookie).catch(() => {});
+      }
+    } else if (!hub.on && hub.slug && ++hub.fails >= 2) { // two checks in a row failed: switch to the WiFi backup
+      hub.on = true; hub.cookie = await cloudCookie();
+      win.loadURL(`${hub.base}/api/hub/login?slug=${encodeURIComponent(hub.slug)}`);
+      hubNote('No internet: WiFi backup is on', 'Guests on your WiFi can order with the backup QR. Waiters keep working on the WiFi.');
+    }
+  } catch {} finally { hub.busy = false; }
+}
+ipcMain.handle('vd:hub', async () => {
+  if (!hub.base) return null;
+  let st = {}; try { st = await (await tfetch(hub.base + '/api/hub/status', {}, 3000)).json(); } catch {}
+  return { on: hub.on, lan: hub.lanUrl, port: hub.port, slug: hub.slug || st.slug, copiedAt: st.at || null, pending: st.pending || 0 };
+});
+ipcMain.on('vd:hub-print', () => { if (hub.base && hub.slug) shell.openExternal(`${hub.base}/api/hub/login?slug=${encodeURIComponent(hub.slug)}&to=/print-qr`); });
+ipcMain.on('vd:hub-refresh', async () => { const c = await cloudCookie(); if (c) { hub.lastPull = 0; hubTick(); } });
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1360, height: 860, minWidth: 980, minHeight: 640, title: APP_NAME, icon: ICON, show: false,
@@ -48,10 +134,10 @@ function createWindow() {
   win.once('ready-to-show', () => win.show());
   // open outside links (WhatsApp, buy, test menu, print) in the normal browser
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith(baseUrl + '/print-qr')) return { action: 'allow', overrideBrowserWindowOptions: { width: 1000, height: 800, icon: ICON, autoHideMenuBar: true } };
+    if (url.startsWith(baseUrl + '/print-qr') || (hub.base && url.startsWith(hub.base + '/print-qr'))) return { action: 'allow', overrideBrowserWindowOptions: { width: 1000, height: 800, icon: ICON, autoHideMenuBar: true } };
     shell.openExternal(url); return { action: 'deny' };
   });
-  win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith(baseUrl)) { e.preventDefault(); shell.openExternal(url); } });
+  win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith(baseUrl) && !(hub.base && url.startsWith(hub.base))) { e.preventDefault(); shell.openExternal(url); } });
   win.webContents.on('did-fail-load', (_e, code, desc, url) => {
     if (code === -3) return; // aborted, ignore
     win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(`<body style="font-family:Segoe UI,sans-serif;display:grid;place-items:center;height:100vh;margin:0;background:#FBF6EE;color:#1B1714"><div style="text-align:center;max-width:460px"><h2>Can't reach ${APP_NAME}</h2><p>Please check that this computer is connected to the internet.</p><button onclick="location.href='${baseUrl}/admin'" style="height:46px;padding:0 22px;border:0;border-radius:12px;background:#E4572E;color:#fff;font-weight:700;font-size:15px;cursor:pointer">Try again</button></div></body>`));
@@ -230,6 +316,7 @@ app.whenReady().then(async () => {
   createWindow();
   createTray();
   setupUpdates();
+  if (CONFIG.serverUrl && !baseUrl.startsWith('http://localhost') && CONFIG.hub !== false) startHub().catch(e => console.log('[hub]', e.message));
   if (process.argv.includes('--hidden')) win.once('ready-to-show', () => win.hide());
   if (!fs.existsSync(path.join(app.getPath('userData'), '.first-run-done'))) {
     app.setLoginItemSettings({ openAtLogin: true, args: ['--hidden'] }); // start with Windows by default

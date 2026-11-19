@@ -44,7 +44,7 @@
     const ig = handle && !handle.includes('.') ? '@' + handle : '';
     const cards = tables.filter(t => t.active).map(t => `<div class="card">
       <div class="band">${r.logo ? `<img src="${esc(r.logo)}" alt="">` : ''}<b>${esc(r.name)}</b></div>
-      <div class="scan">Scan to order</div><div class="sub">Open your camera and point it at the code</div>
+      <div class="scan">${me.hubMode ? 'No internet? Scan this' : 'Scan to order'}</div><div class="sub">${me.hubMode ? (r.wifiCfg && r.wifiCfg.ssid ? `Join WiFi ${esc(r.wifiCfg.ssid)}${r.wifiCfg.pass ? ' · password ' + esc(r.wifiCfg.pass) : ''}, then scan` : 'Join our WiFi first, then scan to order') : 'Open your camera and point it at the code'}</div>
       <div class="qr">${t.qr}</div>
       <div class="tbl">${esc(t.name)}</div>
       <div class="foot">${ig && ig !== '@' ? icon('instagram', 12) + ' ' + esc(ig) : ''}</div></div>`);

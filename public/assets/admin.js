@@ -409,7 +409,8 @@
     const on = !S.offline && navigator.onLine !== false && (!es || es.readyState !== 2);
     el.className = 'net-pill ' + (on ? 'on' : 'off');
     el.title = on ? 'Connected. New orders arrive here live, and guests see "Kitchen online".' : 'Not connected. Guests see "Kitchen offline". Orders they send will show here when you are back online.';
-    el.innerHTML = `<i></i><span>${on ? 'Online' : 'Offline'}</span>`;
+    if (on && S.me && S.me.hubMode) el.title = 'WiFi backup. Guests and waiters on your WiFi can order.';
+    el.innerHTML = `<i></i><span>${on ? (S.me && S.me.hubMode ? 'On WiFi' : 'Online') : 'Offline'}</span>`;
   }
   setInterval(() => { if (S.me && !S.offline) fetch('/api/admin/ping', { method: 'POST' }).then(r => { if (r.status === 401) return; drawNet(); }).catch(() => { drawNet(); }); }, 30000);
   window.addEventListener('online', () => drawNet()); window.addEventListener('offline', () => drawNet());
@@ -594,11 +595,27 @@
     const cp = box.querySelector('#cpyPhone'); if (cp) cp.onclick = () => { navigator.clipboard.writeText(q.url).then(() => toast('Link copied', 'ok')).catch(() => { box.querySelector('input').select(); }); };
     const ib = box.querySelector('#phoneInstall'); if (ib) ib.onclick = installApp;
   }
+  function hubBanner() {
+    if (!S.me.hubMode) return '';
+    return `<div class="banner hub-on">${icon('wifi', 22)}<span>No internet, so the WiFi backup is on. Orders from the backup QR and from waiters on your WiFi come in here. They go to your online account by themselves when the internet is back. Keep this computer on.</span></div>`;
+  }
+  async function drawHub() {
+    const b = document.getElementById('hubB'); if (!b) return;
+    const h = await window.vdDesktop.hub().catch(() => null);
+    if (!document.body.contains(b)) return;
+    if (!h) { b.innerHTML = '<p class="muted" style="margin:0">The WiFi backup could not start on this computer. Close and open the app again.</p>'; return; }
+    const a0 = h.copiedAt ? ago(h.copiedAt) : '', when = /ago|now/i.test(a0) ? a0.toLowerCase() : 'at ' + a0;
+    b.innerHTML = `<div class="hub-box"><span>Status</span><b>${h.copiedAt ? 'Ready. Copy updated ' + esc(when) : 'Making the first copy…'}</b><span>Backup address on your WiFi</span><b style="word-break:break-all">${h.lan ? esc(h.lan) : 'Connect this computer to the restaurant WiFi'}</b>${h.pending ? `<span>Waiting to go online</span><b>${h.pending} order${h.pending > 1 ? 's' : ''}</b>` : ''}</div>
+      <ol class="hub-steps"><li>Print the backup QR cards and stick one on each table, next to the normal one (or on the back).</li><li>Keep this computer on and connected to the restaurant WiFi, with the app open.</li><li>Ask whoever set up your WiFi router to give this computer a fixed address, so the backup QR keeps working.</li><li>The first time, Windows may ask about the firewall. Tap <b>Allow</b> so phones on the WiFi can reach this computer.</li></ol>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" type="button" id="hubPrint" ${h.copiedAt && h.lan ? '' : 'disabled'}>${icon('printer', 18)} Print backup QR cards</button><button class="btn" type="button" id="hubRef">${icon('refresh', 18)} Update the copy now</button></div>`;
+    document.getElementById('hubPrint').onclick = () => { window.vdDesktop.hubPrint(); toast('The backup QR cards open in your browser. Print them from there.', 'ok'); };
+    document.getElementById('hubRef').onclick = () => { window.vdDesktop.hubRefresh(); toast('Updating the copy. This takes a few seconds.', 'ok'); setTimeout(drawHub, 6000); };
+  }
   function renderOrders(c) {
     const st = S.stats || { ordersToday: 0, salesToday: 0, activeTables: 0, activeOrders: 0 };
     const isLocal = /localhost|127\.0\.0\.1/.test(S.me.baseUrl);
     c.innerHTML = `
-      ${phoneBanner()}
+      ${phoneBanner()}${hubBanner()}
       <div class="o-tools"><button class="btn btn-primary" id="newOrder">${icon('plus', 18)} New order</button><span class="muted">Take an order at the counter or for a phone call. ${S.me.restaurant.service && S.me.restaurant.service.autoAccept ? 'QR orders go straight to the kitchen.' : ''}</span></div>
       ${!S.audioOk && !window.vdDesktop ? `<div class="banner">${icon('bell', 22)}<span>Turn on alerts so you hear a sound and get a pop-up for every new order.</span><button class="btn btn-primary" id="enableAlerts">Turn on alerts</button></div>` : ''}
       <div class="stats">
@@ -1027,6 +1044,7 @@
         <small class="muted" style="margin-top:-8px">${r.hasWaiterPin ? 'A PIN is set. Changing it logs out every waiter phone.' : 'No PIN yet, so waiters cannot log in.'}</small>
         <div id="wlink" class="w-link-box"></div>
       </div></div>
+      ${window.vdDesktop && window.vdDesktop.hub && !S.me.hubMode ? `<div class="panel" id="hubP"><div class="panel-head"><div><h2>WiFi backup (no internet)</h2><span class="muted" style="font-size:14px">This computer keeps a copy of your menu and tables. If the internet goes down, the app switches to it by itself. Guests scan the backup QR and waiters keep taking orders on your WiFi. When the internet is back, every order goes online with no doubles.</span></div></div><div class="panel-body form" id="hubB"><p class="muted" style="margin:0">Checking the backup…</p></div></div>` : ''}
       <form class="panel" id="svcF"><div class="panel-head"><div><h2>Orders without a waiter</h2><span class="muted" style="font-size:14px">Guests scan, order and pay from the table. The kitchen gets the order straight away.</span></div></div><div class="panel-body form">
         <label class="switch"><input type="checkbox" name="autoAccept" ${r.service && r.service.autoAccept ? 'checked' : ''}><span class="track"></span>Send QR orders straight to the kitchen (no "Accept" tap needed)</label>
         <label class="switch"><input type="checkbox" name="payFirst" ${r.service && r.service.payFirst ? 'checked' : ''} ${r.upiId ? '' : 'disabled'}><span class="track"></span>Ask guests to pay by UPI right after they order</label>
@@ -1098,6 +1116,7 @@
     phonePanel(document.getElementById('phonePanel'));
     const svcF = document.getElementById('svcF');
     api('/api/admin/waiter-link').then(d => { const b = document.getElementById('wlink'); if (!b) return; b.innerHTML = `<div class="w-qr">${d.qr}</div><div><b>Waiters scan this, or open:</b><a href="${esc(d.link)}" target="_blank">${esc(d.link)}</a><span class="muted">Log in with your restaurant ID <b>${esc(r.slug)}</b>, their name and the PIN.</span><button class="btn btn-sm" type="button" id="wcopy">${icon('copy', 16)} Copy link</button></div>`; document.getElementById('wcopy').onclick = () => { navigator.clipboard.writeText(d.link).then(() => toast('Link copied', 'ok')).catch(() => {}); }; }).catch(() => {});
+    if (document.getElementById('hubB')) drawHub();
     document.getElementById('wpinF').onsubmit = async e => { e.preventDefault(); try { S.me.restaurant = await api('/api/admin/waiter-pin', { method: 'POST', body: { pin: e.target.pin.value } }); saveCache(); toast(`${icon('check', 18)} Waiter PIN saved`, 'ok'); renderSettings(document.getElementById('content')); } catch (err) { toast(esc(err.message), 'error'); } };
     svcF.onchange = async () => { const f = new FormData(svcF); try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { service: { autoAccept: !!f.get('autoAccept'), payFirst: !!f.get('payFirst') } } }); saveCache(); toast('Saved', 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
     const wifiF = document.getElementById('wifiF');

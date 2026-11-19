@@ -14,6 +14,8 @@ const PORT = Number(process.env.PORT) || 3000;
 const ROOT = __dirname;
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
+// WiFi backup hub: the Windows app runs a copy of this server on the restaurant WiFi. It works with no internet and sends its orders online later.
+const HUB = process.env.HUB_MODE === '1';
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 
@@ -135,7 +137,7 @@ function publicRestaurant(r) {
     brandColor: r.brandColor, currency: r.currency, phone: r.phone, address: r.address,
     socials: r.socials || {}, acceptingOrders: r.acceptingOrders !== false && access(r).active, footerNote: r.footerNote || '',
     poweredBy: r.poweredBy !== false,
-    guestLogin: r.guestLogin !== false,
+    guestLogin: !HUB && r.guestLogin !== false,
     upi: r.upiId ? { id: r.upiId, name: r.upiName || r.name } : null,
     payFirst: !!(r.service && r.service.payFirst && r.upiId),
     wifi: r.wifi && r.wifi.on && r.wifi.ssid ? { ssid: r.wifi.ssid, pass: r.wifi.pass || '', open: !r.wifi.pass } : null,
@@ -861,7 +863,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     if (okey) { const dup = db.orders.find(o => o.restaurantId === r.id && o.key === okey && Date.parse(o.createdAt) > Date.now() - 6 * 3600e3); if (dup) return send(res, 201, publicOrder(dup)); }
     if (!kitchenOnline(r)) return fail(res, 409, 'The kitchen is offline right now, so orders from the menu are paused. Please ask a staff member to take your order.');
     const guest = guestOf(req, r);
-    if (r.guestLogin !== false && !guest) return fail(res, 401, 'Please log in to place your order.');
+    if (!HUB && r.guestLogin !== false && !guest) return fail(res, 401, 'Please log in to place your order.');
     const lines = [];
     const shared = !!body.shared && gidOk(body.gid);
     if (shared) {
@@ -906,6 +908,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       if (!order.customerName) order.customerName = people.length > 1 ? people.join(', ').slice(0, 60) : people[0];
       cartOf(table.id).lines = [];
     }
+    if (HUB) order.hub = true;
     db.orders.push(order); save();
     emit(r.id, 'order', adminOrder(order));
     if (shared) emitTable(table.id, 'placed', { id: order.id, number: order.number, createdAt: order.createdAt, by: str(body.name, 40) || 'Someone', gid: body.gid });
@@ -1125,6 +1128,40 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     return send(res, 200, { at: now(), restaurants, codes, downloads: db.config.downloads || {}, analytics, leads: (db.leads || []).slice(-1000) });
   }
 
+  if (HUB && p.startsWith('/api/hub/')) { // only the Windows app on this computer may call these
+    const ra = req.socket.remoteAddress || '';
+    if (!/^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(ra) || req.headers['x-forwarded-for']) return fail(res, 403, 'Only this computer');
+    if (m === 'POST' && p === '/api/hub/import') { // fresh copy from the online server
+      const snap = body; const rr = snap && snap.restaurant; if (!rr || !rr.id) return fail(res, 400, 'Bad copy');
+      const keep = db.restaurants.find(x => x.id === rr.id);
+      const merged = { ...rr, orderSeq: Math.max(rr.orderSeq || 100, keep ? keep.orderSeq || 100 : 0) };
+      db.restaurants = db.restaurants.filter(x => x.id !== rr.id).concat(merged);
+      for (const k of ['categories', 'items', 'tables', 'coupons']) db[k] = db[k].filter(x => x.restaurantId !== rr.id).concat(Array.isArray(snap[k]) ? snap[k] : []);
+      // online orders still cooking: show them here too, but keep anything changed on this computer
+      const cloud = Array.isArray(snap.orders) ? snap.orders : [];
+      db.orders = db.orders.filter(o => o.restaurantId !== rr.id || (o.hub && (!o.synced || o.dirty)) || o.dirty || (!o.fromCloud && !o.hub));
+      for (const o of cloud) if (!db.orders.some(x => x.id === o.id || (o.clientId && o.clientId === 'hub-' + x.id))) db.orders.push({ ...o, fromCloud: true });
+      db.config.hubSlug = rr.slug; db.config.hubAt = snap.at || now(); save();
+      return send(res, 200, { ok: true, slug: rr.slug });
+    }
+    if (m === 'GET' && p === '/api/hub/pending') return send(res, 200, { orders: db.orders.filter(o => (o.hub && (!o.synced || o.dirty)) || (o.fromCloud && o.dirty)) });
+    if (m === 'POST' && p === '/api/hub/synced') {
+      const ids = new Set(Array.isArray(body.ids) ? body.ids : []);
+      for (const o of db.orders) if (ids.has(o.id)) { if (o.hub) o.synced = true; o.dirty = false; }
+      // once online again, finished and synced orders are no longer needed here
+      db.orders = db.orders.filter(o => !(o.synced && ['served', 'cancelled'].includes(o.status)));
+      save(); return send(res, 200, { ok: true });
+    }
+    if (m === 'GET' && p === '/api/hub/login') { // open the admin of the copied restaurant on this computer
+      const r = db.restaurants.find(x => x.slug === (url.searchParams.get('slug') || db.config.hubSlug));
+      if (!r) return fail(res, 404, 'No copy yet');
+      setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0)));
+      const to = /^\/[a-z0-9/_?=&-]*$/i.test(url.searchParams.get('to') || '') ? url.searchParams.get('to') : '/admin/' + r.slug;
+      res.writeHead(302, { Location: to }); return res.end();
+    }
+    if (m === 'GET' && p === '/api/hub/status') return send(res, 200, { slug: db.config.hubSlug || '', at: db.config.hubAt || null, lan: lanAddresses(), pending: db.orders.filter(o => (o.hub && (!o.synced || o.dirty)) || (o.fromCloud && o.dirty)).length });
+    return fail(res, 404, 'Not found');
+  }
   if (m === 'POST' && p === '/api/waiter/login') {
     const r = db.restaurants.find(x => x.slug === slugify(str(body.slug, 80)));
     const tk = 'wpin|' + clientIp(req); if (tooMany(tk)) return fail(res, 429, 'Too many tries. Please wait 10 minutes.');
@@ -1147,7 +1184,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     const mine = list => list.filter(x => x.restaurantId === r.id);
 
     if (m === 'GET' && p === '/api/admin/me') {
-      return send(res, 200, { restaurant: adminRestaurant(r), baseUrl: baseUrl(req), lan: lanAddresses(), port: PORT, publicUrlSet: !!process.env.PUBLIC_URL, plans: PLANS, buyUrl: BUY_URL });
+      return send(res, 200, { restaurant: adminRestaurant(r), hubMode: HUB, baseUrl: baseUrl(req), lan: lanAddresses(), port: PORT, publicUrlSet: !!process.env.PUBLIC_URL, plans: PLANS, buyUrl: BUY_URL });
     }
     if (m === 'POST' && p === '/api/admin/activate') {
       const code = normShort(body.key);
@@ -1250,7 +1287,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       if (body.status === 'ready' && !o.readyAt) o.readyAt = now();
       if (body.status === 'preparing' && !o.preparingAt) o.preparingAt = now();
       if (body.status === 'served' && !o.readyAt) o.readyAt = now();
-      o.status = body.status; o.updatedAt = now();
+      o.status = body.status; o.updatedAt = now(); if (HUB) o.dirty = true;
       if (o.status === 'served') earnFor(r, o);
       save();
       { const t = db.tables.find(x => x.id === o.tableId); if (t) tableChanged(r, t, false); }
@@ -1513,9 +1550,39 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
         createdAt: new Date(at).toISOString(), updatedAt: now(), readyBy: estimateReady(r, lines), ...(st !== 'new' ? { preparingAt: now() } : {}),
         ...(cid ? { clientId: cid } : {}), ...(body.offline ? { offline: true } : {}), ...(lp ? { loyaltyPhone: lp } : {}) };
       if (lp) customerOf(r, lp, true, body.name);
+      if (HUB) order.hub = true;
       db.orders.push(order); if (st === 'served') earnFor(r, order); save();
       emit(r.id, 'order', adminOrder(order)); if (table) tableChanged(r, table, false);
       return send(res, 201, adminOrder(order));
+    }
+    // ---- WiFi backup hub: the laptop keeps a copy, and sends back what was ordered while the internet was down ----
+    if (m === 'GET' && p === '/api/admin/hub/snapshot' && !HUB) {
+      const day = Date.now() - 12 * 3600e3;
+      return send(res, 200, { at: now(), restaurant: r, categories: mine(db.categories), items: mine(db.items), tables: mine(db.tables), coupons: mine(db.coupons),
+        orders: mine(db.orders).filter(o => ['new', 'preparing', 'ready'].includes(o.status) && Date.parse(o.createdAt) > day) });
+    }
+    if (m === 'POST' && p === '/api/admin/hub/sync' && !HUB) {
+      const done = [];
+      for (const h of Array.isArray(body.orders) ? body.orders.slice(0, 500) : []) {
+        if (!h || !h.id) continue;
+        const st = ['new', 'preparing', 'ready', 'served', 'cancelled'].includes(h.status) ? h.status : 'preparing';
+        let o = db.orders.find(x => x.restaurantId === r.id && (x.id === h.id || x.clientId === 'hub-' + h.id));
+        if (o) { // known order: bring its status forward
+          if (o.status !== st && !['served', 'cancelled'].includes(o.status)) { o.status = st; o.updatedAt = now(); if (st === 'served') earnFor(r, o); emit(r.id, 'order', adminOrder(o)); emitOrder(o); }
+          done.push(h.id); continue;
+        }
+        const table = db.tables.find(t => t.id === h.tableId && t.restaurantId === r.id);
+        const lines = (Array.isArray(h.items) ? h.items : []).slice(0, 80).map(l => ({ itemId: str(l.itemId, 20), name: str(l.name, 120), price: money(Number(l.price) || 0), qty: Math.min(99, Math.max(1, parseInt(l.qty, 10) || 1)), diet: str(l.diet, 10), note: str(l.note, 140), ...(l.by ? { by: str(l.by, 40) } : {}) })).filter(l => l.name);
+        if (!lines.length) { done.push(h.id); continue; }
+        let at = Date.parse(h.createdAt); if (!(at > Date.now() - 7 * DAY && at <= Date.now() + 60000)) at = Date.now();
+        const total = money(lines.reduce((a, l) => a + l.price * l.qty, 0));
+        r.orderSeq = (r.orderSeq || 100) + 1;
+        o = { id: id(16), restaurantId: r.id, number: r.orderSeq, tableId: table ? table.id : null, tableName: table ? table.name : str(h.tableName, 40) || 'Counter', items: lines, note: str(h.note, 300), customerName: str(h.customerName, 60),
+          total, subtotal: total, discount: 0, coupon: '', status: st, source: 'wifi', ...(h.waiter ? { waiter: str(h.waiter, 30) } : {}), createdAt: new Date(at).toISOString(), updatedAt: now(), clientId: 'hub-' + h.id, hubNumber: h.number, offline: true };
+        db.orders.push(o); if (st === 'served') earnFor(r, o);
+        emit(r.id, 'order', adminOrder(o)); done.push(h.id);
+      }
+      save(); return send(res, 200, { ok: true, done });
     }
     if (m === 'GET' && p === '/api/admin/waiter-link') { const link = baseUrl(req) + '/waiter/' + r.slug; return send(res, 200, { link, qr: await QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }) }); }
     if (m === 'POST' && p === '/api/admin/waiter-pin') { // owner sets the PIN waiters use; a new PIN logs every waiter phone out

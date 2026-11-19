@@ -9,5 +9,8 @@ contextBridge.exposeInMainWorld('vdDesktop', {
   printers: () => ipcRenderer.invoke('vd:printers'),
   print: (html, opts) => ipcRenderer.invoke('vd:print', { html, ...(opts || {}) }),
   mode: () => ipcRenderer.invoke('vd:mode'),
+  hub: () => ipcRenderer.invoke('vd:hub'),
+  hubPrint: () => ipcRenderer.send('vd:hub-print'),
+  hubRefresh: () => ipcRenderer.send('vd:hub-refresh'),
   useOnline: then => ipcRenderer.send('vd:use-online', then || ''),
 });

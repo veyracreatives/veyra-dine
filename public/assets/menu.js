@@ -485,7 +485,7 @@
         <button class="btn btn-lg btn-block" id="gagain">Play again</button><button class="btn btn-ghost btn-block" id="gboard">See the leaderboard</button></div>`;
       body.querySelector('#gagain').onclick = play; body.querySelector('#gboard').onclick = async () => { await loadTop(); home(); };
       const f = body.querySelector('#gform');
-      if (f) f.onsubmit = async e => { e.preventDefault(); const name = f.querySelector('#gname').value.trim(), ph = f.querySelector('#gph'); const btn = f.querySelector('button'); btn.disabled = true;
+      if (f) f.onsubmit = async e => { e.preventDefault(); const name = f.querySelector('#gname').value.trim(), ph = f.querySelector('#gph'); const btn = f.querySelector('button:not(.pw-eye)'); btn.disabled = true;
         try { const x = await api(`/api/menu/${slug}/games/score`, { method: 'POST', body: { sid, score, name, phone: ph ? ph.value.trim() : '' } }); store('vd_gname', name); if (ph && ph.value.trim()) store('vd_phone', ph.value.trim()); sid = '';
           f.outerHTML = `<div class="gm-rank">${x.rank === 1 ? `${icon('star', 20)} You're number 1 this week!` : `You're number ${x.rank} this week`}${x.best > score ? `<small>Your best is still ${x.best}</small>` : ''}</div>`; await loadTop(); }
         catch (err) { btn.disabled = false; toast(esc(err.message), 'error'); } };

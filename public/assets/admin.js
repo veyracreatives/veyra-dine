@@ -137,14 +137,14 @@
     if (reset) {
       const f1 = document.getElementById('rf1'), f2 = document.getElementById('rf2'); let who = '';
       const sendCode = async () => {
-        const btn = f1.querySelector('button'); btn.disabled = true;
+        const btn = f1.querySelector('button:not(.pw-eye)'); btn.disabled = true;
         try { const r = await api('/api/admin/reset/start', { method: 'POST', body: { who } }); f1.hidden = true; f2.hidden = false; document.getElementById('rfTo').innerHTML = `We sent a code to <b>${esc(r.to)}</b>. It works for 10 minutes.`; f2.code.focus(); toast(`${icon('check', 18)} Code sent`, 'ok'); }
         catch (err) { toast(esc(err.message), 'error'); } finally { btn.disabled = false; }
       };
       f1.onsubmit = e => { e.preventDefault(); who = f1.who.value.trim(); sendCode(); };
       document.getElementById('rfAgain').onclick = e => { e.preventDefault(); sendCode(); };
       f2.onsubmit = async e => {
-        e.preventDefault(); const btn = f2.querySelector('button'); btn.disabled = true;
+        e.preventDefault(); const btn = f2.querySelector('button:not(.pw-eye)'); btn.disabled = true;
         try { const r = await api('/api/admin/reset/finish', { method: 'POST', body: { who, code: f2.code.value, password: f2.password.value } }); toast(`${icon('check', 18)} Password changed`, 'ok'); await afterLogin(r); }
         catch (err) { toast(esc(err.message), 'error'); btn.disabled = false; }
       };
@@ -1040,7 +1040,7 @@
       </div></div>
       <div class="panel" id="phonePanel"></div>
       <div class="panel" id="waitP"><div class="panel-head"><div><h2>Waiters</h2><span class="muted" style="font-size:14px">Waiters take orders on their own phones: tap the table, add dishes, send to the kitchen. They also see calls from tables and when food is ready.</span></div></div><div class="panel-body form">
-        <form id="wpinF" class="loy-f"><input class="input" name="pin" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="6" placeholder="${r.hasWaiterPin ? 'New PIN (4 to 6 numbers)' : 'Set a PIN (4 to 6 numbers)'}" required autocomplete="new-password"><button class="btn btn-primary">${r.hasWaiterPin ? 'Change PIN' : 'Set PIN'}</button></form>
+        <form id="wpinF" class="loy-f"><input class="input" name="pin" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="6" placeholder="${r.hasWaiterPin ? 'New PIN, 4–6 digits' : 'PIN, 4–6 digits'}" required autocomplete="new-password"><button class="btn btn-primary">${r.hasWaiterPin ? 'Change PIN' : 'Set PIN'}</button></form>
         <small class="muted" style="margin-top:-8px">${r.hasWaiterPin ? 'A PIN is set. Changing it logs out every waiter phone.' : 'No PIN yet, so waiters cannot log in.'}</small>
         <div id="wlink" class="w-link-box"></div>
       </div></div>

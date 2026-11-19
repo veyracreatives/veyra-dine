@@ -69,7 +69,7 @@
         <button class="btn btn-dark btn-lg btn-block">Log in</button>
       </form></div>`;
     document.getElementById('lf').onsubmit = async e => {
-      e.preventDefault(); const f = new FormData(e.target), b = e.target.querySelector('button'); b.disabled = true;
+      e.preventDefault(); const f = new FormData(e.target), b = e.target.querySelector('button:not(.pw-eye)'); b.disabled = true;
       try {
         await api('/api/waiter/login', { method: 'POST', body: { slug: f.get('slug').trim(), name: f.get('name').trim(), pin: f.get('pin') } });
         store('vw_slug', f.get('slug').trim().toLowerCase()); store('vw_name', f.get('name').trim());

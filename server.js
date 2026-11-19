@@ -968,7 +968,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     const ip = 'rst|' + clientIp(req); if (tooMany(ip)) return fail(res, 429, 'Too many tries. Please wait 10 minutes.'); failCount(ip);
     const who = str(body.who, 120).toLowerCase(); if (!who) return fail(res, 400, 'Type your email or restaurant ID');
     const r = db.restaurants.find(x => (who.includes('@') ? (x.email || '').toLowerCase() === who : x.slug === slugify(who)));
-    if (!r || !r.email) { if (who.includes('@')) return send(res, 200, { ok: true, to: maskEmail(who) }); return fail(res, 404, r ? 'This restaurant has no email saved. Message us on WhatsApp and we will reset it.' : 'No restaurant with that ID. Try your email instead.'); }
+    if (!r || !r.email) { if (who.includes('@')) return fail(res, 404, 'No account uses this email, so no code was sent. Check the spelling, try your restaurant ID, or sign up.'); return fail(res, 404, r ? 'This restaurant has no email saved. Message us on WhatsApp and we will reset it.' : 'No restaurant with that ID. Try your email instead.'); }
     const old = resetCodes.get(r.id); if (old && old.sent > Date.now() - 45000) return fail(res, 429, 'A code was sent a moment ago. Check your inbox and spam folder, or wait a minute to send again.');
     const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
     try {

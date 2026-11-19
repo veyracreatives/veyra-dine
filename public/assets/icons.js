@@ -83,3 +83,23 @@
     root.setProperty('--on-brand', onColor(hex));
   };
 })();
+
+// Show/hide button on every password and PIN box (added by itself, also to boxes that appear later)
+(function () {
+  if (window.__pwEye) return; window.__pwEye = true;
+  const EYE = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const OFF = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 5.1A10.7 10.7 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-2.6 3.5M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></svg>';
+  const css = document.createElement('style');
+  css.textContent = '.pw-wrap{position:relative;display:block;flex:1 1 auto;min-width:0}.pw-wrap>input{width:100%;padding-right:46px!important;box-sizing:border-box}.pw-eye{position:absolute;top:50%;right:4px;transform:translateY(-50%);width:40px;height:40px;display:grid;place-items:center;border:0;background:none;color:var(--ink-3,#7a7069);cursor:pointer;border-radius:10px;padding:0}.pw-eye:hover{color:var(--ink,#1b1714)}.pw-eye:focus-visible{outline:2px solid var(--brand,#E4572E);outline-offset:-2px}';
+  document.head.appendChild(css);
+  const add = inp => {
+    if (inp.dataset.eye || inp.type !== 'password') return; inp.dataset.eye = '1';
+    const w = document.createElement('span'); w.className = 'pw-wrap'; inp.parentNode.insertBefore(w, inp); w.appendChild(inp);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'pw-eye'; b.innerHTML = EYE; b.setAttribute('aria-label', 'Show password'); b.title = 'Show';
+    b.addEventListener('click', () => { const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.innerHTML = show ? OFF : EYE; b.setAttribute('aria-label', show ? 'Hide password' : 'Show password'); b.title = show ? 'Hide' : 'Show'; inp.focus(); });
+    w.appendChild(b);
+  };
+  const scan = root => (root.querySelectorAll ? root.querySelectorAll('input[type=password]') : []).forEach(add);
+  const start = () => { scan(document); new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1) { if (n.matches && n.matches('input[type=password]')) add(n); scan(n); } }))).observe(document.body, { childList: true, subtree: true }); };
+  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+})();

@@ -24,14 +24,18 @@
   function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
   const cur = v => fmtMoney(v, D.restaurant.currency);
   const item = id => D.items.find(i => i.id === id);
-  const canOrder = () => D.table && D.restaurant.acceptingOrders;
+  const canOrder = () => D.table && D.restaurant.acceptingOrders && D.kitchenOnline !== false && navigator.onLine !== false;
 
   function toast(msg, type = '') {
     const el = document.createElement('div'); el.className = 'toast ' + type; el.innerHTML = msg;
     document.getElementById('toasts').appendChild(el); setTimeout(() => el.remove(), 3200);
   }
   async function api(path, opts = {}) {
-    const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
+    let res;
+    const ac = opts.timeout && window.AbortController ? new AbortController() : null, tt = ac && setTimeout(() => ac.abort(), opts.timeout);
+    try { res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts, ...(ac ? { signal: ac.signal } : {}), body: opts.body ? JSON.stringify(opts.body) : undefined }); }
+    catch (e) { const err = new Error('No internet right now. Please check your connection and try again.'); err.network = true; throw err; }
+    finally { clearTimeout(tt); }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
     return data;
@@ -106,11 +110,13 @@
         <div class="identity">
           <div class="logo">${r.logo ? `<img src="${esc(r.logo)}" alt="${esc(r.name)} logo">` : esc(r.name.slice(0, 1))}</div>
           <div class="name-row"><h1>${esc(r.name)}</h1>${r.tagline ? `<p class="tagline">${esc(r.tagline)}</p>` : ''}</div>
-          ${D.table ? `<div class="table-chip">${icon('utensils', 18)} You're ordering for ${esc(D.table.name)}</div>` : ''}
+          ${D.table ? `<div class="chips-row"><div class="table-chip">${icon('utensils', 18)} You're ordering for ${esc(D.table.name)}</div>${r.acceptingOrders && navigator.onLine !== false ? `<div class="kitchen-chip ${D.kitchenOnline !== false ? 'on' : 'off'}"><i></i>${D.kitchenOnline !== false ? 'Kitchen online' : 'Kitchen offline'}</div>` : ''}</div>` : ''}
           ${socials ? `<div class="socials">${socials}</div>` : ''}
         </div>
       </header>
       ${!D.table ? `<div class="notice">${icon('qr', 18)}<span>You're viewing the menu. To order, scan the QR code on your table.</span></div>` : ''}
+      ${D.table && navigator.onLine === false ? `<div class="notice notice-off">${icon('wifi', 18)}<span><b>Your phone is offline.</b> Check your internet. You can keep looking at the menu.</span></div>` : ''}
+      ${D.table && r.acceptingOrders && navigator.onLine !== false && D.kitchenOnline === false ? `<div class="notice notice-off">${icon('hand', 18)}<span><b>The kitchen is offline right now.</b> Ordering from the menu is paused. Please ask a staff member to take your order.</span></div>` : ''}
       ${D.table && !r.acceptingOrders ? `<div class="notice">${icon('clock', 18)}<span>We're not taking orders on the app right now. Please ask our staff.</span></div>` : ''}
       ${D.table && r.acceptingOrders ? `<div class="together">${icon('utensils', 18)}<span><b>Ordering with friends?</b> Everyone at ${esc(D.table.name)} can scan the QR and add to this same order from their own phone.</span></div>` : ''}
       ${r.games ? `<a class="gz-promo" href="#games" id="gzPromo">${gzPromoInner(GS)}</a>` : ''}
@@ -339,6 +345,7 @@
       if (name) try { T = await api(`/api/menu/${slug}/table/name`, { method: 'POST', body: { t: tableToken, gid: GID, name } }); refreshCart(); } catch {}
     };
     draw();
+    let sendKey = null;
     o.querySelector('#place').onclick = async e => {
       const btn = e.currentTarget;
       if (needLogin()) { if (!(await guestLogin())) return; o.querySelector('#cname').value = myName(); draw(); }
@@ -346,7 +353,19 @@
       const name = o.querySelector('#cname').value.trim(); localStorage.setItem('vd_name', name);
       try {
         const cph = o.querySelector('#cphone'); if (cph && cph.value.trim()) store('vd_phone', cph.value.trim());
-        const order = await api(`/api/menu/${slug}/orders`, { method: 'POST', body: { table: tableToken, shared: true, gid: GID, name, note: o.querySelector('#note').value, coupon: coupon ? coupon.code : '', phone: cph ? cph.value.trim() : '' } });
+        // one key per tap: if the network is slow and we try again, the server returns the same order instead of a second one
+        const key = sendKey || (sendKey = Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
+        const body = { table: tableToken, shared: true, gid: GID, name, note: o.querySelector('#note').value, coupon: coupon ? coupon.code : '', phone: cph ? cph.value.trim() : '', key };
+        let order = null;
+        for (let tryNo = 1; !order; tryNo++) {
+          try { order = await api(`/api/menu/${slug}/orders`, { method: 'POST', body, timeout: 15000 }); }
+          catch (err) {
+            if (!err.network || tryNo >= 6) throw err;
+            btn.textContent = tryNo < 3 ? 'Slow internet, still sending…' : `Still trying to send (${tryNo} of 6)…`;
+            await new Promise(r => setTimeout(r, Math.min(8000, 1500 * tryNo)));
+          }
+        }
+        sendKey = null;
         T = { lines: [], people: [] }; sessionStorage.removeItem('vd_note'); coupon = null; store('vd_coupon_' + slug, null);
         rememberOrder(order); o.close(); location.hash = 'order=' + order.id;
       } catch (err) { toast(esc(err.message), 'error'); btn.disabled = false; if (/log in/i.test(err.message)) G = null; if (/coupon/i.test(err.message)) { coupon = null; store('vd_coupon_' + slug, null); } draw(); }
@@ -623,7 +642,7 @@
   }
 
   // ---------- order status ----------
-  const STEPS = [['new', 'Order sent', 'The kitchen has your order'], ['preparing', 'Being prepared', 'Our chefs are cooking'], ['ready', 'Ready', 'Coming to your table'], ['served', 'Served', 'Enjoy your meal!']];
+  const STEPS = [['new', 'Order sent', 'Waiting for the kitchen to accept'], ['preparing', 'Being prepared', 'Our chefs are cooking'], ['ready', 'Ready', 'Coming to your table'], ['served', 'Served', 'Enjoy your meal!']];
   function renderStatus(order) {
     const r = D.restaurant;
     const idx = STEPS.findIndex(s => s[0] === order.status);
@@ -631,7 +650,7 @@
     const head = order.status === 'cancelled' ? ['Order cancelled', 'Please speak to our staff if this is a mistake.'] :
       order.status === 'served' ? ['Enjoy your meal!', 'Your order has been served.'] :
       order.status === 'ready' ? ['Your food is ready', 'It is on its way to your table.'] :
-      order.status === 'preparing' ? ['Being prepared', 'The kitchen has started on your order.'] : ['Order placed!', 'The kitchen has received your order.'];
+      order.status === 'preparing' ? ['Accepted · being prepared', 'The kitchen has accepted your order and started on it.'] : ['Order sent!', 'Waiting for the kitchen to accept it. This usually takes a minute.'];
     const mine = load(ORDERS_KEY, []);
     app.innerHTML = `<div class="status-page">
       <button class="btn btn-ghost btn-sm" id="back">${icon('left', 18)} Back to menu</button>
@@ -736,6 +755,17 @@
   (async function init() {
     try {
       D = await api(`/api/menu/${slug}${tableToken ? '?t=' + encodeURIComponent(tableToken) : ''}`);
+      if (D.table && !window.__vdKT) {
+        // keep "Kitchen online / offline" live: check every 20 s and when the phone's own internet comes or goes
+        let shown = canOrder() + '|' + (navigator.onLine !== false) + '|' + (D.kitchenOnline !== false);
+        const recheck = async () => {
+          if (navigator.onLine !== false) { try { const k = await api(`/api/menu/${slug}/kitchen`, { timeout: 10000 }); D.kitchenOnline = k.online; D.restaurant.acceptingOrders = k.accepting; } catch (e) {} }
+          const now = canOrder() + '|' + (navigator.onLine !== false) + '|' + (D.kitchenOnline !== false);
+          if (now !== shown) { shown = now; if (!location.hash || location.hash === '#menu') renderMenu(); renderCartBar(); }
+        };
+        window.__vdKT = setInterval(recheck, 20000);
+        window.addEventListener('online', recheck); window.addEventListener('offline', recheck);
+      }
       if (D.restaurant.guestLogin && D.table) { try { G = (await api(`/api/menu/${slug}/guest/me`)).guest; } catch {} if (G) adoptGuestName(); }
       applyBrand(D.restaurant.brandColor);
       document.querySelector('meta[name=theme-color]').content = D.restaurant.brandColor;

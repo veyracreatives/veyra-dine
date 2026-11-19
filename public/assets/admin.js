@@ -350,6 +350,7 @@
       <div class="main">${trialBar()}
         <div class="topbar">
           <h1>${TABS.find(t => t[0] === S.tab)[1]}</h1>
+          <span class="net-pill" id="netPill"></span>
           <label class="live-pill switch" title="When off, customers can still see the menu but can't order">
             <input type="checkbox" id="accepting" ${r.acceptingOrders ? 'checked' : ''}><span class="track"></span><span id="accLabel">${r.acceptingOrders ? 'Taking orders' : 'Orders paused'}</span>
           </label>
@@ -367,6 +368,7 @@
       try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { acceptingOrders: on } }); document.getElementById('accLabel').textContent = on ? 'Taking orders' : 'Orders paused'; toast(on ? 'Customers can order again' : 'Ordering paused. Customers can still see the menu.'); }
       catch (err) { e.target.checked = !on; toast(esc(err.message), 'error'); }
     };
+    drawNet();
     document.getElementById('soundBtn').onclick = () => { S.sound = !S.sound; localStorage.setItem('vd_sound', S.sound ? 'on' : 'off'); unlockAudio(); if (S.sound) chime(1); renderShell(); };
     renderTab();
   }
@@ -401,7 +403,18 @@
     if (!pingT) pingT = setInterval(tryOnline, 8000);
     if (justSync) tryOnline();
   }
+  // Online pill in the top bar. Guests see "Kitchen online" on the menu while this page is open and connected.
+  function drawNet() {
+    const el = document.getElementById('netPill'); if (!el) return;
+    const on = !S.offline && navigator.onLine !== false && (!es || es.readyState !== 2);
+    el.className = 'net-pill ' + (on ? 'on' : 'off');
+    el.title = on ? 'Connected. New orders arrive here live, and guests see "Kitchen online".' : 'Not connected. Guests see "Kitchen offline". Orders they send will show here when you are back online.';
+    el.innerHTML = `<i></i><span>${on ? 'Online' : 'Offline'}</span>`;
+  }
+  setInterval(() => { if (S.me && !S.offline) fetch('/api/admin/ping', { method: 'POST' }).then(r => { if (r.status === 401) return; drawNet(); }).catch(() => { drawNet(); }); }, 30000);
+  window.addEventListener('online', () => drawNet()); window.addEventListener('offline', () => drawNet());
   function drawOffBar() {
+    drawNet();
     let bar = document.getElementById('offbar');
     const n = outbox().length;
     if (!S.offline && !n) { if (bar) bar.remove(); return; }
@@ -676,7 +689,8 @@
       if (S.tab === 'orders') renderOrders(document.getElementById('content')); refreshBadges();
     });
     es.addEventListener('request-done', e => { const { id } = JSON.parse(e.data); S.requests = S.requests.filter(q => q.id !== id); if (S.tab === 'orders') renderOrders(document.getElementById('content')); refreshBadges(); });
-    es.onopen = () => loadLive().then(() => { if (S.tab === 'orders') renderOrders(document.getElementById('content')); refreshBadges(); }).catch(() => {});
+    es.onerror = () => setTimeout(drawNet, 50);
+    es.onopen = () => { drawNet(); return loadLive().then(() => { if (S.tab === 'orders') renderOrders(document.getElementById('content')); refreshBadges(); }).catch(() => {}); };
   }
   setInterval(() => { if (S.tab === 'orders' && !document.querySelector('.overlay')) renderOrders(document.getElementById('content')); }, 30000);
 

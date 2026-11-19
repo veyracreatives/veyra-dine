@@ -422,3 +422,16 @@ body.has-gnav .cartbar { bottom: calc(74px + env(safe-area-inset-bottom, 0px)); 
 .gz-best { display: block; }
 .gz-best .ic { vertical-align: -2px; margin-right: 4px; }
 @media (max-width: 400px) { .gz-promo .gz-art { display: none; } .gz-promo { padding-left: 16px; } }
+
+
+/* kitchen online / offline */
+.chips-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+.chips-row .table-chip { margin-top: 0; }
+.kitchen-chip { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; border-radius: 12px; font-weight: 700; font-size: 13px; }
+.kitchen-chip i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+.kitchen-chip.on { background: #E7F6EC; color: #157F3B; }
+.kitchen-chip.on i { box-shadow: 0 0 0 0 rgba(21,127,59,.5); animation: kpulse 2s infinite; }
+.kitchen-chip.off { background: #FDECEC; color: #B42318; }
+@keyframes kpulse { 0% { box-shadow: 0 0 0 0 rgba(21,127,59,.45); } 70% { box-shadow: 0 0 0 7px rgba(21,127,59,0); } 100% { box-shadow: 0 0 0 0 rgba(21,127,59,0); } }
+@media (prefers-reduced-motion: reduce) { .kitchen-chip.on i { animation: none; } }
+.notice.notice-off { background: #FDECEC; color: #912018; }

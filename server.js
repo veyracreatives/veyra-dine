@@ -294,6 +294,9 @@ function emit(rid, type, data) {
   const msg = `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const res of set) res.write(msg);
 }
+// Kitchen online: the admin (counter laptop or phone) pings every 30 s while it is open. Guests see this on the menu.
+const adminSeen = new Map(); // restaurantId -> last admin request time
+const kitchenOnline = r => Date.now() - (adminSeen.get(r.id) || 0) < 90000 || !!(streams.get(r.id) && streams.get(r.id).size && Date.now() - (adminSeen.get(r.id) || 0) < 180000);
 const orderStreams = new Map(); // orderId -> Set(res)
 function emitOrder(order) {
   const set = orderStreams.get(order.id); if (!set) return;
@@ -693,7 +696,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     const token = url.searchParams.get('t');
     const table = token ? db.tables.find(t => t.restaurantId === r.id && t.token === token && t.active !== false) : null;
     return send(res, 200, {
-      restaurant: publicRestaurant(r),
+      restaurant: publicRestaurant(r), kitchenOnline: kitchenOnline(r),
       table: table ? { name: table.name, token: table.token } : null,
       offers: db.coupons.filter(c => c.restaurantId === r.id && c.active && c.showOnMenu && (!c.expires || c.expires >= new Date().toISOString().slice(0, 10)) && !(c.maxUses && (c.uses || 0) >= c.maxUses)).map(c => publicCoupon(c, r)),
       prep: (() => { const pm = prepMinutes(r.id), out = {}; for (const [k, v] of Object.entries(pm)) if (v.n >= 3) out[k] = v.mins; return out; })(),
@@ -823,6 +826,10 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     const totals = Object.fromEntries(Object.keys(GAME_RULES).map(g => [g, pick(list.filter(x => x.game === g)).slice(0, 1).map(x => ({ name: x.name, restaurant: on.get(x.restaurantId).name, score: x.score }))[0] || null]));
     return send(res, 200, { thisWeek: week.length >= 3, rows, best: totals, restaurants: on.size, plays: (db.scores || []).filter(x => on.has(x.restaurantId)).length }, { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=30' });
   }
+  if (m === 'GET' && (mt = /^\/api\/menu\/([a-z0-9-]+)\/kitchen$/.exec(p))) { // guests check every 20 s whether the counter is online
+    const r = db.restaurants.find(x => x.slug === mt[1]); if (!r) return fail(res, 404, 'Restaurant not found');
+    return send(res, 200, { online: kitchenOnline(r), accepting: r.acceptingOrders !== false && access(r).active });
+  }
   if (m === 'GET' && (mt = /^\/api\/menu\/([a-z0-9-]+)\/wifi-qr$/.exec(p))) { // other guests can scan this to join the WiFi
     const r = db.restaurants.find(x => x.slug === mt[1]); if (!r || !r.wifi || !r.wifi.on || !r.wifi.ssid) return fail(res, 404, 'Not found');
     const e = v => String(v).replace(/([\\;,:"])/g, '\\$1');
@@ -840,6 +847,10 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     if (r.acceptingOrders === false || !access(r).active) return fail(res, 409, 'Sorry, the restaurant is not taking orders right now. Please ask the staff.');
     const table = db.tables.find(t => t.restaurantId === r.id && t.token === body.table && t.active !== false);
     if (!table) return fail(res, 400, 'Please scan the QR code on your table to order.');
+    // the phone sends the same key when it retries on a slow connection, so one tap never makes two orders
+    const okey = str(body.key, 40);
+    if (okey) { const dup = db.orders.find(o => o.restaurantId === r.id && o.key === okey && Date.parse(o.createdAt) > Date.now() - 6 * 3600e3); if (dup) return send(res, 201, publicOrder(dup)); }
+    if (!kitchenOnline(r)) return fail(res, 409, 'The kitchen is offline right now, so orders from the menu are paused. Please ask a staff member to take your order.');
     const guest = guestOf(req, r);
     if (r.guestLogin !== false && !guest) return fail(res, 401, 'Please log in to place your order.');
     const lines = [];
@@ -875,6 +886,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       id: id(16), restaurantId: r.id, number: r.orderSeq, tableId: table.id, tableName: table.name,
       items: lines, note: str(body.note, 300), customerName: str(body.name, 60), total, subtotal, discount, coupon: couponCode,
       status: auto ? 'preparing' : 'new', ...(auto ? { preparingAt: now(), autoAccepted: true } : {}), createdAt: now(), updatedAt: now(), readyBy: estimateReady(r, lines),
+      ...(okey ? { key: okey } : {}),
       ...(guest ? { guestId: guest.id, customerPhone: guest.phone || guest.email } : {}),
       ...(lp ? { loyaltyPhone: lp } : {}),
     };
@@ -1129,6 +1141,8 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       save();
       return send(res, 200, { ok: true, restaurant: adminRestaurant(r) });
     }
+    adminSeen.set(r.id, Date.now()); // any admin request means someone is at the counter
+    if (m === 'POST' && p === '/api/admin/ping') return send(res, 200, { ok: true });
     if (m === 'GET' && p === '/api/admin/stream') return openStream(req, res, streams, r.id);
 
     // orders

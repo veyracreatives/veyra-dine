@@ -40,13 +40,12 @@ function syncInstaller() {
     console.log('[download] fetching installer from GitHub Pages');
     dlFetch(DL_REMOTE + '/Veyra-Dine-In-Setup.exe', path.join(DL_DIR, 'Veyra-Dine-In-Setup.exe'), e1 => {
       if (e1) return console.log('[download] installer failed:', e1.message);
-      dlFetch(DL_REMOTE + '/Veyra-Dine-In-Setup.exe.blockmap', path.join(DL_DIR, 'Veyra-Dine-In-Setup.exe.blockmap'), () => {
-        fs.rename(newYml, yml, () => console.log('[download] installer ready'));
-      });
+      fs.rename(newYml, yml, () => console.log('[download] installer ready'));
     });
   });
 }
-if (process.env.DL_MIRROR !== '0' && !process.versions.electron) { setTimeout(syncInstaller, 5000); setInterval(syncInstaller, 6 * 3600 * 1000).unref(); }
+let syncT = null; const syncSoon = () => { if (!syncT) syncT = setTimeout(() => { syncT = null; syncInstaller(); }, 2000); };
+if (process.env.DL_MIRROR !== '0' && !process.versions.electron) { setTimeout(syncInstaller, 5000); setInterval(syncInstaller, 15 * 60 * 1000).unref(); }
 // Plans and where the "Buy" buttons go. Change prices here.
 const PLANS = { trialDays: 10, monthly: 799, yearly: 5999, lifetime: 24999 };
 const TERM_PLANS = ['monthly', 'yearly']; // paid plans that run until a date
@@ -576,7 +575,10 @@ async function handle(req, res) {
   if (m === 'GET' && /^\/download\/(Veyra-Dine-In-Setup\.exe|latest\.yml|Veyra-Dine-In-Setup\.exe\.blockmap)$/.test(p)) {
     const name = p.slice(10), f = path.join(DL_DIR, name);
     if (name.endsWith('.exe') && !/^bytes=[1-9]/.test(req.headers.range || '')) { const d = new Date().toISOString().slice(0, 10), D = db.config.downloads = db.config.downloads || {}; D[d] = (D[d] || 0) + 1; for (const k of Object.keys(D).sort().slice(0, -400)) delete D[k]; save(); }
-    if (!fs.existsSync(f)) { res.writeHead(302, { Location: DL_REMOTE + '/' + name }); return res.end(); }
+    if (name.endsWith('.blockmap')) return fail(res, 404, 'Not found'); // no partial updates: the app downloads the whole installer once
+    let stale = false; const want = url.searchParams.get('v');
+    if (want && name.endsWith('.exe')) { try { stale = !new RegExp('^version: ' + want.replace(/[^0-9.]/g, '').replace(/\./g, '\\.') + '\\s*$', 'm').test(fs.readFileSync(path.join(DL_DIR, 'latest.yml'), 'utf8')); } catch { stale = true; } if (stale) syncSoon(); }
+    if (stale || !fs.existsSync(f)) { res.writeHead(302, { Location: DL_REMOTE + '/' + name }); return res.end(); }
     if (name.endsWith('.exe')) res.setHeader('Content-Disposition', 'attachment; filename="' + name + '"');
 
     return serveFile(res, f, name.endsWith('.yml') ? 'no-cache' : 'public, max-age=3600', req.headers.range);
@@ -1122,10 +1124,11 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     // overview: restaurants on the online server, activations and installer downloads
     const lastOrder = {}, orders = {};
     for (const o of db.orders) { orders[o.restaurantId] = (orders[o.restaurantId] || 0) + 1; if (!lastOrder[o.restaurantId] || o.createdAt > lastOrder[o.restaurantId]) lastOrder[o.restaurantId] = o.createdAt; }
-    const restaurants = db.restaurants.map(r => ({ id: r.id, slug: r.slug, name: r.name, ownerName: r.ownerName || '', phone: r.ownerPhone || r.phone || '', email: r.email || '', createdAt: r.createdAt, access: access(r), suspended: !!r.suspended, licenseCode: r.licenseCode || null, licensedTo: r.licensedTo || '', updatesUntil: r.updatesUntil || null, google: !!r.google, items: db.items.filter(i => i.restaurantId === r.id).length, tables: db.tables.filter(t => t.restaurantId === r.id).length, orders: orders[r.id] || 0, lastOrderAt: lastOrder[r.id] || null, hqNote: r.hqNote || '' }));
+    const restaurants = db.restaurants.map(r => ({ id: r.id, slug: r.slug, name: r.name, ownerName: r.ownerName || '', phone: r.ownerPhone || r.phone || '', email: r.email || '', createdAt: r.createdAt, access: access(r), suspended: !!r.suspended, licenseCode: r.licenseCode || null, licensedTo: r.licensedTo || '', updatesUntil: r.updatesUntil || null, google: !!r.google, items: db.items.filter(i => i.restaurantId === r.id).length, tables: db.tables.filter(t => t.restaurantId === r.id).length, orders: orders[r.id] || 0, lastOrderAt: lastOrder[r.id] || null, hqNote: r.hqNote || '', kitchenOnline: kitchenOnline(r), seenAt: adminSeen.get(r.id) ? new Date(adminSeen.get(r.id)).toISOString() : null, waiterPin: !!r.waiterPin, wifiBackupAt: r.hubAt || null, loyalty: !!(r.loyalty && r.loyalty.on), games: !!(r.games && r.games.on), guestWifi: !!(r.wifi && r.wifi.on) }));
     const codes = {}; for (const [c, x] of Object.entries(db.licenseCodes)) codes[c] = codeView(c, x);
     const A = db.analytics || {}, analytics = {}; for (const k of Object.keys(A).sort().slice(-120)) analytics[k] = A[k];
-    return send(res, 200, { at: now(), restaurants, codes, downloads: db.config.downloads || {}, analytics, leads: (db.leads || []).slice(-1000) });
+    let appVersion = null; try { appVersion = (/^version:\s*(\S+)/m.exec(fs.readFileSync(path.join(DL_DIR, 'latest.yml'), 'utf8')) || [])[1] || null; } catch {}
+    return send(res, 200, { at: now(), restaurants, codes, downloads: db.config.downloads || {}, analytics, leads: (db.leads || []).slice(-1000), appVersion, emailCodes: !!smtpCfg() });
   }
 
   if (HUB && p.startsWith('/api/hub/')) { // only the Windows app on this computer may call these
@@ -1557,6 +1560,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     }
     // ---- WiFi backup hub: the laptop keeps a copy, and sends back what was ordered while the internet was down ----
     if (m === 'GET' && p === '/api/admin/hub/snapshot' && !HUB) {
+      r.hubAt = now(); saveSoon();
       const day = Date.now() - 12 * 3600e3;
       return send(res, 200, { at: now(), restaurant: r, categories: mine(db.categories), items: mine(db.items), tables: mine(db.tables), coupons: mine(db.coupons),
         orders: mine(db.orders).filter(o => ['new', 'preparing', 'ready'].includes(o.status) && Date.parse(o.createdAt) > day) });

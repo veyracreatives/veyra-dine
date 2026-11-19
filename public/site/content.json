@@ -29,11 +29,11 @@
    "section": "Top of page"
   },
   {
-   "k": "t6403f2b7",
+   "k": "t3c3d7921",
    "type": "text",
-   "tag": "span",
-   "text": "New",
-   "section": "Top of page"
+   "tag": "h3",
+   "text": "Waiter app",
+   "section": "Built for Indian restaurants"
   },
   {
    "k": "t398ed329",
@@ -68,6 +68,13 @@
    "type": "text",
    "tag": "a",
    "text": "FAQ",
+   "section": "Top of page"
+  },
+  {
+   "k": "t9fb9c6a7",
+   "type": "text",
+   "tag": "a",
+   "text": "Waiter login",
    "section": "Top of page"
   },
   {
@@ -708,10 +715,10 @@
    "section": "Have waiters? Give them the app"
   },
   {
-   "k": "t93658b26",
+   "k": "te9baa47f",
    "type": "text",
    "tag": "p",
-   "text": "Your staff take orders on their own phones. No new device and no extra cost. They log in with your restaurant ID, their name and a PIN you set.",
+   "text": "Your staff take orders on their own phones. No new device and no extra cost. You, the admin, give each waiter the login: your restaurant ID and the waiter PIN you set.",
    "section": "Have waiters? Give them the app"
   },
   {
@@ -754,6 +761,20 @@
    "type": "text",
    "tag": "span",
    "text": "If the network drops, the order waits on the phone and goes the moment it is back. Never sent twice.",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "t6655a1e5",
+   "type": "text",
+   "tag": "span",
+   "text": "Open the waiter app",
+   "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "t1142e103",
+   "type": "text",
+   "tag": "small",
+   "text": "Waiters: open this on your phone and log in with the restaurant ID and PIN your admin gives you.",
    "section": "Have waiters? Give them the app"
   },
   {
@@ -804,6 +825,13 @@
    "tag": "span",
    "text": "Internet back, every order synced",
    "section": "Have waiters? Give them the app"
+  },
+  {
+   "k": "t6403f2b7",
+   "type": "text",
+   "tag": "span",
+   "text": "New",
+   "section": "Top of page"
   },
   {
    "k": "t7c087ef3",
@@ -1170,13 +1198,6 @@
    "section": "Built for Indian restaurants"
   },
   {
-   "k": "t3c3d7921",
-   "type": "text",
-   "tag": "h3",
-   "text": "Waiter app",
-   "section": "Built for Indian restaurants"
-  },
-  {
    "k": "tcfc800e3",
    "type": "text",
    "tag": "p",
@@ -1408,10 +1429,10 @@
    "section": "Step-by-step guides"
   },
   {
-   "k": "t6d806e75",
+   "k": "t929f5db3",
    "type": "text",
    "tag": "p",
-   "text": "Waiters scan the QR shown there, or you send them the link.",
+   "text": "Give each waiter your restaurant ID and the PIN, plus the link or the QR shown there.",
    "section": "Step-by-step guides"
   },
   {
@@ -1422,10 +1443,10 @@
    "section": "Step-by-step guides"
   },
   {
-   "k": "t6bc5d20e",
+   "k": "t651d9586",
    "type": "text",
    "tag": "p",
-   "text": "Restaurant ID, their name and the PIN. Works on any phone.",
+   "text": "They enter the restaurant ID and PIN you gave them, and their own name. Works on any phone.",
    "section": "Step-by-step guides"
   },
   {
@@ -2024,10 +2045,10 @@
    "section": "Good to know"
   },
   {
-   "k": "t64e0e81e",
+   "k": "t80552869",
    "type": "text",
    "tag": "p",
-   "text": "Yes. Set a waiter PIN in Settings and share the waiter link. Waiters log in with your restaurant ID, their name and the PIN, then see every table, take orders, hear calls from tables and know when food is ready. It works on any Android phone or iPhone, with no app to install.",
+   "text": "Yes. The restaurant admin sets a waiter PIN in Settings › Waiters and gives each waiter the restaurant ID, the PIN and the waiter link. Waiters log in with those and their own name, then see every table, take orders, hear calls from tables and know when food is ready. It works on any Android phone or iPhone, with no app to install.",
    "section": "Good to know"
   },
   {
@@ -2301,6 +2322,20 @@
    "type": "text",
    "tag": "a",
    "text": "Contact",
+   "section": "Footer"
+  },
+  {
+   "k": "tcb7f1b73",
+   "type": "text",
+   "tag": "a",
+   "text": "Owner log in",
+   "section": "Footer"
+  },
+  {
+   "k": "t5244b34b",
+   "type": "text",
+   "tag": "a",
+   "text": "Download the Windows app",
    "section": "Footer"
   },
   {

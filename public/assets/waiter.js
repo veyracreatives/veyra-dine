@@ -60,7 +60,7 @@
     app.innerHTML = `<div class="w-login">
       <div class="w-brand">${icon('utensils', 26)}<div><b>Waiter</b><small>Veyra Dine In</small></div></div>
       <h1>Log in to take orders</h1>
-      <p class="muted">Ask the owner for the restaurant ID and the waiter PIN. They are in Settings › Waiters.</p>
+      <p class="muted">Your restaurant admin gives you the restaurant ID and the waiter PIN. Ask them if you don't have them yet.</p>
       ${msg ? `<div class="w-err">${esc(msg)}</div>` : ''}
       <form id="lf" class="form">
         <label class="field"><span>Restaurant ID</span><input class="input" name="slug" value="${esc(pathSlug || load('vw_slug', ''))}" required autocapitalize="off" autocomplete="off"></label>

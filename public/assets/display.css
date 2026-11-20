@@ -168,3 +168,60 @@ button { font: inherit; cursor: pointer; }
   .d-foot { justify-content: center; }
   .pay .amt { font-size: 44px; }
 }
+
+/* ===== Dark counter look: ink background, big bright numbers, orange accents (reads well on TVs and across a room) ===== */
+:root {
+  --bg: #14110F; --card: #211C18; --ink: #FBF6EE; --ink-2: #D6CCBF; --ink-3: #9A8F83; --line: #322A24;
+  --brand-soft: color-mix(in srgb, var(--brand) 18%, #211C18); --brand-line: color-mix(in srgb, var(--brand) 45%, #211C18);
+  --green: #22A15A; --amber: #FF9A5C; --amber-soft: #2C231D;
+}
+body { background: radial-gradient(1200px 600px at 85% -10%, color-mix(in srgb, var(--brand) 22%, transparent), transparent 60%), var(--bg); }
+.card { box-shadow: 0 1px 0 rgba(255,255,255,.04) inset; }
+.d-logo { background: #fff; border-color: transparent; }
+.d-fs { background: var(--card); border-color: var(--line); color: var(--ink-2); }
+.d-clock { color: var(--ink); }
+.d-net { background: #3A2A12; color: #FBBF24; }
+
+/* numbers fill the column instead of leaving empty space */
+.board { grid-template-columns: 1fr 1.5fr; }
+.nums { display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(88px, 8.2vw, 170px), 1fr)); }
+.ready .nums { grid-template-columns: repeat(auto-fill, minmax(clamp(120px, 11vw, 240px), 1fr)); }
+.num { min-width: 0; background: var(--amber-soft); color: var(--amber); border: 1px solid #3A2E25; padding: clamp(10px, 1.1vw, 20px) 8px; }
+.b-col.ready { background: linear-gradient(170deg, #12301F, #16231B 60%); border-color: #1F4A30; }
+.b-col.ready h2 { color: #fff; }
+.ready .num { min-width: 0; background: var(--green); color: #fff; border-color: transparent; box-shadow: 0 10px 30px rgba(34,161,90,.25); }
+.ready .num b { font-size: clamp(40px, 5vw, 104px); }
+.b-col h2 .dot { background: var(--amber); }
+.b-empty { color: var(--ink-3); }
+
+/* side cards */
+.welcome { background: linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 70%, #7C2D12)); }
+.qr { border-color: transparent; }
+.offer { border-top-color: var(--line); }
+.offer .code { background: var(--brand-soft); color: #FFB48F; border-color: var(--brand-line); }
+.qrrow .pw { background: #2C251F; color: #fff; }
+
+/* bill: bigger lines, pay panel in brand orange with a white QR */
+.ln { border-bottom-color: var(--line); font-size: clamp(18px, 1.7vw, 34px); }
+.lines.more::after { background: linear-gradient(transparent, var(--card)); }
+.sums { border-top-color: var(--ink); }
+.sums .tot { font-size: clamp(26px, 2.8vw, 56px); }
+.sums .paid { color: #4ADE80; }
+.ln.fresh { animation: flashd 1.2s ease-out; }
+@keyframes flashd { 0% { background: color-mix(in srgb, var(--brand) 30%, transparent); } 100% { background: transparent; } }
+.bill-h .tag { background: var(--brand-soft); color: #FFB48F; }
+.pay { background: linear-gradient(160deg, var(--brand), color-mix(in srgb, var(--brand) 72%, #7C2D12)); border-color: transparent; color: #fff; }
+.pay .lbl { color: rgba(255,255,255,.8); }
+.pay .sub { color: rgba(255,255,255,.88); }
+.pay .sub b { color: #fff; }
+.pay .big { border: 0; box-shadow: 0 16px 40px rgba(0,0,0,.25); }
+.apps span { background: rgba(255,255,255,.18); color: #fff; }
+.pay.cash .amt { color: #fff; }
+
+/* idle hero and thank you */
+.hero { background: linear-gradient(160deg, var(--brand-soft), var(--card) 70%); }
+.thanks { background: radial-gradient(600px 400px at 50% 35%, rgba(34,161,90,.28), transparent 70%), var(--card); }
+.thanks p { color: var(--ink-2); }
+.d-foot b { color: var(--ink); }
+.d-off h1 { color: var(--ink); }
+.d-start div { color: #1B1714; }

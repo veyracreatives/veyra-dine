@@ -2505,6 +2505,146 @@
    "tag": "p",
    "text": "Mark food ready and the number moves to Ready to collect with a chime.",
    "section": "Step-by-step guides"
+  },
+  {
+   "k": "ifecba6ce",
+   "type": "img",
+   "src": "img/kitchen-display.jpg",
+   "alt": "Kitchen display: every order as a big ticket with the table, dishes, notes, a timer and a Ready button",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "t2bac54f7",
+   "type": "text",
+   "tag": "span",
+   "text": "New · Kitchen display",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "t0f135bf8",
+   "type": "text",
+   "tag": "h2",
+   "text": "A kitchen screen instead of paper KOTs",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "tea27dcb0",
+   "type": "text",
+   "tag": "p",
+   "text": "Put a TV, a monitor or a tablet in the kitchen. Every order shows up as a big ticket with a bell, so nothing gets lost in a pile of paper.",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "t5e3d596d",
+   "type": "text",
+   "tag": "b",
+   "text": "Every order, the second it comes in",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "tca449256",
+   "type": "text",
+   "tag": "span",
+   "text": "Table, dishes, veg and non-veg marks and notes like less spicy. QR, counter and waiter orders all land here.",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "t2cae2616",
+   "type": "text",
+   "tag": "b",
+   "text": "Two taps: Start cooking, then Ready",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "t9da570e9",
+   "type": "text",
+   "tag": "span",
+   "text": "The counter, the waiter app and the guest’s phone update at once. Tapped Ready by mistake? Bring it back in one tap.",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "tbf0749fa",
+   "type": "text",
+   "tag": "b",
+   "text": "Timers and a “to make” list",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "t18acf74c",
+   "type": "text",
+   "tag": "span",
+   "text": "Each ticket turns amber at 10 minutes and red when it is late. The top row adds up how many of each dish to make.",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "tb574fdf7",
+   "type": "text",
+   "tag": "small",
+   "text": "Turn it on in Settings › Kitchen display. Open the link on the kitchen screen, or scan its QR with the tablet.",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "t69c63e10",
+   "type": "text",
+   "tag": "h3",
+   "text": "Kitchen display",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t53ec29e9",
+   "type": "text",
+   "tag": "p",
+   "text": "Orders as big tickets on a kitchen screen, with timers, a bell and one-tap Ready. No paper KOT needed.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t4639e320",
+   "type": "text",
+   "tag": "p",
+   "text": "Settings › Kitchen display: switch it on. Keep the bell on so cooks hear new orders.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t1b924872",
+   "type": "text",
+   "tag": "b",
+   "text": "Open it in the kitchen",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tf13f27ed",
+   "type": "text",
+   "tag": "p",
+   "text": "Scan the QR with the kitchen tablet, or open the link on the kitchen TV and tap Start.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t48cdf3aa",
+   "type": "text",
+   "tag": "b",
+   "text": "Cook from the tickets",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t127c033b",
+   "type": "text",
+   "tag": "p",
+   "text": "Tap Start cooking on a new ticket. The timer and the To make row show what comes first.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tb687a6ad",
+   "type": "text",
+   "tag": "b",
+   "text": "Tap Ready",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "td16c87d4",
+   "type": "text",
+   "tag": "p",
+   "text": "The ticket moves to Ready, and the counter, waiters and guests see it at once.",
+   "section": "Step-by-step guides"
   }
  ],
  "prices": {

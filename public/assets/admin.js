@@ -470,6 +470,15 @@
     if (now) go(); else dispT = setTimeout(go, 250);
   }
   function onGone(el, fn) { const mo = new MutationObserver(() => { if (!el.isConnected) { mo.disconnect(); fn(); } }); mo.observe(document.body, { childList: true }); }
+  const KDS = () => !!(S.me && S.me.restaurant.kitchenCfg && S.me.restaurant.kitchenCfg.on);
+  async function openKitchen() {
+    try {
+      const d = await api('/api/admin/kitchen-link'); if (!d.link) return toast('Turn on the kitchen display in Settings first.', 'error');
+      const w = window.open(d.link, 'vd-kitchen', 'popup,width=1280,height=760');
+      if (!w && !window.vdDesktop) toast('Your browser blocked the window. Allow pop-ups for this site, or copy the link from Settings › Kitchen display.', 'error');
+      else toast('Kitchen display opened. Move it to the kitchen screen and tap Start.', 'ok');
+    } catch (err) { toast(esc(err.message), 'error'); }
+  }
   async function openDisplay() {
     try {
       const d = await api('/api/admin/display-link'); if (!d.link) return toast('Turn on the counter display in Settings first.', 'error');
@@ -639,7 +648,7 @@
     const isLocal = /localhost|127\.0\.0\.1/.test(S.me.baseUrl);
     c.innerHTML = `
       ${phoneBanner()}${hubBanner()}
-      <div class="o-tools"><button class="btn btn-primary" id="newOrder">${icon('plus', 18)} New order</button>${DISP() ? `<button class="btn" id="openDisp">${icon('monitor', 18)} Customer display</button>` : ''}<span class="muted">Take an order at the counter or for a phone call. ${S.me.restaurant.service && S.me.restaurant.service.autoAccept ? 'QR orders go straight to the kitchen.' : ''}</span></div>
+      <div class="o-tools"><button class="btn btn-primary" id="newOrder">${icon('plus', 18)} New order</button>${KDS() ? `<button class="btn" id="openKds">${icon('chef', 18)} Kitchen display</button>` : ''}${DISP() ? `<button class="btn" id="openDisp">${icon('monitor', 18)} Customer display</button>` : ''}<span class="muted">Take an order at the counter or for a phone call. ${S.me.restaurant.service && S.me.restaurant.service.autoAccept ? 'QR orders go straight to the kitchen.' : ''}</span></div>
       ${!S.audioOk && !window.vdDesktop ? `<div class="banner">${icon('bell', 22)}<span>Turn on alerts so you hear a sound and get a pop-up for every new order.</span><button class="btn btn-primary" id="enableAlerts">Turn on alerts</button></div>` : ''}
       <div class="stats">
         <button class="stat link" data-gosales>  <small>Orders today</small><b>${st.ordersToday}</b><span class="sub">Other days ›</span></button>
@@ -656,6 +665,7 @@
       }).join('')}</div>`;
     const no = document.getElementById('newOrder'); if (no) no.onclick = () => newOrder();
     const od = document.getElementById('openDisp'); if (od) od.onclick = openDisplay;
+    const ok = document.getElementById('openKds'); if (ok) ok.onclick = openKitchen;
     const ai = document.getElementById('appInstall'); if (ai) ai.onclick = installApp;
     const ax = document.getElementById('appHintX'); if (ax) ax.onclick = () => { lsSet('vd_app_hint', 'x'); renderOrders(c); };
     const en = document.getElementById('enableAlerts');
@@ -1051,7 +1061,7 @@
 
   // ---------- settings ----------
   function renderSettings(c) {
-    const r = S.me.restaurant, DC = () => r.displayCfg || {};
+    const r = S.me.restaurant, DC = () => r.displayCfg || {}, KC = () => r.kitchenCfg || {};
     const menuUrl = `${S.me.baseUrl}/m/${r.slug}`;
     const a = r.access || {}, lic = r.license;
     const planTxt = a.plan === 'lifetime' ? 'Lifetime' : (a.plan === 'yearly' || a.plan === 'monthly') ? `${a.plan === 'monthly' ? 'Monthly' : 'Yearly'}, until ${new Date(a.until).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}` : `Free trial, ${a.daysLeft} day${a.daysLeft === 1 ? '' : 's'} left`;
@@ -1068,6 +1078,15 @@
         <small class="muted" style="margin-top:-8px">${r.hasWaiterPin ? 'A PIN is set. Changing it logs out every waiter phone.' : 'No PIN yet, so waiters cannot log in.'}</small>
         <div id="wlink" class="w-link-box"></div>
       </div></div>
+      <form class="panel" id="kdsF"><div class="panel-head"><div><h2>Kitchen display (KDS)</h2><span class="muted" style="font-size:14px">A screen in the kitchen with every order to cook as a big ticket: table, dishes, notes and a timer that turns amber at 10 minutes and red at 20. Cooks tap Start cooking, then Ready, and the counter, waiters and guests see it at once. No paper KOT needed. Use a TV, a monitor or a tablet.</span></div>${KC().on ? `<button type="button" class="btn btn-sm" id="kdsOpen">${icon('chef', 16)} Open kitchen display</button>` : ''}</div><div class="panel-body form">
+        <label class="switch"><input type="checkbox" name="on" ${KC().on ? 'checked' : ''}><span class="track"></span>Turn on the kitchen display</label>
+        <div class="disp-opts">
+          <label class="switch"><input type="checkbox" name="sound" ${KC().sound !== false ? 'checked' : ''}><span class="track"></span>Ring a bell for every new order</label>
+          <label class="switch"><input type="checkbox" name="readyShow" ${KC().readyShow !== false ? 'checked' : ''}><span class="track"></span>Show ready orders at the bottom (tap to bring one back)</label>
+        </div>
+        <button class="btn btn-primary" style="justify-self:start">Save kitchen display</button>
+        <div id="klink" class="w-link-box"></div>
+      </div></form>
       <form class="panel" id="dispF"><div class="panel-head"><div><h2>Counter display (customer screen)</h2><span class="muted" style="font-size:14px">A screen at your counter that faces customers. While you take an order or open a bill it shows the dishes, the total and a UPI QR for the exact amount. The rest of the time it shows which order numbers are cooking and which are ready to collect. Use a second monitor, a TV or an old tablet.</span></div>${DC().on ? `<button type="button" class="btn btn-sm" id="dispOpen">${icon('monitor', 16)} Open display</button>` : ''}</div><div class="panel-body form">
         <label class="switch"><input type="checkbox" name="on" ${DC().on ? 'checked' : ''}><span class="track"></span>Turn on the counter display</label>
         <label class="field"><span>Welcome message (optional)</span><input class="input" name="welcome" maxlength="120" value="${esc(DC().welcome || '')}" placeholder="E.g. Fresh dosas all day. Order and pay at the counter."></label>
@@ -1155,6 +1174,18 @@
     const svcF = document.getElementById('svcF');
     api('/api/admin/waiter-link').then(d => { const b = document.getElementById('wlink'); if (!b) return; b.innerHTML = `<div class="w-qr">${d.qr}</div><div><b>Waiters scan this, or open:</b><a href="${esc(d.link)}" target="_blank">${esc(d.link)}</a><span class="muted">Log in with your restaurant ID <b>${esc(r.slug)}</b>, their name and the PIN.</span><button class="btn btn-sm" type="button" id="wcopy">${icon('copy', 16)} Copy link</button></div>`; document.getElementById('wcopy').onclick = () => { navigator.clipboard.writeText(d.link).then(() => toast('Link copied', 'ok')).catch(() => {}); }; }).catch(() => {});
     if (document.getElementById('hubB')) drawHub();
+    const kdsF = document.getElementById('kdsF');
+    const drawKLink = () => api('/api/admin/kitchen-link').then(d => { const b = document.getElementById('klink'); if (!b || !d.link || !d.on) return;
+      b.innerHTML = `<div class="w-qr">${d.qr}</div><div><b>Open this on the kitchen screen, or scan it with the tablet:</b><a href="${esc(d.link)}" target="_blank" rel="noreferrer">${esc(d.link.replace(/^https?:\/\//, '').replace(/\?k=.*/, '?k=…'))}</a>
+        <span class="muted">${d.screens ? `${icon('check', 14)} ${d.screens} kitchen screen${d.screens === 1 ? ' is' : 's are'} open now.` : 'No kitchen screen is open right now.'} No login needed, so anyone with this link can use it. Make a new link if it gets shared.</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-sm btn-primary" type="button" id="kOpen">${icon('chef', 16)} Open on this computer</button><button class="btn btn-sm" type="button" id="kCopy">${icon('copy', 16)} Copy link</button><button class="btn btn-sm btn-ghost" type="button" id="kNew">${icon('refresh', 16)} New link</button></div></div>`;
+      document.getElementById('kOpen').onclick = openKitchen;
+      document.getElementById('kCopy').onclick = () => { navigator.clipboard.writeText(d.link).then(() => toast('Link copied', 'ok')).catch(() => prompt('Copy this link', d.link)); };
+      document.getElementById('kNew').onclick = async () => { if (!(await confirmBox('Make a new kitchen link?', 'Kitchen screens using the old link stop at once. Open the new link on them again.', 'Make new link'))) return; try { S.me.restaurant = await api('/api/admin/kitchen/new-link', { method: 'POST' }); saveCache(); toast('New link made', 'ok'); drawKLink(); } catch (err) { toast(esc(err.message), 'error'); } };
+    }).catch(() => {});
+    drawKLink();
+    const kOpenTop = document.getElementById('kdsOpen'); if (kOpenTop) kOpenTop.onclick = openKitchen;
+    kdsF.onsubmit = async e => { e.preventDefault(); const f = new FormData(kdsF); try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { kitchen: { on: !!f.get('on'), sound: !!f.get('sound'), readyShow: !!f.get('readyShow') } } }); saveCache(); toast(`${icon('check', 18)} Kitchen display saved`, 'ok'); renderSettings(c); } catch (err) { toast(esc(err.message), 'error'); } };
     const dispF = document.getElementById('dispF');
     const drawDLink = () => api('/api/admin/display-link').then(d => { const b = document.getElementById('dlink'); if (!b || !d.link || !d.on) return;
       b.innerHTML = `<div class="w-qr">${d.qr}</div><div><b>Open this on the customer screen, or scan it with the tablet:</b><a href="${esc(d.link)}" target="_blank" rel="noreferrer">${esc(d.link.replace(/^https?:\/\//, '').replace(/\?k=.*/, '?k=…'))}</a>

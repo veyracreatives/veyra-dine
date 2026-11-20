@@ -273,7 +273,7 @@ function updatesUntilOf(pl) {
   const d = new Date((pl.iat || new Date().toISOString().slice(0, 10)) + 'T00:00:00Z'); d.setUTCFullYear(d.getUTCFullYear() + 1); return d.toISOString().slice(0, 10);
 }
 const BILL_DEFAULT = { width: '80', gstin: '', fssai: '', footer: 'Thank you! Please visit again.', autoKot: false, showUpi: true };
-function adminRestaurant(r) { return { ...publicRestaurant(r), hasWaiterPin: !!r.waiterPin, upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null) } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}), service: Object.assign({ autoAccept: false, payFirst: false }, r.service || {}), loyaltyCfg: Object.assign({}, LOYALTY_DEFAULT, r.loyalty || {}), wifiCfg: Object.assign({ on: false, ssid: '', pass: '' }, r.wifi || {}), gamesCfg: Object.assign({}, GAMES_DEFAULT, r.games || {}), displayCfg: displayCfg(r) }; }
+function adminRestaurant(r) { return { ...publicRestaurant(r), hasWaiterPin: !!r.waiterPin, upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null) } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}), service: Object.assign({ autoAccept: false, payFirst: false }, r.service || {}), loyaltyCfg: Object.assign({}, LOYALTY_DEFAULT, r.loyalty || {}), wifiCfg: Object.assign({ on: false, ssid: '', pass: '' }, r.wifi || {}), gamesCfg: Object.assign({}, GAMES_DEFAULT, r.games || {}), displayCfg: displayCfg(r), kitchenCfg: kitchenCfg(r) }; }
 function newRestaurant({ name, slug, password, email, ownerName, phone, plan = 'trial' }) {
   let s = slugify(slug || name), n = 2;
   while (db.restaurants.some(r => r.slug === s)) s = slugify(slug || name) + '-' + n++;
@@ -291,7 +291,7 @@ function newRestaurant({ name, slug, password, email, ownerName, phone, plan = '
 // ---------- live events (Server-Sent Events) ----------
 const streams = new Map(); // restaurantId -> Set(res)
 function emit(rid, type, data) {
-  if (type === 'order' || type === 'order-removed') pushBoard(rid); // the counter display shows order numbers
+  if (type === 'order' || type === 'order-removed') { pushBoard(rid); pushKitchen(rid); } // the counter display shows order numbers
   const set = streams.get(rid); if (!set) return;
   const msg = `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const res of set) res.write(msg);
@@ -429,8 +429,51 @@ async function setDisplayScreen(r, b) {
   return view;
 }
 
+// ---------- Kitchen display (KDS): a screen in the kitchen with the orders to cook ----------
+// Opened with a secret link (no login). Cooks tap Start and Ready; the counter, waiters and guests see it at once.
+const KITCHEN_DEFAULT = { on: false, sound: true, readyShow: true };
+const kitchenStreams = new Map(); // restaurantId -> Set(res)
+const kitchenCfg = r => { const d = Object.assign({}, KITCHEN_DEFAULT, r.kitchen || {}); delete d.key; return d; };
+function kitchenOf(slug, key) {
+  const r = db.restaurants.find(x => x.slug === slug), d = r && r.kitchen;
+  if (!r || !d || !d.on || !d.key || typeof key !== 'string' || key.length !== d.key.length) return null;
+  return crypto.timingSafeEqual(Buffer.from(key), Buffer.from(d.key)) ? r : null;
+}
+function kitchenOrders(r) {
+  const since = Date.now() - 12 * 3600e3, t = Date.now();
+  const row = o => ({ id: o.id, number: o.number, table: o.tableName || '', status: o.status, source: o.source || 'qr', waiter: o.waiter || '', name: o.customerName || '', note: o.note || '', createdAt: o.createdAt, preparingAt: o.preparingAt || null, readyAt: o.readyAt || null, readyBy: o.readyBy || null,
+    items: (o.items || []).map(l => ({ name: l.name, qty: l.qty, diet: l.diet || '', note: l.note || '' })) });
+  const list = db.orders.filter(o => o.restaurantId === r.id && Date.parse(o.createdAt) > since);
+  return {
+    cooking: list.filter(o => o.status === 'new' || o.status === 'preparing').sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(row),
+    ready: list.filter(o => o.status === 'ready' && t - Date.parse(o.readyAt || o.updatedAt) < 15 * 60e3).sort((a, b) => (b.readyAt || '').localeCompare(a.readyAt || '')).slice(0, 12).map(row),
+  };
+}
+function emitKitchen(rid, type, data) {
+  const set = kitchenStreams.get(rid); if (!set) return;
+  const msg = `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const res of set) res.write(msg);
+}
+const kitchenTimers = new Map();
+function pushKitchen(rid) { // many order changes can come at once; send the list once
+  if (!kitchenStreams.has(rid) || kitchenTimers.has(rid)) return;
+  kitchenTimers.set(rid, setTimeout(() => { kitchenTimers.delete(rid); const r = db.restaurants.find(x => x.id === rid); if (r) emitKitchen(rid, 'orders', kitchenOrders(r)); }, 250));
+}
+function closeKitchens(rid) { const set = kitchenStreams.get(rid); if (!set) return; for (const res of set) { try { res.write('event: off\ndata: {}\n\n'); res.end(); } catch {} } kitchenStreams.delete(rid); }
+// one place that moves an order along, used by the admin, waiters and the kitchen screen
+function setOrderStatus(r, o, status) {
+  if (status === 'ready' && !o.readyAt) o.readyAt = now();
+  if (status === 'preparing' && !o.preparingAt) o.preparingAt = now();
+  if (status === 'served' && !o.readyAt) o.readyAt = now();
+  o.status = status; o.updatedAt = now(); if (HUB) o.dirty = true;
+  if (o.status === 'served') earnFor(r, o);
+  save();
+  { const t = db.tables.find(x => x.id === o.tableId); if (t) tableChanged(r, t, false); }
+  emit(r.id, 'order', adminOrder(o)); emitOrder(o);
+}
+
 setInterval(() => {
-  for (const set of [...streams.values(), ...orderStreams.values(), ...tableStreams.values(), ...displayStreams.values()]) for (const res of set) res.write(': ping\n\n');
+  for (const set of [...streams.values(), ...orderStreams.values(), ...tableStreams.values(), ...displayStreams.values(), ...kitchenStreams.values()]) for (const res of set) res.write(': ping\n\n');
 }, 25000).unref();
 function openStream(req, res, map, key) {
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
@@ -690,7 +733,7 @@ self.addEventListener('notificationclick', e => {
 `, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' });
   if (m === 'GET' && p === '/favicon.ico') return serveFile(res, path.join(SITE_DIR, 'favicon-32.png'), 'public, max-age=86400');
   if (m === 'GET' && /^\/m\/[a-z0-9-]+\/?$/.test(p)) return serveMenuPage(req, res, url, p.split('/')[2]);
-  if (m === 'GET' && p === '/robots.txt') return send(res, 200, `User-agent: *\nDisallow: /admin\nDisallow: /platform\nDisallow: /api/\nDisallow: /print-qr\nDisallow: /display/\nAllow: /m/\n\nSitemap: ${baseUrl(req)}/sitemap.xml\n`, { 'Content-Type': 'text/plain; charset=utf-8' });
+  if (m === 'GET' && p === '/robots.txt') return send(res, 200, `User-agent: *\nDisallow: /admin\nDisallow: /platform\nDisallow: /api/\nDisallow: /print-qr\nDisallow: /display/\nDisallow: /kitchen/\nAllow: /m/\n\nSitemap: ${baseUrl(req)}/sitemap.xml\n`, { 'Content-Type': 'text/plain; charset=utf-8' });
   if (m === 'GET' && p === '/sitemap.xml') { const b = baseUrl(req), d = new Date().toISOString().slice(0, 10), u = (loc, freq, pri) => `  <url><loc>${b}${loc}</loc><lastmod>${d}</lastmod><changefreq>${freq}</changefreq><priority>${pri}</priority></url>`;
     return send(res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[u('/', 'weekly', '1.0'), u('/signup', 'monthly', '0.8'), ...['contact', 'privacy', 'terms', 'refund'].map(x => u('/' + x, 'yearly', '0.3')), ...db.restaurants.filter(r => access(r).active).map(r => u('/m/' + r.slug, 'weekly', '0.6'))].join('\n')}\n</urlset>\n`, { 'Content-Type': 'application/xml; charset=utf-8' }); }
   if (m === 'GET' && p === '/admin/google-link') {
@@ -719,6 +762,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
   if (m === 'GET' && p !== '/admin/google-link' && /^\/admin(\/[a-z0-9-]+)?\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'admin.html'));
   if (m === 'GET' && /^\/waiter(\/[a-z0-9-]+)?\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'waiter.html'));
   if (m === 'GET' && /^\/display\/[a-z0-9-]+\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'display.html'));
+  if (m === 'GET' && /^\/kitchen\/[a-z0-9-]+\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'kitchen.html'));
   if (m === 'GET' && p === '/platform') return serveFile(res, path.join(PUBLIC_DIR, 'platform.html'));
   if (m === 'GET' && p === '/print-qr') return serveFile(res, path.join(PUBLIC_DIR, 'print-qr.html'));
   if (m === 'GET' && p.startsWith('/uploads/')) { const f = safeJoin(UPLOAD_DIR, p.slice(9)); return f ? serveFile(res, f, 'public, max-age=31536000, immutable') : fail(res, 404, 'Not found'); }
@@ -926,6 +970,26 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     if (p === '/api/display/state') return send(res, 200, state, { 'Cache-Control': 'no-store' });
     openStream(req, res, displayStreams, r.id);
     return res.write(`event: state\ndata: ${JSON.stringify(state)}\n\n`);
+  }
+  if (p.startsWith('/api/kitchen/')) { // the kitchen screen: opened with its secret link, no login
+    const q = m === 'GET' ? { s: url.searchParams.get('s'), k: url.searchParams.get('k') } : body;
+    const r = kitchenOf(q.s, q.k);
+    if (!r) return fail(res, 401, 'This kitchen screen link is turned off or was changed. Open the new link from Settings › Kitchen display.');
+    adminSeen.set(r.id, Date.now()); // the kitchen screen is open, so guests see "Kitchen online"
+    const state = () => ({ restaurant: { name: r.name, logo: r.logo || '', brandColor: r.brandColor || '#E4572E', slug: r.slug }, cfg: kitchenCfg(r), accepting: r.acceptingOrders !== false, ...kitchenOrders(r) });
+    if (m === 'GET' && p === '/api/kitchen/state') return send(res, 200, state(), { 'Cache-Control': 'no-store' });
+    if (m === 'GET' && p === '/api/kitchen/stream') { openStream(req, res, kitchenStreams, r.id); return res.write(`event: state\ndata: ${JSON.stringify(state())}\n\n`); }
+    if (m === 'POST' && p === '/api/kitchen/ping') return send(res, 200, { ok: true });
+    if (m === 'POST' && p === '/api/kitchen/order') { // Start, Ready, or bring a ready order back to cooking
+      const o = db.orders.find(x => x.id === body.id && x.restaurantId === r.id);
+      if (!o) return fail(res, 404, 'Order not found');
+      const ok = { preparing: ['new', 'ready'], ready: ['new', 'preparing'] }[body.status];
+      if (!ok) return fail(res, 400, 'Unknown status');
+      if (!ok.includes(o.status)) return fail(res, 409, o.status === 'cancelled' ? 'This order was cancelled at the counter.' : 'Someone already moved this order.');
+      setOrderStatus(r, o, body.status);
+      return send(res, 200, kitchenOrders(r));
+    }
+    return fail(res, 404, 'Not found');
   }
   if (m === 'GET' && (mt = /^\/api\/menu\/([a-z0-9-]+)\/kitchen$/.exec(p))) { // guests check every 20 s whether the counter is online
     const r = db.restaurants.find(x => x.slug === mt[1]); if (!r) return fail(res, 404, 'Restaurant not found');
@@ -1375,14 +1439,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       const o = db.orders.find(x => x.id === mt[1] && x.restaurantId === r.id);
       if (!o) return fail(res, 404, 'Order not found');
       if (!['new', 'preparing', 'ready', 'served', 'cancelled'].includes(body.status)) return fail(res, 400, 'Unknown status');
-      if (body.status === 'ready' && !o.readyAt) o.readyAt = now();
-      if (body.status === 'preparing' && !o.preparingAt) o.preparingAt = now();
-      if (body.status === 'served' && !o.readyAt) o.readyAt = now();
-      o.status = body.status; o.updatedAt = now(); if (HUB) o.dirty = true;
-      if (o.status === 'served') earnFor(r, o);
-      save();
-      { const t = db.tables.find(x => x.id === o.tableId); if (t) tableChanged(r, t, false); }
-      emit(r.id, 'order', adminOrder(o)); emitOrder(o);
+      setOrderStatus(r, o, body.status);
       return send(res, 200, publicOrder(o));
     }
     // service requests
@@ -1469,7 +1526,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       for (const o of db.orders) if (o.tableId === table.id && !o.settled) { o.settled = true; earnFor(r, o); }
       for (const q of db.requests) if (q.tableId === table.id && (q.type === 'bill' || q.type === 'paid') && !q.done) { q.done = true; q.settled = true; emit(r.id, 'request-done', { id: q.id }); }
       for (const q of db.requests) if (q.tableId === table.id && q.type === 'paid') q.settled = true;
-      tableShares.delete(table.id); save(); pushBoard(r.id);
+      tableShares.delete(table.id); save(); pushBoard(r.id); pushKitchen(r.id);
       emitTable(table.id, 'settled', { at: now() }); tableChanged(r, table, false);
       return send(res, 200, { ok: true });
     }
@@ -1689,6 +1746,15 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       if (!r.display || !r.display.on) return send(res, 200, { mode: 'off' });
       return send(res, 200, await setDisplayScreen(r, body));
     }
+    if (m === 'GET' && p === '/api/admin/kitchen-link') { // kitchen screen: secret link + QR to open it on a TV or tablet in the kitchen
+      const d = r.kitchen || {}; if (!d.key) return send(res, 200, { link: '', on: !!d.on });
+      const link = baseUrl(req) + '/kitchen/' + r.slug + '?k=' + d.key;
+      return send(res, 200, { link, on: !!d.on, screens: (kitchenStreams.get(r.id) || new Set()).size, qr: await QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }) });
+    }
+    if (m === 'POST' && p === '/api/admin/kitchen/new-link') { // a new link stops every screen that used the old one
+      r.kitchen = Object.assign({}, KITCHEN_DEFAULT, r.kitchen || {}, { key: crypto.randomBytes(12).toString('base64url') }); save(); closeKitchens(r.id);
+      return send(res, 200, adminRestaurant(r));
+    }
     if (m === 'GET' && p === '/api/admin/waiter-link') { const link = baseUrl(req) + '/waiter/' + r.slug; return send(res, 200, { link, qr: await QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }) }); }
     if (m === 'POST' && p === '/api/admin/waiter-pin') { // owner sets the PIN waiters use; a new PIN logs every waiter phone out
       const pin = str(body.pin, 12);
@@ -1750,9 +1816,16 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
           if (!D.key) D.key = crypto.randomBytes(12).toString('base64url');
           r.display = D;
         }
+        if (body.kitchen && typeof body.kitchen === 'object') {
+          const K = Object.assign({}, KITCHEN_DEFAULT, r.kitchen || {});
+          for (const k of ['on', 'sound', 'readyShow']) if (body.kitchen[k] != null) K[k] = !!body.kitchen[k];
+          if (!K.key) K.key = crypto.randomBytes(12).toString('base64url');
+          r.kitchen = K;
+        }
         if (body.socials) { r.socials = {}; for (const k of SOCIAL_KEYS) if (str(body.socials[k], 300)) r.socials[k] = str(body.socials[k], 300); }
       } catch (e) { return fail(res, 400, e.message); }
       save(); emit(r.id, 'settings', adminRestaurant(r));
+      if (r.kitchen && !r.kitchen.on) closeKitchens(r.id); else emitKitchen(r.id, 'cfg', { cfg: kitchenCfg(r), accepting: r.acceptingOrders !== false, restaurant: { name: r.name, logo: r.logo || '', brandColor: r.brandColor || '#E4572E', slug: r.slug } });
       if (r.display && !r.display.on) closeDisplays(r.id); else if (displayStreams.has(r.id)) displayInfo(r, req).then(x => emitDisplay(r.id, 'info', x)).catch(() => {});
       return send(res, 200, adminRestaurant(r));
     }

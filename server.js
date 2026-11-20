@@ -50,7 +50,8 @@ if (process.env.DL_MIRROR !== '0' && !process.versions.electron) { setTimeout(sy
 const PLANS = { trialDays: 10, monthly: 799, yearly: 5999, lifetime: 24999, updates: 3999 }; // updates = lifetime update renewal for 1 year
 const TERM_PLANS = ['monthly', 'yearly']; // paid plans that run until a date
 let siteCache = null; // landing page with HQ edits applied
-const BUY_URL = process.env.BUY_URL || 'https://wa.me/918928246726?text=';
+const CONTACT_EMAIL = 'marketing@veyracreatives.com'; // Veyra's contact for restaurants (no phone number on Dine In)
+const BUY_URL = process.env.BUY_URL || 'mailto:' + CONTACT_EMAIL + '?subject=' + encodeURIComponent('Buy Veyra Dine In') + '&body=';
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 // ---------- tiny JSON database ----------
@@ -228,11 +229,11 @@ function hqSigned(msg, sig) { // requests from Veyra HQ are signed with the priv
 function claimLocal(code, rid, name, via, ip) {
   db.licenseCodes = db.licenseCodes || {};
   const L = db.licenseCodes[code];
-  if (L && L.revoked) { const e = new Error('This license key has been stopped. Please contact Veyra on WhatsApp +91 89282 46726.'); e.status = 403; throw e; }
-  if (!L) { const e = new Error('This license key was not found. Please check it, or ask Veyra on WhatsApp +91 89282 46726.'); e.status = 404; throw e; }
+  if (L && L.revoked) { const e = new Error('This license key has been stopped. Please email Veyra at ' + CONTACT_EMAIL + '.'); e.status = 403; throw e; }
+  if (!L) { const e = new Error('This license key was not found. Please check it, or email Veyra at ' + CONTACT_EMAIL + '.'); e.status = 404; throw e; }
   L.activations = L.activations || [];
   const other = L.activations.find(a => a.rid !== rid);
-  if (other) { const e = new Error('This license key is already used by another restaurant. Ask Veyra on WhatsApp +91 89282 46726 if you moved to a new computer.'); e.status = 409; throw e; }
+  if (other) { const e = new Error('This license key is already used by another restaurant. Email Veyra at ' + CONTACT_EMAIL + ' if you moved to a new computer.'); e.status = 409; throw e; }
   const a = L.activations.find(x => x.rid === rid);
   if (a) { a.lastAt = now(); a.name = name; } else L.activations.push({ rid, name: str(name, 80), via, ip: ip || '', at: now(), lastAt: now() });
   save();
@@ -281,7 +282,7 @@ const addYear = (iso, n = 1) => { const d = new Date(iso); d.setUTCFullYear(d.ge
 // What a restaurant may buy right now, or why not.
 function payCheck(r, plan) {
   if (!PAY_PLANS.includes(plan)) return 'Choose Monthly, Yearly or Lifetime';
-  if (r.suspended) return 'This account is paused. Please contact Veyra.';
+  if (r.suspended) return 'This account is paused. Please email Veyra at ' + CONTACT_EMAIL + '.';
   const a = access(r);
   if (plan === 'updates') return a.plan === 'lifetime' ? null : 'Update renewal is only for lifetime licenses';
   if (a.plan === 'lifetime') return 'You already have a lifetime license';
@@ -323,10 +324,10 @@ function payLines(pay) {
 async function payEmail(r, pay) {
   const cfg = smtpCfg(); if (!cfg || !r.email) return;
   const lines = payLines(pay);
-  const text = `Hi ${r.ownerName || r.name},\n\nThank you for buying Veyra Dine In. Your payment is received and your plan is already active. There is no key to enter: just open your admin.\n\nRestaurant: ${r.name}\n${lines.map(([a, b]) => a + ': ' + b).join('\n')}\n\nAdmin: https://dinein.veyracreatives.com/admin/${r.slug}\n\nNo GST is charged. Need help? Just reply to this email.\n\nVeyra Creative & Digital Lab`;
+  const text = `Hi ${r.ownerName || r.name},\n\nThank you for buying Veyra Dine In. Your payment is received and your plan is already active. There is no key to enter: just open your admin.\n\nRestaurant: ${r.name}\n${lines.map(([a, b]) => a + ': ' + b).join('\n')}\n\nAdmin: https://dinein.veyracreatives.com/admin/${r.slug}\n\nNo GST is charged. Need help? Just reply to this email, or write to ${CONTACT_EMAIL}.\n\nVeyra Creative & Digital Lab`;
   const html = `<div style="font-family:Arial,sans-serif;max-width:520px;color:#1f1a14"><h2 style="margin:0 0 6px">Payment received</h2><p>Hi ${escH(r.ownerName || r.name)},<br>Thank you for buying Veyra Dine In. Your plan is already active. There is no key to enter: just open your admin.</p>
 <table style="border-collapse:collapse;width:100%;font-size:14px"><tr><td style="padding:6px 0;color:#7a6f63">Restaurant</td><td style="padding:6px 0;font-weight:bold">${escH(r.name)}</td></tr>${lines.map(([a, b]) => `<tr><td style="padding:6px 0;color:#7a6f63;border-top:1px solid #eee">${escH(a)}</td><td style="padding:6px 0;font-weight:bold;border-top:1px solid #eee">${escH(b)}</td></tr>`).join('')}</table>
-<p><a href="https://dinein.veyracreatives.com/admin/${encodeURIComponent(r.slug)}" style="display:inline-block;background:#E4572E;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open my admin</a></p><p style="color:#7a6f63;font-size:13px">No GST is charged. Need help? Just reply to this email.<br>Veyra Creative &amp; Digital Lab</p></div>`;
+<p><a href="https://dinein.veyracreatives.com/admin/${encodeURIComponent(r.slug)}" style="display:inline-block;background:#E4572E;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open my admin</a></p><p style="color:#7a6f63;font-size:13px">No GST is charged. Need help? Just reply to this email, or write to ${CONTACT_EMAIL}.<br>Veyra Creative &amp; Digital Lab</p></div>`;
   await mailer.send(cfg, { to: r.email, subject: `Payment received: Veyra Dine In ${PLAN_NAMES[pay.plan]} (${pay.receipt})`, text, html });
   pay.emailed = now(); save();
 }
@@ -367,7 +368,7 @@ function receiptHtml(r, pay) {
 <style>body{font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#FBF6EE;color:#1f1a14;margin:0;padding:24px 16px}.r{max-width:560px;margin:0 auto;background:#fff;border-radius:18px;padding:32px;box-shadow:0 10px 40px rgba(60,40,20,.08)}h1{font-size:22px;margin:0}.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:22px;flex-wrap:wrap}.paid{background:#E7F6EC;color:#166534;font-weight:800;border-radius:99px;padding:4px 12px;font-size:13px}table{width:100%;border-collapse:collapse}td{padding:10px 0;border-top:1px solid #eee;vertical-align:top}td:first-child{color:#7a6f63;width:45%}td:last-child{font-weight:700;word-break:break-word}.muted{color:#7a6f63;font-size:13px;margin-top:20px}button{margin-top:20px;font:inherit;font-weight:700;background:#E4572E;color:#fff;border:0;border-radius:10px;padding:11px 20px;cursor:pointer}@media print{body{background:#fff;padding:0}.r{box-shadow:none}button{display:none}}</style></head>
 <body><div class="r"><div class="top"><div><h1>Payment receipt</h1><div class="muted" style="margin:2px 0 0">Veyra Creative &amp; Digital Lab · Veyra Dine In</div></div><span class="paid">PAID</span></div>
 <table><tr><td>Billed to</td><td>${escH(r.name)}${r.ownerName ? '<br>' + escH(r.ownerName) : ''}${r.email ? '<br>' + escH(r.email) : ''}</td></tr>${rows}</table>
-<p class="muted">Software delivered online. No GST is charged.${pay.mode === 'test' ? ' TEST PAYMENT: no real money was taken.' : ''}</p><button onclick="print()">Print or save as PDF</button></div></body></html>`;
+<p class="muted">Software delivered online. No GST is charged. Questions: ${CONTACT_EMAIL}.${pay.mode === 'test' ? ' TEST PAYMENT: no real money was taken.' : ''}</p><button onclick="print()">Print or save as PDF</button></div></body></html>`;
 }
 
 // Lifetime keys include 1 year of updates (payload.u, or 1 year from the issue date for older keys). Yearly plans get updates while paid.
@@ -732,7 +733,7 @@ fetch('/api/admin/google/device/info?c='+encodeURIComponent(c)).then(function(r)
 function post(b){return fetch('/api/admin/google/device/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'Something went wrong');return j})})}
 function done(n){box.innerHTML='<div class="ok">You are signed in'+(n?' to '+esc(n):'')+'.</div><p>Go back to the Veyra Dine In app. It opens by itself in a few seconds. You can close this tab.</p>'}
 function start(reset){var s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=function(){google.accounts.id.initialize({client_id:${JSON.stringify(cid)},ux_mode:'popup',callback:function(r){var cred=r.credential;post({c:c,credential:cred}).then(function(j){if(!j.needSignup)return done(j.name);
-box.innerHTML='<h1>One more step</h1><p>Signed in as <b>'+esc(j.email)+'</b>. Tell us about your restaurant to start the 10-day free trial.</p><form class="form" id="f"><input class="input" name="name" required maxlength="80" placeholder="Restaurant name"><input class="input" name="phone" required inputmode="tel" maxlength="16" placeholder="Mobile (WhatsApp)"><button class="btn btn-primary btn-lg btn-block">Start free trial</button></form>';
+box.innerHTML='<h1>One more step</h1><p>Signed in as <b>'+esc(j.email)+'</b>. Tell us about your restaurant to start the 10-day free trial.</p><form class="form" id="f"><input class="input" name="name" required maxlength="80" placeholder="Restaurant name"><input class="input" name="phone" required inputmode="tel" maxlength="16" placeholder="Mobile number"><button class="btn btn-primary btn-lg btn-block">Start free trial</button></form>';
 document.getElementById('f').onsubmit=function(e){e.preventDefault();var f=new FormData(e.target);post({c:c,credential:cred,name:f.get('name'),phone:f.get('phone')}).then(function(j){done(j.name)}).catch(function(er){alert(er.message)})}}).catch(function(er){box.insertAdjacentHTML('beforeend','<p style="color:#B91C1C">'+esc(er.message)+'</p>')})}});
 google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',size:'large',shape:'pill',text:reset?'continue_with':'signin_with',width:320})};document.head.appendChild(s)}})();</script></body></html>`, { 'Content-Type': 'text/html; charset=utf-8', 'Referrer-Policy': 'no-referrer' });
   }
@@ -1100,18 +1101,18 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
   }
   if (m === 'GET' && p === '/api/auth/config') return send(res, 200, { googleClientId: googleClientId(req), emailReset: !!smtpCfg() });
   if (m === 'POST' && p === '/api/admin/reset/start') { // forgot password: email a 6-digit code to the restaurant's email
-    const cfg = smtpCfg(); if (!cfg) return fail(res, 400, 'Email codes are not set up yet. Message us on WhatsApp and we will reset it.');
+    const cfg = smtpCfg(); if (!cfg) return fail(res, 400, 'Email codes are not set up yet. Email us at ' + CONTACT_EMAIL + ' and we will reset it.');
     const ip = 'rst|' + clientIp(req); if (tooMany(ip)) return fail(res, 429, 'Too many tries. Please wait 10 minutes.'); failCount(ip);
     const who = str(body.who, 120).toLowerCase(); if (!who) return fail(res, 400, 'Type your email or restaurant ID');
     const r = db.restaurants.find(x => (who.includes('@') ? (x.email || '').toLowerCase() === who : x.slug === slugify(who)));
-    if (!r || !r.email) { if (who.includes('@')) return fail(res, 404, 'No account uses this email, so no code was sent. Check the spelling, try your restaurant ID, or sign up.'); return fail(res, 404, r ? 'This restaurant has no email saved. Message us on WhatsApp and we will reset it.' : 'No restaurant with that ID. Try your email instead.'); }
+    if (!r || !r.email) { if (who.includes('@')) return fail(res, 404, 'No account uses this email, so no code was sent. Check the spelling, try your restaurant ID, or sign up.'); return fail(res, 404, r ? 'This restaurant has no email saved. Email us at ' + CONTACT_EMAIL + ' and we will reset it.' : 'No restaurant with that ID. Try your email instead.'); }
     const old = resetCodes.get(r.id); if (old && old.sent > Date.now() - 45000) return fail(res, 429, 'A code was sent a moment ago. Check your inbox and spam folder, or wait a minute to send again.');
     const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
     try {
       await mailer.send(cfg, { to: r.email, subject: `${code} is your Veyra Dine In code`,
         text: `Your code to reset the password for ${r.name} is ${code}\n\nIt works for 10 minutes. If you did not ask for this, ignore this email; your password stays the same.\n\nVeyra Dine In`,
         html: `<div style="font-family:Arial,sans-serif;max-width:460px;margin:auto;padding:24px;color:#1B1714"><h2 style="margin:0 0 8px">Reset your password</h2><p style="margin:0 0 18px;color:#5b524b">For <b>${escH(r.name)}</b> on Veyra Dine In. Type this code in the app:</p><div style="font:700 34px/1 Consolas,monospace;letter-spacing:8px;background:#FDE7DC;color:#C2410C;padding:16px;border-radius:12px;text-align:center">${code}</div><p style="color:#5b524b;font-size:14px;margin:18px 0 0">It works for 10 minutes. If you did not ask for this, ignore this email; your password stays the same.</p></div>` });
-    } catch (e) { console.log('[reset] email failed:', e.message); return fail(res, 502, 'Could not send the email right now. Please try again, or message us on WhatsApp.'); }
+    } catch (e) { console.log('[reset] email failed:', e.message); return fail(res, 502, 'Could not send the email right now. Please try again, or email us at ' + CONTACT_EMAIL + '.'); }
     resetCodes.set(r.id, { hash: codeHash(r.id, code), exp: Date.now() + 10 * 60000, tries: 0, sent: Date.now() });
     trackEvent('reset_code_sent'); return send(res, 200, { ok: true, to: maskEmail(r.email) });
   }
@@ -1170,7 +1171,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     let gu; try { gu = await verifyGoogle(body.credential); } catch (e) { return fail(res, e.status || 400, e.message); }
     let r = db.restaurants.find(x => x.email === gu.email);
     if (!r) {
-      if (L.reset) return fail(res, 404, `No restaurant uses ${gu.email}. Pick the Google account you signed up with, or message us on WhatsApp.`);
+      if (L.reset) return fail(res, 404, `No restaurant uses ${gu.email}. Pick the Google account you signed up with, or email us at ${CONTACT_EMAIL}.`);
       if (!str(body.name)) return send(res, 200, { needSignup: true, email: gu.email });
       if (!/^[0-9+\s-]{8,16}$/.test(str(body.phone))) return fail(res, 400, 'Please enter a valid mobile number');
       r = newRestaurant({ name: body.name, password: crypto.randomBytes(12).toString('hex'), email: gu.email, ownerName: gu.name, phone: body.phone, plan: 'trial' });
@@ -1205,7 +1206,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     catch (e) { if (e.status === 404) failCount(tk); return fail(res, e.status || 400, e.message); }
   }
   // ---- Veyra HQ only: every request is signed with Veyra's private license key ----
-  if (m === 'POST' && (p.startsWith('/api/licenses/') || p.startsWith('/api/hq/')) && ['/api/licenses/status', '/api/licenses/reset', '/api/licenses/revoke', '/api/licenses/unrevoke', '/api/hq/overview', '/api/hq/restaurant', '/api/hq/lead', '/api/hq/site', '/api/hq/site/save', '/api/hq/site/preview', '/api/hq/site/media'].includes(p)) {
+  if (m === 'POST' && (p.startsWith('/api/licenses/') || p.startsWith('/api/hq/')) && ['/api/licenses/status', '/api/licenses/reset', '/api/licenses/revoke', '/api/licenses/unrevoke', '/api/hq/overview', '/api/hq/restaurant', '/api/hq/payment', '/api/hq/lead', '/api/hq/site', '/api/hq/site/save', '/api/hq/site/preview', '/api/hq/site/media'].includes(p)) {
     const ts = Number(body.ts), raw = String(body.code || '');
     const { code: _c, ts: _t, sig: _s, ...rest } = body;
     const bh = crypto.createHash('sha256').update(JSON.stringify(rest)).digest('hex');
@@ -1250,6 +1251,17 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       if ('note' in body) l.note = str(body.note, 1000);
       l.updatedAt = now(); save(); return send(res, 200, { ok: true });
     }
+    if (p === '/api/hq/payment') { // Veyra HQ "Mark as paid": UPI, cash or bank transfer taken by hand (code = restaurant id)
+      const r = db.restaurants.find(x => x.id === raw); if (!r) return fail(res, 404, 'Restaurant not found');
+      const plan = str(body.plan, 20), why = payCheck(Object.assign({}, r, { suspended: false }), plan); if (why) return fail(res, 400, why);
+      const amount = body.amount === '' || body.amount == null ? Number(PLANS[plan]) : money(body.amount);
+      const method = ['upi', 'cash', 'bank transfer', 'cheque', 'other'].includes(str(body.method, 20).toLowerCase()) ? str(body.method, 20).toLowerCase() : 'upi';
+      db.payments = db.payments || [];
+      const pay = { id: id(12), rid: r.id, name: r.name, plan, amount, orderId: '', status: 'created', mode: 'manual', createdAt: now(), note: str(body.note, 200), by: 'hq' };
+      db.payments.push(pay); if (r.suspended) r.suspended = false;
+      applyPayment(pay, { paymentId: str(body.reference, 80), method, via: 'hq' });
+      return send(res, 200, { ok: true, payment: { ...payView(pay), rid: r.id, restaurant: r.name }, access: access(r), emailed: !!(smtpCfg() && r.email), receiptUrl: baseUrl(req) + '/receipt/' + pay.id + '?t=' + encodeURIComponent(sign('rcpt|' + pay.id)) });
+    }
     if (p === '/api/hq/restaurant') {
       const r = db.restaurants.find(x => x.id === raw); if (!r) return fail(res, 404, 'Restaurant not found');
       if (Number(body.extendTrialDays) > 0) { const base = Math.max(Date.now(), Date.parse(r.trialEnds || 0) || 0); if (r.plan !== 'lifetime' && !TERM_PLANS.includes(r.plan)) { r.plan = 'trial'; r.trialEnds = new Date(base + Number(body.extendTrialDays) * DAY).toISOString(); } }
@@ -1264,7 +1276,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     const codes = {}; for (const [c, x] of Object.entries(db.licenseCodes)) codes[c] = codeView(c, x);
     const A = db.analytics || {}, analytics = {}; for (const k of Object.keys(A).sort().slice(-120)) analytics[k] = A[k];
     let appVersion = null; try { appVersion = (/^version:\s*(\S+)/m.exec(fs.readFileSync(path.join(DL_DIR, 'latest.yml'), 'utf8')) || [])[1] || null; } catch {}
-    return send(res, 200, { at: now(), restaurants, codes, downloads: db.config.downloads || {}, analytics, leads: (db.leads || []).slice(-1000), appVersion, emailCodes: !!smtpCfg(), payments: (db.payments || []).filter(x => x.status === 'paid').map(x => ({ ...payView(x), rid: x.rid, restaurant: x.name })), onlinePay: rzpCfg() ? rzpCfg().mode : null });
+    return send(res, 200, { at: now(), restaurants, codes, downloads: db.config.downloads || {}, analytics, leads: (db.leads || []).slice(-1000), appVersion, emailCodes: !!smtpCfg(), payments: (db.payments || []).filter(x => x.status === 'paid').map(x => ({ ...payView(x), rid: x.rid, restaurant: x.name, receiptUrl: baseUrl(req) + '/receipt/' + x.id + '?t=' + encodeURIComponent(sign('rcpt|' + x.id)) })), onlinePay: rzpCfg() ? { mode: rzpCfg().mode, webhook: !!rzpCfg().webhookSecret, email: !!smtpCfg() } : null, prices: PLANS });
   }
 
   if (HUB && p.startsWith('/api/hub/')) { // only the Windows app on this computer may call these

@@ -107,7 +107,7 @@
           <div class="form">
             <label class="field"><span>Restaurant name</span><input class="input" name="name" required maxlength="80" autocomplete="organization"></label>
             <div class="row2"><label class="field"><span>Your name</span><input class="input" name="ownerName" required maxlength="80" autocomplete="name"></label>
-              <label class="field"><span>Mobile (WhatsApp)</span><input class="input" name="phone" required inputmode="tel" maxlength="16" autocomplete="tel"></label></div>
+              <label class="field"><span>Mobile number</span><input class="input" name="phone" required inputmode="tel" maxlength="16" autocomplete="tel"></label></div>
             <label class="field"><span>Email</span><input class="input" name="email" type="email" required autocomplete="email"></label>
             <label class="field"><span>Create a password</span><input class="input" name="password" type="password" minlength="6" required autocomplete="new-password"><small>Staff use this to open orders on their phones.</small></label>
             <button class="btn btn-primary btn-lg btn-block">Start 10-day free trial</button>
@@ -129,7 +129,7 @@
           </div>
           <div class="small-link"><a href="#" data-mode="forgot">Forgot your password?</a></div></form>`}
         <div id="gwrap" hidden>${mode === 'forgot' ? '' : '<div class="or" style="margin:20px 0 14px">or</div>'}<div class="gbtn" style="display:flex;justify-content:center;min-height:44px"></div></div>
-        ${mode === 'forgot' ? `<div class="small-link" style="margin-top:18px">Still stuck? Message us on <a href="https://wa.me/918928246726" target="_blank">WhatsApp</a> and we'll reset it for you.<br><a href="#" data-mode="login">Back to log in</a></div>` : ''}
+        ${mode === 'forgot' ? `<div class="small-link" style="margin-top:18px">Still stuck? Email us at <a href="mailto:marketing@veyracreatives.com">marketing@veyracreatives.com</a> and we'll reset it for you.<br><a href="#" data-mode="login">Back to log in</a></div>` : ''}
       </div></div></div>`;
     app.querySelectorAll('[data-mode]').forEach(b => b.onclick = e => { e.preventDefault(); renderLogin(b.dataset.mode); });
     const afterLogin = async (r, created) => { if (r.reset) setTimeout(newPassword, 400); localStorage.setItem('vd_slug', r.slug); history.replaceState(null, '', '/admin/' + r.slug + location.search); if (created) S.tab = 'menu'; await boot(); if (created) toast(`${icon('check', 18)} Your free trial has started`, 'ok'); };
@@ -148,7 +148,7 @@
         try { const r = await api('/api/admin/reset/finish', { method: 'POST', body: { who, code: f2.code.value, password: f2.password.value } }); toast(`${icon('check', 18)} Password changed`, 'ok'); await afterLogin(r); }
         catch (err) { toast(esc(err.message), 'error'); btn.disabled = false; }
       };
-      // email codes need the server's email settings; without them, fall back to Google and WhatsApp only
+      // email codes need the server's email settings; without them, fall back to Google and email to Veyra only
       fetch('/api/auth/config').then(r => r.json()).then(c => { if (!c.emailReset) { document.getElementById('rf1').hidden = true; document.querySelector('#rst > p.muted').textContent = 'Signed up with a Gmail or Google account? Continue with Google using that email. You\'ll be logged in and can set a new password straight away.'; document.getElementById('rfGoogle').hidden = true; } }).catch(() => {});
     }
     const gw = document.getElementById('gwrap');
@@ -179,7 +179,7 @@
         const card = app.querySelector('.form-card');
         card.innerHTML = `<form id="gsf"><span class="trial-chip">${icon('check', 15)} 10-day free trial</span><h2>One more step</h2><p class="muted">Signed in as <b>${esc(r.email)}</b>. Tell us about your restaurant.</p>
           <div class="form"><label class="field"><span>Restaurant name</span><input class="input" name="name" required maxlength="80" autocomplete="organization"></label>
-          <label class="field"><span>Mobile (WhatsApp)</span><input class="input" name="phone" required inputmode="tel" maxlength="16" autocomplete="tel"></label>
+          <label class="field"><span>Mobile number</span><input class="input" name="phone" required inputmode="tel" maxlength="16" autocomplete="tel"></label>
           <button class="btn btn-primary btn-lg btn-block">Start 10-day free trial</button></div>
           <div class="small-link"><a href="#" id="gback">Use a different account</a></div></form>`;
         card.querySelector('#gback').onclick = e => { e.preventDefault(); renderLogin(mode); };
@@ -272,7 +272,7 @@
     };
   }
   // ---------- trial, license, buying ----------
-  // Plans are bought online with Razorpay when Veyra has switched it on (S.me.pay.on); otherwise the Buy buttons open WhatsApp.
+  // Plans are bought online with Razorpay when Veyra has switched it on (S.me.pay.on); otherwise the Buy buttons open an email to Veyra.
   const inr = n => '₹' + Number(n).toLocaleString('en-IN');
   const payOn = () => !!(S.me && S.me.pay && S.me.pay.on);
   const PLAN_LABEL = { monthly: 'Monthly', yearly: 'Yearly', lifetime: 'Lifetime', updates: 'Update renewal' };
@@ -281,7 +281,7 @@
     const r = S.me.restaurant;
     return S.me.buyUrl + encodeURIComponent(`Hi Veyra, I want to buy Veyra Dine In ${plan} (${plan === 'lifetime' ? inr(S.me.plans.lifetime) : plan === 'monthly' ? inr(S.me.plans.monthly) + '/month' : inr(S.me.plans.yearly) + '/year'}) for ${r.name}. My login email: ${r.email || r.slug}`);
   }
-  // a Buy button: pays online when Razorpay is on, else the old WhatsApp link
+  // a Buy button: pays online when Razorpay is on, else an email to Veyra
   const buyBtn = (plan, cls, label) => payOn() ? `<button type="button" class="${cls}" data-pay="${plan}">${label}</button>` : `<a class="${cls}" href="${esc(buyLink(plan))}" target="_blank">${label}</a>`;
   let razorLoad = null;
   const loadRazorpay = () => razorLoad || (razorLoad = new Promise((ok, no) => { if (window.Razorpay) return ok(); const sc = document.createElement('script'); sc.src = 'https://checkout.razorpay.com/v1/checkout.js'; sc.onload = ok; sc.onerror = () => { razorLoad = null; no(new Error('Could not open the payment window. Check the internet and try again.')); }; document.head.appendChild(sc); }));
@@ -352,7 +352,7 @@
   const payNote = () => `<p class="pay-note">${icon('check', 16)}<span>Pay by UPI, card or netbanking. Your plan starts the moment you pay, with no key to enter. No GST.${S.me.pay && S.me.pay.mode === 'test' ? ' <b>(Test mode: no real money is taken.)</b>' : ''}</span></p>`;
   function buyOptions() {
     return `<div class="or">Don't have a key?</div>${planCards()}
-      <div class="help">${icon('phone', 18)} Need help? WhatsApp <a href="https://wa.me/918928246726" target="_blank">+91 89282 46726</a></div>`;
+      <div class="help">${icon('mail', 18)} Need help? Email <a href="mailto:marketing@veyracreatives.com">marketing@veyracreatives.com</a></div>`;
   }
   function licenseModal() {
     if (payOn()) {
@@ -365,7 +365,7 @@
     }
     const kf = keyForm(() => { o.close(); renderActivated(); });
     const o = modal(`<div class="sheet-head"><h3>Enter license key</h3><button class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body">
-      <p class="muted" style="margin:0 0 16px">You get the key on WhatsApp or email after you pay.</p>${kf.html}${buyOptions()}</div>`, { wide: true });
+      <p class="muted" style="margin:0 0 16px">You get the key by email after you pay.</p>${kf.html}${buyOptions()}</div>`, { wide: true });
     kf.bind(o);
   }
   function renderActivate() {
@@ -379,7 +379,7 @@
       <details class="have-key"><summary>Have a license key from Veyra?</summary>${kf.html}</details>
       <div class="small-link" style="text-align:left"><a href="#" id="lo2">Log out</a></div></div></div>`
       : `<div class="activate-page"><div class="act-card"><div class="big-ic">${icon('clock', 32)}</div>
-      <h2>${title}</h2>${a.plan === 'suspended' ? '<p class="muted">Please contact Veyra on WhatsApp +91 89282 46726.</p>' : ''}
+      <h2>${title}</h2>${a.plan === 'suspended' ? '<p class="muted">Please email Veyra at <a href="mailto:marketing@veyracreatives.com">marketing@veyracreatives.com</a>.</p>' : ''}
       <p class="muted">Your menu, tables and QR codes are all saved. Enter your license key to start taking orders again.</p>
       ${kf.html}${buyOptions()}
       <div class="small-link" style="text-align:left"><a href="#" id="lo2">Log out</a></div></div></div>`;
@@ -1121,7 +1121,7 @@
     c.innerHTML = `<div style="display:grid;gap:18px;max-width:720px">
       <div class="panel" id="planPanel"><div class="panel-head"><h2>Plan and license</h2>${payOn() ? (a.plan !== 'lifetime' && endingSoon(a) ? `<button class="btn btn-sm btn-primary" data-license>${a.plan === 'trial' ? 'Buy a plan' : 'Renew now'}</button>` : '') : endingSoon(a) || (lic && lic.updatesUntil && lic.updatesUntil < new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10)) ? '<button class="btn btn-sm btn-primary" data-license>Enter license key</button>' : ''}</div><div class="panel-body form">
         <div class="lic-box" style="margin:0"><span>Plan</span><b>${esc(planTxt)}</b>${lic ? `<span>Licensed to</span><b>${esc(lic.to)}</b>${lic.online ? '<span>Bought</span><b>Online (Razorpay)</b>' : `<span>License key</span><b style="font-family:ui-monospace,Consolas,monospace;word-break:break-all">${esc(keyTxt)}</b>`}${lic.at ? `<span>Activated</span><b>${fmtD(lic.at)}</b>` : ''}` : ''}<span>Updates</span><b>${a.plan === 'trial' ? 'Included after you buy' : a.plan === 'lifetime' && lic && lic.updatesUntil ? (lic.updatesUntil >= new Date().toISOString().slice(0, 10) ? 'Included until ' : 'Ended on ') + fmtD(lic.updatesUntil) : 'Included'}</b></div>
-        ${a.plan === 'lifetime' && lic && lic.updatesUntil && lic.updatesUntil < new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10) ? `<p class="muted" style="margin:0">${lic.updatesUntil < new Date().toISOString().slice(0, 10) ? 'Your app keeps working as it is.' : 'Your year of updates ends soon. Your app keeps working after that.'} To keep getting new features, renew updates for one more year${payOn() ? ` for ${inr(S.me.plans.updates)}.` : ` on <a href="https://wa.me/918928246726?text=${encodeURIComponent('Hi Veyra, I want to renew Veyra Dine In updates for ' + r.name)}" target="_blank">WhatsApp +91 89282 46726</a> and enter the new key above.`}</p>` : ''}
+        ${a.plan === 'lifetime' && lic && lic.updatesUntil && lic.updatesUntil < new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10) ? `<p class="muted" style="margin:0">${lic.updatesUntil < new Date().toISOString().slice(0, 10) ? 'Your app keeps working as it is.' : 'Your year of updates ends soon. Your app keeps working after that.'} To keep getting new features, renew updates for one more year${payOn() ? ` for ${inr(S.me.plans.updates)}.` : ` by emailing <a href="mailto:marketing@veyracreatives.com?subject=${encodeURIComponent('Renew Veyra Dine In updates for ' + r.name)}">marketing@veyracreatives.com</a> and enter the new key above.`}</p>` : ''}
         <div style="display:flex;gap:8px;flex-wrap:wrap">${a.plan === 'lifetime' ? `${lic && lic.key ? `<button class="btn" id="cpyKey">${icon('copy', 18)} Copy license key</button>` : ''}${payOn() && lic && lic.updatesUntil && lic.updatesUntil < new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10) ? `<button class="btn btn-primary" data-pay="updates">Renew updates ${inr(S.me.plans.updates)}</button>` : ''}` : `${buyBtn('lifetime', 'btn btn-primary', 'Buy lifetime ' + inr(S.me.plans.lifetime))}${buyBtn('yearly', 'btn', (a.plan === 'yearly' ? 'Renew yearly ' : 'Buy yearly ') + inr(S.me.plans.yearly))}${buyBtn('monthly', 'btn', (a.plan === 'monthly' ? 'Renew monthly ' : 'Buy monthly ') + inr(S.me.plans.monthly))}${lic && lic.key ? `<button class="btn" id="cpyKey">${icon('copy', 18)} Copy license key</button>` : ''}`}<a class="btn" href="https://dinein.veyracreatives.com/download/Veyra-Dine-In-Setup.exe">${icon('download', 18)} Download Windows app</a></div>
         ${payOn() && a.plan !== 'lifetime' ? payNote() : ''}
         <div id="payHist"></div>
@@ -1166,7 +1166,7 @@
         <p class="muted" id="loyEx" style="margin:0;font-size:14px"></p>
         <button class="btn btn-primary" style="justify-self:start">Save loyalty rules</button>
       </div></form>
-      <form class="panel" id="ideaF"><div class="panel-head"><div><h2>Suggest a feature or ask for custom work</h2><span class="muted" style="font-size:14px">Tell Veyra what you'd like next, or what you need built for your restaurant. We reply on WhatsApp.</span></div></div><div class="panel-body form">
+      <form class="panel" id="ideaF"><div class="panel-head"><div><h2>Suggest a feature or ask for custom work</h2><span class="muted" style="font-size:14px">Tell Veyra what you'd like next, or what you need built for your restaurant. We reply by email.</span></div></div><div class="panel-body form">
         <div class="wseg" style="justify-self:start" role="radiogroup" aria-label="What is it?"><label><input type="radio" name="type" value="feature" checked>Feature idea</label><label><input type="radio" name="type" value="custom">Custom build</label></div>
         <label class="field"><span>Your message</span><textarea class="input" name="message" rows="3" maxlength="2000" required placeholder="E.g. a kitchen screen, or 3 outlets with one dashboard"></textarea></label>
         <button class="btn btn-primary" style="justify-self:start">Send to Veyra</button>

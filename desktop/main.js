@@ -132,7 +132,7 @@ function createWindow() {
   });
   win.loadURL(`${baseUrl}/admin${startQuery}`);
   win.once('ready-to-show', () => win.show());
-  // open outside links (WhatsApp, buy, test menu, print) in the normal browser
+  // open outside links (email, buy, test menu, print) in the normal browser
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith(baseUrl + '/print-qr') || (hub.base && url.startsWith(hub.base + '/print-qr'))) return { action: 'allow', overrideBrowserWindowOptions: { width: 1000, height: 800, icon: ICON, autoHideMenuBar: true } };
     shell.openExternal(url); return { action: 'deny' };
@@ -240,7 +240,7 @@ async function updatesAllowed() {
   } catch { return true; }
 }
 function updatesEndedBox() {
-  return dialog.showMessageBox(win, { type: 'info', message: 'Updates for your lifetime license have ended', detail: `Your 1 year of updates ended on ${new Date(updatesEndedOn + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}. ${APP_NAME} keeps working as it is.\n\nTo get the newest features, renew updates on WhatsApp +91 89282 46726 and enter the new key under Settings, Plan and license.` });
+  return dialog.showMessageBox(win, { type: 'info', message: 'Updates for your lifetime license have ended', detail: `Your 1 year of updates ended on ${new Date(updatesEndedOn + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}. ${APP_NAME} keeps working as it is.\n\nTo get the newest features, renew updates in Settings, Plan and license (pay online), or email marketing@veyracreatives.com.` });
 }
 function setupUpdates() {
   if (!app.isPackaged || !CONFIG.updateUrl) return;

@@ -1547,8 +1547,12 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
   }
   if (m === 'POST' && p === '/api/waiter/logout') { setCookie(res, 'vd_waiter', '', 0); return send(res, 200, { ok: true }); }
   if (p.startsWith('/api/admin/')) {
+    // The waiter app sends the restaurant from its link (/waiter/<slug>). A login for a different restaurant on the
+    // same browser (an owner logged in to another account, or an old waiter PIN) must not be used for this one.
+    const wantRaw = str(req.headers['x-vd-slug'] || url.searchParams.get('vdslug') || '', 80), want = wantRaw ? slugify(wantRaw) : '';
     let r = adminOf(req), waiter = null;
-    if (!r) { waiter = waiterOf(req); if (waiter && WAITER_OK.some(([mm, rx]) => mm === m && rx.test(p))) r = waiter.r; }
+    if (r && want && r.slug !== want) r = null;
+    if (!r) { waiter = waiterOf(req); if (waiter && want && waiter.r.slug !== want) waiter = null; if (waiter && WAITER_OK.some(([mm, rx]) => mm === m && rx.test(p))) r = waiter.r; }
     if (!r) return fail(res, 401, 'Please log in');
     adminSeen.set(r.id, Date.now()); // any staff request means someone is at work, so guests see "Kitchen online"
     if (m === 'GET' && p === '/api/admin/waiter/me') {

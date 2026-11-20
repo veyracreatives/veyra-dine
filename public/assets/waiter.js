@@ -13,7 +13,7 @@
   async function api(path, opts = {}) {
     let res;
     const ac = new AbortController(), tt = setTimeout(() => ac.abort(), opts.timeout || 15000);
-    try { res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts, signal: ac.signal, body: opts.body ? JSON.stringify(opts.body) : undefined }); }
+    try { res = await fetch(path, { headers: { 'Content-Type': 'application/json', ...(pathSlug ? { 'X-VD-Slug': pathSlug } : {}) }, ...opts, signal: ac.signal, body: opts.body ? JSON.stringify(opts.body) : undefined }); }
     catch (e) { const err = new Error('No internet. Check the WiFi or mobile data.'); err.network = true; throw err; }
     finally { clearTimeout(tt); }
     const data = await res.json().catch(() => ({}));
@@ -82,7 +82,7 @@
   // ---- data ----
   async function boot() {
     try { S.me = await api('/api/admin/waiter/me'); }
-    catch (e) { if (e.network && load('vw_cache', null)) { S.me = load('vw_cache', null); S.online = false; } else return renderLogin(e.status === 401 ? '' : e.message); }
+    catch (e) { const c = load('vw_cache', null); if (e.network && c && (!pathSlug || c.restaurant.slug === pathSlug)) { S.me = c; S.online = false; } else return renderLogin(e.status === 401 ? '' : e.message); }
     store('vw_cache', S.me); document.title = 'Waiter · ' + S.me.restaurant.name;
     if (S.me.restaurant.brandColor && window.applyBrand) window.applyBrand(S.me.restaurant.brandColor);
     await refresh(); connect(); render(); flush();
@@ -96,7 +96,7 @@
   function upsert(o) { const i = S.orders.findIndex(x => x.id === o.id); if (['served', 'cancelled'].includes(o.status)) { if (i >= 0) S.orders.splice(i, 1); } else if (i >= 0) S.orders[i] = o; else S.orders.push(o); }
   function connect() {
     if (es) es.close();
-    es = new EventSource('/api/admin/stream');
+    es = new EventSource('/api/admin/stream' + (pathSlug ? '?vdslug=' + encodeURIComponent(pathSlug) : ''));
     es.addEventListener('order', e => {
       const o = JSON.parse(e.data), old = S.orders.find(x => x.id === o.id);
       if (o.status === 'ready' && (!old || old.status !== 'ready')) { ding(2); toast(`${icon('bell', 18)} <b>${esc(o.tableName)}</b>&nbsp;food is ready to serve`, 'ok'); }

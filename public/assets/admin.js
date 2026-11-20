@@ -461,6 +461,24 @@
     return { table: { id: t.id, name: t.name }, total, discount: list.reduce((a, o) => a + (o.discount || 0), 0), coupons: [...new Set(list.map(o => o.coupon).filter(Boolean))], lines, people: lines.length ? [{ gid: 'table', name: 'Table', amount: Math.round(total), own: total, sharedPart: 0 }] : [], paid: (S.offPaid[tableId] || []).slice(), orders: list.map(o => ({ id: o.id, number: o.number, status: o.status })) };
   }
 
+  // ---------- counter display: the screen customers see at the counter ----------
+  const DISP = () => !!(S.me && S.me.restaurant.displayCfg && S.me.restaurant.displayCfg.on);
+  let dispT = 0;
+  function toDisplay(body, now) { // what the customer screen shows; quietly does nothing offline or when it is off
+    if (!DISP() || S.offline) return; clearTimeout(dispT);
+    const go = () => api('/api/admin/display/show', { method: 'POST', body }).catch(() => {});
+    if (now) go(); else dispT = setTimeout(go, 250);
+  }
+  function onGone(el, fn) { const mo = new MutationObserver(() => { if (!el.isConnected) { mo.disconnect(); fn(); } }); mo.observe(document.body, { childList: true }); }
+  async function openDisplay() {
+    try {
+      const d = await api('/api/admin/display-link'); if (!d.link) return toast('Turn on the counter display in Settings first.', 'error');
+      const w = window.open(d.link, 'vd-display', 'popup,width=1280,height=760');
+      if (!w && !window.vdDesktop) toast('Your browser blocked the window. Allow pop-ups for this site, or copy the link from Settings › Counter display.', 'error');
+      else toast('Counter display opened. Move it to the screen that faces customers and tap Start display.', 'ok');
+    } catch (err) { toast(esc(err.message), 'error'); }
+  }
+
   // ---------- counter order (also works offline) ----------
   async function newOrder() {
     if (!S.menu || !S.tables) { try { const [mn, tb] = await Promise.all([S.menu || api('/api/admin/menu'), S.tables || api('/api/admin/tables')]); S.menu = mn; S.tables = tb; saveCache(); } catch (err) { if (!S.menu || !S.tables) return toast('Open the Menu and Tables tabs once while online, then counter orders work offline too.', 'error'); } }
@@ -485,7 +503,12 @@
       const n = Object.values(cart).reduce((a, b) => a + b, 0), tot = Object.entries(cart).reduce((a, [id, qty]) => a + qty * (items.find(i => i.id === id) || {}).price, 0);
       o.querySelector('#psum').innerHTML = n ? `<b>${n} item${n === 1 ? '' : 's'}</b> · ${cur(tot)}` : 'No dishes yet';
       o.querySelector('#psend').disabled = !n;
+      const tSel = o.querySelector('#ptab'), tN = tSel && tSel.value ? tSel.options[tSel.selectedIndex].text : '';
+      toDisplay(n ? { mode: 'cart', title: tN || 'Your order', lines: Object.entries(cart).map(([id, qty]) => { const it = items.find(i => i.id === id) || {}; return { name: it.name, qty, price: it.price }; }) } : { mode: 'idle' });
     };
+    let sentOrder = null;
+    onGone(o, () => toDisplay(sentOrder && !sentOrder.offline ? { mode: 'order', orderId: sentOrder.id } : { mode: 'idle' }, true));
+    o.querySelector('#ptab').onchange = () => draw();
     o.querySelector('#plist').onclick = e => { const b = e.target.closest('[data-a],[data-d]'); if (!b) return; const id = b.dataset.a || b.dataset.d; cart[id] = Math.max(0, (cart[id] || 0) + (b.dataset.a ? 1 : -1)); if (!cart[id]) delete cart[id]; draw(); };
     o.querySelector('#pq').oninput = e => { q = e.target.value.trim().toLowerCase(); draw(); };
     o.querySelectorAll('[data-pc]').forEach(b => b.onclick = () => { cat = b.dataset.pc; o.querySelectorAll('[data-pc]').forEach(x => x.classList.toggle('on', x === b)); draw(); });
@@ -501,7 +524,7 @@
         order = { id: tmpId, number: 'OFF-' + (outbox().filter(x => x.kind === 'order').length + 1), tableId: tId || null, tableName: t ? t.name : 'Counter', items: lines, note: body.note, customerName: body.name, total, subtotal: total, discount: 0, coupon: '', status: 'preparing', createdAt: new Date().toISOString(), offline: true, source: 'counter' };
         queue({ kind: 'order', tmpId, body: { ...body, createdAt: order.createdAt } });
       }
-      o.close(); upsertOrder(order);
+      sentOrder = order; o.close(); upsertOrder(order);
       if (window.vdDesktop && window.vdDesktop.print && BILLCFG().autoKot) printKot(order);
       toast(`${icon('check', 18)} Order for ${esc(order.tableName)} sent${order.offline && String(order.id).startsWith('off-') ? ' (saved offline)' : ''}. ${window.vdDesktop && BILLCFG().autoKot ? 'KOT printing.' : 'Tap KOT on the order to print the kitchen ticket.'}`, 'ok');
     };
@@ -616,7 +639,7 @@
     const isLocal = /localhost|127\.0\.0\.1/.test(S.me.baseUrl);
     c.innerHTML = `
       ${phoneBanner()}${hubBanner()}
-      <div class="o-tools"><button class="btn btn-primary" id="newOrder">${icon('plus', 18)} New order</button><span class="muted">Take an order at the counter or for a phone call. ${S.me.restaurant.service && S.me.restaurant.service.autoAccept ? 'QR orders go straight to the kitchen.' : ''}</span></div>
+      <div class="o-tools"><button class="btn btn-primary" id="newOrder">${icon('plus', 18)} New order</button>${DISP() ? `<button class="btn" id="openDisp">${icon('monitor', 18)} Customer display</button>` : ''}<span class="muted">Take an order at the counter or for a phone call. ${S.me.restaurant.service && S.me.restaurant.service.autoAccept ? 'QR orders go straight to the kitchen.' : ''}</span></div>
       ${!S.audioOk && !window.vdDesktop ? `<div class="banner">${icon('bell', 22)}<span>Turn on alerts so you hear a sound and get a pop-up for every new order.</span><button class="btn btn-primary" id="enableAlerts">Turn on alerts</button></div>` : ''}
       <div class="stats">
         <button class="stat link" data-gosales>  <small>Orders today</small><b>${st.ordersToday}</b><span class="sub">Other days ›</span></button>
@@ -632,6 +655,7 @@
           <div class="col">${list.length ? list.map(orderCard).join('') : `<div class="col-empty">${k === 'new' ? (isLocal ? 'No new orders yet.' : 'Waiting for orders. New ones pop up here with a sound.') : 'Nothing here right now.'}</div>`}</div></div>`;
       }).join('')}</div>`;
     const no = document.getElementById('newOrder'); if (no) no.onclick = () => newOrder();
+    const od = document.getElementById('openDisp'); if (od) od.onclick = openDisplay;
     const ai = document.getElementById('appInstall'); if (ai) ai.onclick = installApp;
     const ax = document.getElementById('appHintX'); if (ax) ax.onclick = () => { lsSet('vd_app_hint', 'x'); renderOrders(c); };
     const en = document.getElementById('enableAlerts');
@@ -1027,7 +1051,7 @@
 
   // ---------- settings ----------
   function renderSettings(c) {
-    const r = S.me.restaurant;
+    const r = S.me.restaurant, DC = () => r.displayCfg || {};
     const menuUrl = `${S.me.baseUrl}/m/${r.slug}`;
     const a = r.access || {}, lic = r.license;
     const planTxt = a.plan === 'lifetime' ? 'Lifetime' : (a.plan === 'yearly' || a.plan === 'monthly') ? `${a.plan === 'monthly' ? 'Monthly' : 'Yearly'}, until ${new Date(a.until).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}` : `Free trial, ${a.daysLeft} day${a.daysLeft === 1 ? '' : 's'} left`;
@@ -1044,6 +1068,20 @@
         <small class="muted" style="margin-top:-8px">${r.hasWaiterPin ? 'A PIN is set. Changing it logs out every waiter phone.' : 'No PIN yet, so waiters cannot log in.'}</small>
         <div id="wlink" class="w-link-box"></div>
       </div></div>
+      <form class="panel" id="dispF"><div class="panel-head"><div><h2>Counter display (customer screen)</h2><span class="muted" style="font-size:14px">A screen at your counter that faces customers. While you take an order or open a bill it shows the dishes, the total and a UPI QR for the exact amount. The rest of the time it shows which order numbers are cooking and which are ready to collect. Use a second monitor, a TV or an old tablet.</span></div>${DC().on ? `<button type="button" class="btn btn-sm" id="dispOpen">${icon('monitor', 16)} Open display</button>` : ''}</div><div class="panel-body form">
+        <label class="switch"><input type="checkbox" name="on" ${DC().on ? 'checked' : ''}><span class="track"></span>Turn on the counter display</label>
+        <label class="field"><span>Welcome message (optional)</span><input class="input" name="welcome" maxlength="120" value="${esc(DC().welcome || '')}" placeholder="E.g. Fresh dosas all day. Order and pay at the counter."></label>
+        <div class="disp-opts">
+          <label class="switch"><input type="checkbox" name="board" ${DC().board ? 'checked' : ''}><span class="track"></span>Show order numbers: Preparing and Ready to collect</label>
+          <label class="switch"><input type="checkbox" name="sound" ${DC().sound ? 'checked' : ''}><span class="track"></span>Chime when an order is ready</label>
+          <label class="switch"><input type="checkbox" name="menuQr" ${DC().menuQr ? 'checked' : ''}><span class="track"></span>Show the menu QR</label>
+          <label class="switch"><input type="checkbox" name="wifi" ${DC().wifi ? 'checked' : ''}><span class="track"></span>Show guest WiFi${r.wifiCfg && r.wifiCfg.on ? '' : ' (turn on WiFi for guests below)'}</label>
+          <label class="switch"><input type="checkbox" name="offers" ${DC().offers ? 'checked' : ''}><span class="track"></span>Show coupons marked “Show on menu”</label>
+        </div>
+        ${r.upiId ? '' : '<p class="muted" style="margin:0;font-size:13px">Add your UPI ID under “Split bill and UPI payments” so the screen shows a QR to pay. Without it, the screen shows the amount and asks guests to pay at the counter.</p>'}
+        <button class="btn btn-primary" style="justify-self:start">Save counter display</button>
+        <div id="dlink" class="w-link-box"></div>
+      </div></form>
       ${window.vdDesktop && window.vdDesktop.hub && !S.me.hubMode ? `<div class="panel" id="hubP"><div class="panel-head"><div><h2>WiFi backup (no internet)</h2><span class="muted" style="font-size:14px">This computer keeps a copy of your menu and tables. If the internet goes down, the app switches to it by itself. Guests scan the backup QR and waiters keep taking orders on your WiFi. When the internet is back, every order goes online with no doubles.</span></div></div><div class="panel-body form" id="hubB"><p class="muted" style="margin:0">Checking the backup…</p></div></div>` : ''}
       <form class="panel" id="svcF"><div class="panel-head"><div><h2>Orders without a waiter</h2><span class="muted" style="font-size:14px">Guests scan, order and pay from the table. The kitchen gets the order straight away.</span></div></div><div class="panel-body form">
         <label class="switch"><input type="checkbox" name="autoAccept" ${r.service && r.service.autoAccept ? 'checked' : ''}><span class="track"></span>Send QR orders straight to the kitchen (no "Accept" tap needed)</label>
@@ -1117,6 +1155,18 @@
     const svcF = document.getElementById('svcF');
     api('/api/admin/waiter-link').then(d => { const b = document.getElementById('wlink'); if (!b) return; b.innerHTML = `<div class="w-qr">${d.qr}</div><div><b>Waiters scan this, or open:</b><a href="${esc(d.link)}" target="_blank">${esc(d.link)}</a><span class="muted">Log in with your restaurant ID <b>${esc(r.slug)}</b>, their name and the PIN.</span><button class="btn btn-sm" type="button" id="wcopy">${icon('copy', 16)} Copy link</button></div>`; document.getElementById('wcopy').onclick = () => { navigator.clipboard.writeText(d.link).then(() => toast('Link copied', 'ok')).catch(() => {}); }; }).catch(() => {});
     if (document.getElementById('hubB')) drawHub();
+    const dispF = document.getElementById('dispF');
+    const drawDLink = () => api('/api/admin/display-link').then(d => { const b = document.getElementById('dlink'); if (!b || !d.link || !d.on) return;
+      b.innerHTML = `<div class="w-qr">${d.qr}</div><div><b>Open this on the customer screen, or scan it with the tablet:</b><a href="${esc(d.link)}" target="_blank" rel="noreferrer">${esc(d.link.replace(/^https?:\/\//, '').replace(/\?k=.*/, '?k=…'))}</a>
+        <span class="muted">${d.screens ? `${icon('check', 14)} ${d.screens} screen${d.screens === 1 ? ' is' : 's are'} showing it now.` : 'No screen is showing it right now.'} Second monitor: tap Open on this computer, drag the window to that screen and tap Start display. Anyone with this link can see the screen, so make a new link if it gets shared.</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-sm btn-primary" type="button" id="dOpen">${icon('monitor', 16)} Open on this computer</button><button class="btn btn-sm" type="button" id="dCopy">${icon('copy', 16)} Copy link</button><button class="btn btn-sm btn-ghost" type="button" id="dNew">${icon('refresh', 16)} New link</button></div></div>`;
+      document.getElementById('dOpen').onclick = openDisplay;
+      document.getElementById('dCopy').onclick = () => { navigator.clipboard.writeText(d.link).then(() => toast('Link copied', 'ok')).catch(() => prompt('Copy this link', d.link)); };
+      document.getElementById('dNew').onclick = async () => { if (!(await confirmBox('Make a new display link?', 'Screens using the old link stop at once. Open the new link on them again.', 'Make new link'))) return; try { S.me.restaurant = await api('/api/admin/display/new-link', { method: 'POST' }); saveCache(); toast('New link made', 'ok'); drawDLink(); } catch (err) { toast(esc(err.message), 'error'); } };
+    }).catch(() => {});
+    drawDLink();
+    const dOpenTop = document.getElementById('dispOpen'); if (dOpenTop) dOpenTop.onclick = openDisplay;
+    dispF.onsubmit = async e => { e.preventDefault(); const f = new FormData(dispF); try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { display: { on: !!f.get('on'), welcome: f.get('welcome'), board: !!f.get('board'), sound: !!f.get('sound'), menuQr: !!f.get('menuQr'), wifi: !!f.get('wifi'), offers: !!f.get('offers') } } }); saveCache(); toast(`${icon('check', 18)} Counter display saved`, 'ok'); renderSettings(c); } catch (err) { toast(esc(err.message), 'error'); } };
     document.getElementById('wpinF').onsubmit = async e => { e.preventDefault(); try { S.me.restaurant = await api('/api/admin/waiter-pin', { method: 'POST', body: { pin: e.target.pin.value } }); saveCache(); toast(`${icon('check', 18)} Waiter PIN saved`, 'ok'); renderSettings(document.getElementById('content')); } catch (err) { toast(esc(err.message), 'error'); } };
     svcF.onchange = async () => { const f = new FormData(svcF); try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { service: { autoAccept: !!f.get('autoAccept'), payFirst: !!f.get('payFirst') } } }); saveCache(); toast('Saved', 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
     const wifiF = document.getElementById('wifiF');
@@ -1265,7 +1315,8 @@
     const o = modal('<div class="sheet-body"><div class="empty">Loading…</div></div>', { wide: true });
     o.classList.add('cbill-ov');
     const M = { cash: 'Cash', upi: 'UPI', card: 'Card' }, ML = { ...M, points: 'Points' };
-    let off = false, cust = null;
+    let off = false, cust = null, lastLeft = null;
+    onGone(o, () => { if (lastLeft) toDisplay({ mode: 'idle' }, true); });
     const load = async () => {
       try { B = await api(`/api/admin/tables/${tableId}/bill`); off = false; }
       catch (err) { if (!err.offline) throw err; B = offlineBill(tableId); off = true; }
@@ -1278,6 +1329,9 @@
         ? B.people.map(p => ({ gid: p.gid, name: p.name, amount: p.amount, due: Math.max(0, p.amount - paidBy(p.gid)), items: B.lines.filter(l => !l.shared && l.gid === p.gid) }))
         : Array.from({ length: n }, (_, i) => { const gid = 'eq' + (i + 1), each = Math.ceil(B.total / n), amt = i < n - 1 ? each : Math.max(0, Math.round(B.total) - each * (n - 1)); return { gid, name: 'Person ' + (i + 1), amount: amt, due: Math.max(0, amt - paidBy(gid)), items: [] }; });
       const Lc = S.me.restaurant.loyalty;
+      if (mode !== 'person' || !rows.some(r => r.gid === sel && r.due)) sel = null;
+      const selRow = sel && rows.find(r => r.gid === sel);
+      if (!off && B.lines.length) { lastLeft = left; toDisplay({ mode: 'bill', tableId, ...(mode === 'equal' && left ? { split: n, amount: Math.min(left, Math.ceil(B.total / n)) } : selRow ? { amount: selRow.due, who: selRow.name } : {}) }); }
       o.querySelector('.sheet').innerHTML = `<div class="sheet-head"><h3>${esc(B.table.name)} · Bill</h3><button class="icon-btn" data-close>${icon('x', 20)}</button></div>
       <div class="sheet-body cbill">
         ${off ? `<div class="hint" style="margin:0 0 12px;background:#FEF3C7;color:#78350F">${icon('wifi', 18)}<div><b>Offline.</b> This bill is made from the orders on this screen. Payments and clearing the table are saved and sync when the internet is back.</div></div>` : ''}
@@ -1294,9 +1348,10 @@
         ${mode === 'equal' ? `<div class="cb-n">Split between <button class="btn btn-sm" data-n="-1">−</button><b>${n}</b><button class="btn btn-sm" data-n="1">+</button> people · ${cur(Math.ceil(B.total / n))} each</div>` : ''}
         ${mode === 'one' ? `<div class="cb-row sel"><div class="cb-who"><b>Whole table</b><small>${B.lines.map(l => `${l.qty}× ${esc(l.name)}`).join(', ')}</small></div><div class="cb-amt">${cur(left)}</div>
             ${left ? `<div class="cb-pay">${Object.entries(M).map(([k, l]) => `<button class="btn btn-sm" data-pay="${k}" data-gid="table" data-name="Table" data-amt="${left}">${l}</button>`).join('')}</div>` : `<span class="badge badge-green">${icon('check', 13)} Paid</span>`}</div>`
-          : rows.map(r => `<div class="cb-row"><div class="cb-who"><b>${esc(r.name)}</b>${r.items.length ? `<small>${r.items.map(l => `${l.qty}× ${esc(l.name)}`).join(', ')}</small>` : ''}${B.paid.filter(p => p.gid === r.gid).map(p => `<small class="pd">${icon('check', 12)} ${cur(p.amount)} ${ML[p.method] || 'UPI'}${p.counter ? '' : ' (guest says paid)'}</small>`).join('')}</div>
+          : rows.map(r => `<div class="cb-row ${DISP() && r.gid === sel ? 'sel' : ''}"><div class="cb-who" ${DISP() && mode === 'person' && r.due && rows.length > 1 ? `data-show="${esc(r.gid)}" style="cursor:pointer"` : ''}><b>${esc(r.name)}</b>${r.items.length ? `<small>${r.items.map(l => `${l.qty}× ${esc(l.name)}`).join(', ')}</small>` : ''}${B.paid.filter(p => p.gid === r.gid).map(p => `<small class="pd">${icon('check', 12)} ${cur(p.amount)} ${ML[p.method] || 'UPI'}${p.counter ? '' : ' (guest says paid)'}</small>`).join('')}</div>
             <div class="cb-amt">${cur(r.amount)}</div>
             ${r.due ? `<div class="cb-pay">${Object.entries(M).map(([k, l]) => `<button class="btn btn-sm" data-pay="${k}" data-gid="${esc(r.gid)}" data-name="${esc(r.name)}" data-amt="${r.due}">${l}${r.due !== r.amount ? ' ' + cur(r.due) : ''}</button>`).join('')}</div>` : `<span class="badge badge-green">${icon('check', 13)} Paid</span>`}</div>`).join('')}
+        ${DISP() && !off && mode === 'person' && rows.filter(r => r.due).length > 1 ? `<p class="muted" style="font-size:13px;margin:4px 0 0">${icon('mobile', 14)} The customer screen shows the whole amount. Tap a name to show only that person's share${sel ? ', tap it again for the whole table' : ''}.</p>` : ''}
         ${mode === 'person' && B.lines.some(l => l.shared) ? `<p class="muted" style="font-size:13px">Shared by the table, split equally: ${B.lines.filter(l => l.shared).map(l => `${l.qty}× ${esc(l.name)}`).join(', ')}</p>` : ''}
         `}
       </div>
@@ -1307,6 +1362,7 @@
       </div>`;
       o.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { mode = b.dataset.m; if (mode === 'equal') n = Math.max(2, B.people.length); draw(); });
       o.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { n = Math.max(2, Math.min(30, n + Number(b.dataset.n))); draw(); });
+      o.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { sel = sel === b.dataset.show ? null : b.dataset.show; draw(); });
       const lgo = o.querySelector('#lgo'); if (lgo) { const lph = o.querySelector('#lph'); lph.onkeydown = e => { if (e.key === 'Enter') lgo.click(); };
         lgo.onclick = async () => { try { const x = await api(`/api/admin/tables/${tableId}/loyalty`, { method: 'POST', body: { phone: lph.value } }); cust = x.customer; B = x; draw(); } catch (err) { toast(esc(err.message), 'error'); } }; }
       const chg = o.querySelector('#chgP'); if (chg) chg.onclick = () => { cust = null; draw(); };
@@ -1322,7 +1378,7 @@
         if (left && !(await confirmBox('Clear table with money still due?', `${cur(left)} is not marked as paid yet.`, 'Clear table'))) return;
         if (off) { queue({ kind: 'settle', tableId }); delete S.offPaid[tableId]; S.orders = S.orders.filter(x => x.tableId !== tableId || x.status === 'new' || x.status === 'preparing'); saveCache(); }
         else await api(`/api/admin/tables/${tableId}/settle`, { method: 'POST' });
-        o.close();
+        if (!left) lastLeft = 0; o.close();
         S.requests = S.requests.filter(q => !(q.tableId === tableId && (q.type === 'bill' || q.type === 'paid'))); if (S.tab === 'orders') renderOrders(document.getElementById('content')); refreshBadges();
         toast(`${icon('check', 18)} ${esc(B.table.name)} is cleared for the next guests`, 'ok');
       };

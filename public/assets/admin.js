@@ -272,18 +272,66 @@
     };
   }
   // ---------- trial, license, buying ----------
+  // Plans are bought online with Razorpay when Veyra has switched it on (S.me.pay.on); otherwise the Buy buttons open WhatsApp.
   const inr = n => '₹' + Number(n).toLocaleString('en-IN');
+  const payOn = () => !!(S.me && S.me.pay && S.me.pay.on);
+  const PLAN_LABEL = { monthly: 'Monthly', yearly: 'Yearly', lifetime: 'Lifetime', updates: 'Update renewal' };
+  const fmtD = iso => new Date(String(iso).length === 10 ? iso + 'T00:00:00' : iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
   function buyLink(plan) {
     const r = S.me.restaurant;
     return S.me.buyUrl + encodeURIComponent(`Hi Veyra, I want to buy Veyra Dine In ${plan} (${plan === 'lifetime' ? inr(S.me.plans.lifetime) : plan === 'monthly' ? inr(S.me.plans.monthly) + '/month' : inr(S.me.plans.yearly) + '/year'}) for ${r.name}. My login email: ${r.email || r.slug}`);
   }
+  // a Buy button: pays online when Razorpay is on, else the old WhatsApp link
+  const buyBtn = (plan, cls, label) => payOn() ? `<button type="button" class="${cls}" data-pay="${plan}">${label}</button>` : `<a class="${cls}" href="${esc(buyLink(plan))}" target="_blank">${label}</a>`;
+  let razorLoad = null;
+  const loadRazorpay = () => razorLoad || (razorLoad = new Promise((ok, no) => { if (window.Razorpay) return ok(); const sc = document.createElement('script'); sc.src = 'https://checkout.razorpay.com/v1/checkout.js'; sc.onload = ok; sc.onerror = () => { razorLoad = null; no(new Error('Could not open the payment window. Check the internet and try again.')); }; document.head.appendChild(sc); }));
+  let payWait = null; // the "finish paying in your browser" box in the Windows app
+  async function startPay(plan, btn) {
+    if (!payOn()) { window.open(buyLink(plan), '_blank'); return; }
+    if (btn) btn.disabled = true;
+    try {
+      if (window.vdDesktop) { // the Windows app opens Razorpay in the normal browser, then this screen updates by itself
+        const { url } = await api('/api/admin/pay/link', { method: 'POST', body: { plan } });
+        window.open(url, '_blank');
+        const before = JSON.stringify(S.me.restaurant.access);
+        if (payWait) payWait.close();
+        payWait = modal(`<div class="sheet-head"><h3>Finish paying in your browser</h3><button class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body">
+          <p class="muted" style="margin:0 0 14px">We opened the Razorpay payment page in your web browser for the <b>${esc(PLAN_LABEL[plan])}</b> plan (${inr(S.me.plans[plan])}). Pay there by UPI, card or netbanking.</p>
+          <p class="muted" style="margin:0 0 18px">This screen switches on your plan by itself as soon as the payment goes through.</p>
+          <div class="pay-wait"><span class="spin"></span> Waiting for payment…</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px"><button class="btn" id="pwOpen">Open the payment page again</button><button class="btn" data-close>Close</button></div></div>`);
+        payWait.querySelector('#pwOpen').onclick = () => window.open(url, '_blank');
+        const box = payWait, tick = setInterval(async () => {
+          if (!document.body.contains(box)) return clearInterval(tick);
+          try { const me = await api('/api/admin/me'); if (JSON.stringify(me.restaurant.access) !== before) { clearInterval(tick); S.me = me; box.close(); renderPaid(); } } catch {}
+        }, 5000);
+        return;
+      }
+      const [o] = await Promise.all([api('/api/admin/pay/order', { method: 'POST', body: { plan } }), loadRazorpay()]);
+      const rz = new window.Razorpay({
+        key: o.keyId, order_id: o.orderId, amount: o.amount, currency: o.currency, name: o.name, description: o.description,
+        prefill: o.prefill, notes: { plan }, theme: { color: '#E4572E' },
+        handler: async resp => {
+          try { const r = await api('/api/admin/pay/verify', { method: 'POST', body: resp }); S.me.restaurant = r.restaurant; renderPaid(r.payment); }
+          catch (err) { toast(esc(err.message), 'error'); }
+        },
+        modal: { ondismiss: () => { if (btn) btn.disabled = false; } },
+      });
+      rz.on('payment.failed', resp => toast(esc((resp.error && resp.error.description) || 'Payment failed. No money was taken. Please try again.'), 'error'));
+      rz.open();
+      if (o.mode === 'test') toast('Test mode: use a Razorpay test card or UPI success@razorpay. No real money is taken.');
+    } catch (err) { toast(esc(err.message), 'error'); }
+    finally { if (btn) setTimeout(() => { btn.disabled = false; }, 1500); }
+  }
+  document.addEventListener('click', e => { const b = e.target.closest('[data-pay]'); if (b) { e.preventDefault(); const o = b.closest('.overlay'); if (o) o.remove(); startPay(b.dataset.pay, b); } });
   // A paid plan is 'ending soon' 7 days before a monthly plan ends, 30 days before a yearly one. A trial always shows the bar.
   const endingSoon = a => a.plan === 'trial' || (a.plan === 'monthly' && a.daysLeft <= 7) || (a.plan === 'yearly' && a.daysLeft <= 30);
   function trialBar() {
     const a = S.me.restaurant.access;
     if (!a || a.plan === 'lifetime' || !endingSoon(a)) return '';
     const label = a.plan === 'trial' ? `Free trial <span class="days">${a.daysLeft} day${a.daysLeft === 1 ? '' : 's'} left</span> Everything you set up stays when you buy.` : `Your ${a.plan === 'monthly' ? 'monthly' : 'yearly'} plan ends in <span class="days">${a.daysLeft} day${a.daysLeft === 1 ? '' : 's'}</span>`;
-    return `<div class="trial-bar">${icon('clock', 18)} ${label}<a class="btn btn-sm btn-primary" href="${esc(buyLink('lifetime'))}" target="_blank">Buy lifetime ${inr(S.me.plans.lifetime)}</a><button class="btn btn-sm" data-license>Enter license key</button></div>`;
+    return payOn() ? `<div class="trial-bar">${icon('clock', 18)} ${label}<button class="btn btn-sm btn-primary" data-license>${a.plan === 'trial' ? 'Buy a plan' : 'Renew now'}</button></div>`
+      : `<div class="trial-bar">${icon('clock', 18)} ${label}<a class="btn btn-sm btn-primary" href="${esc(buyLink('lifetime'))}" target="_blank">Buy lifetime ${inr(S.me.plans.lifetime)}</a><button class="btn btn-sm" data-license>Enter license key</button></div>`;
   }
   function keyForm(onDone) {
     return { html: `<label class="field"><span>License key</span><div class="key-row"><input class="input" id="lk" placeholder="VEYRA-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false"><button class="btn btn-primary" id="lkBtn" type="button">Activate</button></div></label>`,
@@ -295,14 +343,26 @@
         };
       } };
   }
+  function planCards() {
+    const P = S.me.plans;
+    const card = (plan, best, sub) => payOn() ? `<button type="button" class="buy${best ? ' best' : ''}" data-pay="${plan}"><b>${PLAN_LABEL[plan]}</b><div class="pr">${inr(P[plan])}</div><small>${sub}</small><span class="buy-go">Pay ${inr(P[plan])}</span></button>`
+      : `<a class="buy${best ? ' best' : ''}" href="${esc(buyLink(plan))}" target="_blank"><b>${PLAN_LABEL[plan]}</b><div class="pr">${inr(P[plan])}</div><small>${sub}</small></a>`;
+    return `<div class="buy-row">${card('lifetime', true, 'Pay once. 1 year of updates')}${card('yearly', false, 'per year')}${card('monthly', false, 'per month')}</div>`;
+  }
+  const payNote = () => `<p class="pay-note">${icon('check', 16)}<span>Pay by UPI, card or netbanking. Your plan starts the moment you pay, with no key to enter. No GST.${S.me.pay && S.me.pay.mode === 'test' ? ' <b>(Test mode: no real money is taken.)</b>' : ''}</span></p>`;
   function buyOptions() {
-    return `<div class="or">Don't have a key?</div><div class="buy-row">
-      <a class="buy best" href="${esc(buyLink('lifetime'))}" target="_blank"><b>Lifetime</b><div class="pr">${inr(S.me.plans.lifetime)}</div><small>Pay once, use forever</small></a>
-      <a class="buy" href="${esc(buyLink('yearly'))}" target="_blank"><b>Yearly</b><div class="pr">${inr(S.me.plans.yearly)}</div><small>per year</small></a>
-      <a class="buy" href="${esc(buyLink('monthly'))}" target="_blank"><b>Monthly</b><div class="pr">${inr(S.me.plans.monthly)}</div><small>per month</small></a></div>
+    return `<div class="or">Don't have a key?</div>${planCards()}
       <div class="help">${icon('phone', 18)} Need help? WhatsApp <a href="https://wa.me/918928246726" target="_blank">+91 89282 46726</a></div>`;
   }
   function licenseModal() {
+    if (payOn()) {
+      const a = S.me.restaurant.access;
+      const kf = keyForm(() => { o.close(); renderActivated(); });
+      const o = modal(`<div class="sheet-head"><h3>${a.plan === 'trial' ? 'Choose your plan' : 'Renew your plan'}</h3><button class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body">
+        <p class="muted" style="margin:0 0 16px">Everything you set up stays as it is.${a.plan !== 'trial' && a.daysLeft > 0 ? ' Paying early adds the new time after your current plan ends.' : ''}</p>${planCards()}${payNote()}
+        <details class="have-key"><summary>Have a license key from Veyra?</summary>${kf.html}</details></div>`, { wide: true });
+      kf.bind(o); return;
+    }
     const kf = keyForm(() => { o.close(); renderActivated(); });
     const o = modal(`<div class="sheet-head"><h3>Enter license key</h3><button class="icon-btn" data-close>${icon('x', 20)}</button></div><div class="sheet-body">
       <p class="muted" style="margin:0 0 16px">You get the key on WhatsApp or email after you pay.</p>${kf.html}${buyOptions()}</div>`, { wide: true });
@@ -312,22 +372,42 @@
     if (es) { es.close(); es = null; }
     const a = S.me.restaurant.access;
     const kf = keyForm(renderActivated);
-    app.innerHTML = `<div class="activate-page"><div class="act-card"><div class="big-ic">${icon('clock', 32)}</div>
-      <h2>${a.plan === 'trial' ? 'Your free trial has ended' : a.plan === 'suspended' ? 'Your license is paused' : 'Your plan has ended'}</h2>${a.plan === 'suspended' ? '<p class="muted">Please contact Veyra on WhatsApp +91 89282 46726.</p>' : ''}
+    const title = a.plan === 'trial' ? 'Your free trial has ended' : a.plan === 'suspended' ? 'Your license is paused' : 'Your plan has ended';
+    app.innerHTML = payOn() && a.plan !== 'suspended' ? `<div class="activate-page"><div class="act-card"><div class="big-ic">${icon('clock', 32)}</div>
+      <h2>${title}</h2><p class="muted">Your menu, tables and QR codes are all saved. Choose a plan to start taking orders again. It switches on the moment you pay.</p>
+      ${planCards()}${payNote()}
+      <details class="have-key"><summary>Have a license key from Veyra?</summary>${kf.html}</details>
+      <div class="small-link" style="text-align:left"><a href="#" id="lo2">Log out</a></div></div></div>`
+      : `<div class="activate-page"><div class="act-card"><div class="big-ic">${icon('clock', 32)}</div>
+      <h2>${title}</h2>${a.plan === 'suspended' ? '<p class="muted">Please contact Veyra on WhatsApp +91 89282 46726.</p>' : ''}
       <p class="muted">Your menu, tables and QR codes are all saved. Enter your license key to start taking orders again.</p>
       ${kf.html}${buyOptions()}
       <div class="small-link" style="text-align:left"><a href="#" id="lo2">Log out</a></div></div></div>`;
     kf.bind(app);
     document.getElementById('lo2').onclick = async e => { e.preventDefault(); await api('/api/admin/logout', { method: 'POST' }); renderLogin('login'); };
   }
+  const planLine = a => a.plan === 'lifetime' ? 'Lifetime' : (a.plan === 'monthly' ? 'Monthly' : 'Yearly') + (a.until ? ', until ' + fmtD(a.until) : '');
+  // after an online payment: thank-you screen with the receipt
+  function renderPaid(pay) {
+    if (payWait) { payWait.close(); payWait = null; }
+    if (es) { es.close(); es = null; }
+    const r = S.me.restaurant, a = r.access, lic = r.license || {};
+    const upd = pay && pay.plan === 'updates';
+    app.innerHTML = `<div class="activate-page"><div class="act-card success"><div class="big-ic">${icon('check', 34)}</div>
+      <h2>${upd ? 'Updates renewed' : "Payment received. You're all set"}</h2><p class="muted">${upd ? 'Thank you. Your app gets new features and fixes for another year.' : 'Thank you for buying Veyra Dine In. Your plan is active now. There is no key to enter.'}${r.email && S.me.pay && S.me.pay.email ? ` The receipt is on its way to <b>${esc(r.email)}</b>.` : ''}</p>
+      <div class="lic-box"><span>Restaurant</span><b>${esc(r.name)}</b><span>Plan</span><b>${esc(planLine(a))}</b><span>Updates</span><b>${lic.updatesUntil && a.plan === 'lifetime' ? 'Until ' + fmtD(lic.updatesUntil) : 'Included'}</b>${pay ? `<span>Paid</span><b>${inr(pay.amount)}</b><span>Receipt</span><b>${esc(pay.receipt)}</b>` : ''}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary btn-lg" id="goOrders" style="flex:1">Go to live orders</button>${pay ? `<a class="btn btn-lg" href="/receipt/${esc(pay.id)}" target="_blank">${icon('download', 18)} Receipt</a>` : ''}</div></div></div>`;
+    document.getElementById('goOrders').onclick = () => { S.tab = 'orders'; boot(); };
+  }
   function renderActivated() {
     const r = S.me.restaurant;
     app.innerHTML = `<div class="activate-page"><div class="act-card success"><div class="big-ic">${icon('check', 34)}</div>
       <h2>You're all set</h2><p class="muted">Thank you for buying Veyra Dine In. Your restaurant is fully activated.</p>
-      <div class="lic-box"><span>Restaurant</span><b>${esc(r.name)}</b><span>Plan</span><b>${r.access.plan === 'lifetime' ? 'Lifetime' : 'Yearly, until ' + new Date(r.access.until).toLocaleDateString()}</b><span>Updates</span><b>Included</b></div>
+      <div class="lic-box"><span>Restaurant</span><b>${esc(r.name)}</b><span>Plan</span><b>${esc(planLine(r.access))}</b><span>Updates</span><b>Included</b></div>
       <button class="btn btn-primary btn-lg btn-block" id="goOrders">Go to live orders</button></div></div>`;
     document.getElementById('goOrders').onclick = () => { S.tab = 'orders'; boot(); };
   }
+
 
   // ---------- shell ----------
   const TABS = [['orders', 'Live orders', 'bell'], ['history', 'Sales by date', 'history'], ['menu', 'Menu', 'book'], ['offers', 'Coupons', 'star'], ['tables', 'Tables & QR', 'qr'], ['branding', 'Branding', 'palette'], ['settings', 'Settings', 'settings']];
@@ -705,6 +785,12 @@
       toast(`${icon(REQ[q.type][0], 18)} <b>${esc(q.tableName)}</b>&nbsp;${reqText(q)}`);
       if (S.tab === 'orders') renderOrders(document.getElementById('content')); refreshBadges();
     });
+    es.addEventListener('plan', e => { // a plan payment went through (maybe from another device or the webhook)
+      const d = JSON.parse(e.data); if (!d.restaurant) return;
+      S.me.restaurant = d.restaurant; if (payWait) return renderPaid();
+      toast(`${icon('check', 18)} Payment received. Your plan: ${esc(planLine(d.restaurant.access))}`, 'ok');
+      if (S.tab === 'settings') renderShell();
+    });
     es.addEventListener('request-done', e => { const { id } = JSON.parse(e.data); S.requests = S.requests.filter(q => q.id !== id); if (S.tab === 'orders') renderOrders(document.getElementById('content')); refreshBadges(); });
     es.onerror = () => setTimeout(drawNet, 50);
     es.onopen = () => { drawNet(); return loadLive().then(() => { if (S.tab === 'orders') renderOrders(document.getElementById('content')); refreshBadges(); }).catch(() => {}); };
@@ -1033,10 +1119,12 @@
     const planTxt = a.plan === 'lifetime' ? 'Lifetime' : (a.plan === 'yearly' || a.plan === 'monthly') ? `${a.plan === 'monthly' ? 'Monthly' : 'Yearly'}, until ${new Date(a.until).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}` : `Free trial, ${a.daysLeft} day${a.daysLeft === 1 ? '' : 's'} left`;
     const keyTxt = lic ? (lic.code || lic.key.slice(0, 18) + '…') : '';
     c.innerHTML = `<div style="display:grid;gap:18px;max-width:720px">
-      <div class="panel" id="planPanel"><div class="panel-head"><h2>Plan and license</h2>${endingSoon(a) || (lic && lic.updatesUntil && lic.updatesUntil < new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10)) ? '<button class="btn btn-sm btn-primary" data-license>Enter license key</button>' : ''}</div><div class="panel-body form">
-        <div class="lic-box" style="margin:0"><span>Plan</span><b>${esc(planTxt)}</b>${lic ? `<span>Licensed to</span><b>${esc(lic.to)}</b><span>License key</span><b style="font-family:ui-monospace,Consolas,monospace;word-break:break-all">${esc(keyTxt)}</b>${lic.at ? `<span>Activated</span><b>${new Date(lic.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</b>` : ''}` : ''}<span>Updates</span><b>${a.plan === 'trial' ? 'Included after you buy' : lic && lic.updatesUntil ? (lic.updatesUntil >= new Date().toISOString().slice(0, 10) ? 'Included until ' : 'Ended on ') + new Date(lic.updatesUntil + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Included'}</b></div>
-        ${a.plan === 'lifetime' && lic && lic.updatesUntil && lic.updatesUntil < new Date().toISOString().slice(0, 10) ? `<p class="muted" style="margin:0">Your app keeps working. To get the newest features again, renew updates on <a href="https://wa.me/918928246726?text=${encodeURIComponent('Hi Veyra, I want to renew Veyra Dine In updates for ' + r.name)}" target="_blank">WhatsApp +91 89282 46726</a> and enter the new key above.</p>` : ''}
-        <div style="display:flex;gap:8px;flex-wrap:wrap">${lic ? `<button class="btn" id="cpyKey">${icon('copy', 18)} Copy license key</button>` : `<a class="btn btn-primary" href="${esc(buyLink('lifetime'))}" target="_blank">Buy lifetime ${inr(S.me.plans.lifetime)}</a><a class="btn" href="${esc(buyLink('yearly'))}" target="_blank">Buy yearly ${inr(S.me.plans.yearly)}</a><a class="btn" href="${esc(buyLink('monthly'))}" target="_blank">Buy monthly ${inr(S.me.plans.monthly)}</a>`}<a class="btn" href="https://dinein.veyracreatives.com/download/Veyra-Dine-In-Setup.exe">${icon('download', 18)} Download Windows app</a></div>
+      <div class="panel" id="planPanel"><div class="panel-head"><h2>Plan and license</h2>${payOn() ? (a.plan !== 'lifetime' && endingSoon(a) ? `<button class="btn btn-sm btn-primary" data-license>${a.plan === 'trial' ? 'Buy a plan' : 'Renew now'}</button>` : '') : endingSoon(a) || (lic && lic.updatesUntil && lic.updatesUntil < new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10)) ? '<button class="btn btn-sm btn-primary" data-license>Enter license key</button>' : ''}</div><div class="panel-body form">
+        <div class="lic-box" style="margin:0"><span>Plan</span><b>${esc(planTxt)}</b>${lic ? `<span>Licensed to</span><b>${esc(lic.to)}</b>${lic.online ? '<span>Bought</span><b>Online (Razorpay)</b>' : `<span>License key</span><b style="font-family:ui-monospace,Consolas,monospace;word-break:break-all">${esc(keyTxt)}</b>`}${lic.at ? `<span>Activated</span><b>${fmtD(lic.at)}</b>` : ''}` : ''}<span>Updates</span><b>${a.plan === 'trial' ? 'Included after you buy' : a.plan === 'lifetime' && lic && lic.updatesUntil ? (lic.updatesUntil >= new Date().toISOString().slice(0, 10) ? 'Included until ' : 'Ended on ') + fmtD(lic.updatesUntil) : 'Included'}</b></div>
+        ${a.plan === 'lifetime' && lic && lic.updatesUntil && lic.updatesUntil < new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10) ? `<p class="muted" style="margin:0">${lic.updatesUntil < new Date().toISOString().slice(0, 10) ? 'Your app keeps working as it is.' : 'Your year of updates ends soon. Your app keeps working after that.'} To keep getting new features, renew updates for one more year${payOn() ? ` for ${inr(S.me.plans.updates)}.` : ` on <a href="https://wa.me/918928246726?text=${encodeURIComponent('Hi Veyra, I want to renew Veyra Dine In updates for ' + r.name)}" target="_blank">WhatsApp +91 89282 46726</a> and enter the new key above.`}</p>` : ''}
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${a.plan === 'lifetime' ? `${lic && lic.key ? `<button class="btn" id="cpyKey">${icon('copy', 18)} Copy license key</button>` : ''}${payOn() && lic && lic.updatesUntil && lic.updatesUntil < new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10) ? `<button class="btn btn-primary" data-pay="updates">Renew updates ${inr(S.me.plans.updates)}</button>` : ''}` : `${buyBtn('lifetime', 'btn btn-primary', 'Buy lifetime ' + inr(S.me.plans.lifetime))}${buyBtn('yearly', 'btn', (a.plan === 'yearly' ? 'Renew yearly ' : 'Buy yearly ') + inr(S.me.plans.yearly))}${buyBtn('monthly', 'btn', (a.plan === 'monthly' ? 'Renew monthly ' : 'Buy monthly ') + inr(S.me.plans.monthly))}${lic && lic.key ? `<button class="btn" id="cpyKey">${icon('copy', 18)} Copy license key</button>` : ''}`}<a class="btn" href="https://dinein.veyracreatives.com/download/Veyra-Dine-In-Setup.exe">${icon('download', 18)} Download Windows app</a></div>
+        ${payOn() && a.plan !== 'lifetime' ? payNote() : ''}
+        <div id="payHist"></div>
       </div></div>
       <div class="panel" id="phonePanel"></div>
       <div class="panel" id="waitP"><div class="panel-head"><div><h2>Waiters</h2><span class="muted" style="font-size:14px">Waiters take orders on their own phones: tap the table, add dishes, send to the kitchen. They also see calls from tables and when food is ready.</span></div></div><div class="panel-body form">
@@ -1129,6 +1217,9 @@
     const gbb = document.getElementById('gbBtn'); if (gbb) gbb.onclick = gameBoard;
     const gameF = document.getElementById('gameF');
     gameF.onsubmit = async e => { e.preventDefault(); const f = new FormData(gameF); try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { games: { on: !!f.get('on'), reward: f.get('reward'), ...(f.get('points') != null ? { points: f.get('points') } : {}) } } }); saveCache(); toast('Games saved', 'ok'); renderTab(); } catch (err) { toast(esc(err.message), 'error'); } };
+    api('/api/admin/pay/history').then(list => { const el = document.getElementById('payHist'); if (!el || !list.length) return;
+      el.innerHTML = `<h3 class="pay-h">Payments</h3><div class="pay-list">${list.map(x => `<div class="pay-row"><div><b>${esc(x.planName)}</b><small>${fmtD(x.paidAt)} · ${esc(x.receipt)}${x.mode === 'test' ? ' · test' : ''}</small></div><span class="amt">${inr(x.amount)}</span><a class="btn btn-sm" href="/receipt/${esc(x.id)}" target="_blank">Receipt</a></div>`).join('')}</div>`;
+    }).catch(() => {});
     const ck = document.getElementById('cpyKey'); if (ck) ck.onclick = async () => { const k = lic.code || lic.key; try { await navigator.clipboard.writeText(k); toast('License key copied'); } catch { prompt('Your license key', k); } };
     c.querySelectorAll('[data-license]').forEach(b => b.onclick = licenseModal);
     document.getElementById('ideaF').onsubmit = async e => { e.preventDefault(); const f = new FormData(e.target); try { await api('/api/requests', { method: 'POST', body: { type: f.get('type'), message: f.get('message') } }); e.target.reset(); toast(`${icon('check', 18)} Sent. Thank you!`, 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
@@ -1381,6 +1472,8 @@
       S.offline = false; goOffline(); renderShell(); return;
     }
     if (window.vdDesktop) { window.vdDesktop.ready({ name: S.me.restaurant.name, access: S.me.restaurant.access }); unlockAudio(); }
+    const buyQ = (/[?&]buy=(monthly|yearly|lifetime)\b/.exec(location.search) || [])[1];
+    if (buyQ) { history.replaceState(null, '', location.pathname + location.hash); if (S.me.restaurant.access.plan !== 'lifetime') setTimeout(() => startPay(buyQ), 300); }
     if (!S.me.restaurant.access.active) return renderActivate();
     const h = location.hash.slice(1); if (TABS.some(t => t[0] === h)) S.tab = h;
     await loadLive().catch(() => {});

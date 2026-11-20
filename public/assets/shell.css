@@ -86,7 +86,7 @@
 .tabs2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px; background: #fff; border: 1px solid var(--line); border-radius: 14px; margin-bottom: 24px; }
 .tabs2 button { height: 42px; border: 0; border-radius: 10px; background: none; font-weight: 750; color: var(--ink-2); }
 .tabs2 button.on { background: var(--ink); color: #fff; }
-.activate-page { min-height: 100vh; display: grid; place-items: center; background: var(--cream); padding: 24px; }
+.activate-page { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 620px); justify-content: center; align-content: center; background: var(--cream); padding: 24px 16px; }
 .act-card { max-width: 100%; }
 .trial-bar.ended { background: var(--red-soft); border-color: #F5B5AE; color: var(--red); }
 @media (max-width: 860px) {

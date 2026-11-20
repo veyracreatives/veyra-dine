@@ -47,7 +47,7 @@ function syncInstaller() {
 let syncT = null; const syncSoon = () => { if (!syncT) syncT = setTimeout(() => { syncT = null; syncInstaller(); }, 2000); };
 if (process.env.DL_MIRROR !== '0' && !process.versions.electron) { setTimeout(syncInstaller, 5000); setInterval(syncInstaller, 15 * 60 * 1000).unref(); }
 // Plans and where the "Buy" buttons go. Change prices here.
-const PLANS = { trialDays: 10, monthly: 799, yearly: 5999, lifetime: 24999 };
+const PLANS = { trialDays: 10, monthly: 799, yearly: 5999, lifetime: 24999, updates: 3999 }; // updates = lifetime update renewal for 1 year
 const TERM_PLANS = ['monthly', 'yearly']; // paid plans that run until a date
 let siteCache = null; // landing page with HQ edits applied
 const BUY_URL = process.env.BUY_URL || 'https://wa.me/918928246726?text=';
@@ -56,7 +56,7 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 // ---------- tiny JSON database ----------
 let db = { config: {}, restaurants: [], categories: [], items: [], tables: [], orders: [], requests: [], coupons: [] };
 if (fs.existsSync(DB_FILE)) db = Object.assign(db, JSON.parse(fs.readFileSync(DB_FILE, 'utf8')));
-if (db.siteContent && db.siteContent.prices) for (const k of ['lifetime', 'yearly', 'monthly']) if (Number(db.siteContent.prices[k]) > 0) PLANS[k] = Number(db.siteContent.prices[k]);
+if (db.siteContent && db.siteContent.prices) for (const k of ['lifetime', 'yearly', 'monthly', 'updates']) if (Number(db.siteContent.prices[k]) > 0) PLANS[k] = Number(db.siteContent.prices[k]);
 if (!db.coupons) db.coupons = [];
 if (!db.guests) db.guests = [];
 if (!db.config.secret) db.config.secret = crypto.randomBytes(32).toString('hex');
@@ -265,6 +265,111 @@ function access(r) {
   const daysLeft = until ? Math.ceil((Date.parse(until) - Date.now()) / DAY) : 0;
   return { plan, active: daysLeft > 0, daysLeft: Math.max(0, daysLeft), until };
 }
+// ---------- Razorpay: restaurants buy Veyra Dine In plans online ----------
+// Only for plan payments to Veyra (monthly, yearly, lifetime, lifetime update renewal). Never for guest bills.
+// Keys come from env (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET) or /platform > Online payments.
+const rzp = require('./lib/razorpay');
+const PAY_PLANS = ['monthly', 'yearly', 'lifetime', 'updates'];
+const PLAN_NAMES = { monthly: 'Monthly plan', yearly: 'Yearly plan', lifetime: 'Lifetime license', updates: 'Lifetime update renewal (1 year)' };
+function rzpCfg() {
+  if (HUB) return null;
+  const e = process.env;
+  const c = e.RAZORPAY_KEY_ID ? { keyId: e.RAZORPAY_KEY_ID, keySecret: e.RAZORPAY_KEY_SECRET, webhookSecret: e.RAZORPAY_WEBHOOK_SECRET || '', fromEnv: true } : (db.config.razorpay || null);
+  return c && c.keyId && c.keySecret ? Object.assign({ mode: /^rzp_live_/.test(c.keyId) ? 'live' : 'test' }, c) : null;
+}
+const addYear = (iso, n = 1) => { const d = new Date(iso); d.setUTCFullYear(d.getUTCFullYear() + n); return d.toISOString(); };
+// What a restaurant may buy right now, or why not.
+function payCheck(r, plan) {
+  if (!PAY_PLANS.includes(plan)) return 'Choose Monthly, Yearly or Lifetime';
+  if (r.suspended) return 'This account is paused. Please contact Veyra.';
+  const a = access(r);
+  if (plan === 'updates') return a.plan === 'lifetime' ? null : 'Update renewal is only for lifetime licenses';
+  if (a.plan === 'lifetime') return 'You already have a lifetime license';
+  return null;
+}
+// Turn a paid Razorpay order into a plan. Safe to call twice (checkout + webhook): it only applies once.
+function applyPayment(pay, info = {}) {
+  if (pay.status === 'paid') return false;
+  const r = db.restaurants.find(x => x.id === pay.rid); if (!r) return false;
+  const t = now(), today = t.slice(0, 10);
+  if (pay.plan === 'monthly' || pay.plan === 'yearly') {
+    const cur = TERM_PLANS.includes(r.plan) && r.paidUntil && Date.parse(r.paidUntil) > Date.now() ? r.paidUntil : t; // renewing early adds on to the end
+    r.paidUntil = pay.plan === 'monthly' ? new Date(Date.parse(cur) + 30 * DAY).toISOString() : addYear(cur);
+    if (!(r.plan === 'yearly' && pay.plan === 'monthly' && cur !== t)) r.plan = pay.plan; // a month added to a running yearly plan stays 'Yearly'
+  } else if (pay.plan === 'lifetime') {
+    r.plan = 'lifetime'; r.paidUntil = null; r.updatesUntil = addYear(today + 'T00:00:00Z').slice(0, 10);
+  } else if (pay.plan === 'updates') {
+    const cur = r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null);
+    r.updatesUntil = addYear((cur && cur > today ? cur : today) + 'T00:00:00Z').slice(0, 10);
+  }
+  r.paidVia = 'razorpay'; r.activatedAt = r.activatedAt || t; r.lastPaymentId = pay.id;
+  db.config.paySeq = (db.config.paySeq || 0) + 1;
+  Object.assign(pay, { status: 'paid', paidAt: t, paymentId: info.paymentId || pay.paymentId || '', method: info.method || pay.method || '', via: info.via || 'checkout',
+    receipt: `VDP-${t.slice(0, 4)}-${String(db.config.paySeq).padStart(4, '0')}`, until: r.plan === 'lifetime' ? null : r.paidUntil, updatesUntil: r.updatesUntil || null });
+  save();
+  emit(r.id, 'plan', { restaurant: adminRestaurant(r) });
+  payEmail(r, pay).catch(e => console.log('[pay] receipt email failed:', e.message));
+  console.log(`[pay] ${pay.receipt} ${r.name}: ${pay.plan} ₹${pay.amount} (${pay.mode})`);
+  return true;
+}
+const fmtDate = iso => iso ? new Date(String(iso).length === 10 ? iso + 'T00:00:00Z' : iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' }) : '';
+const inrTxt = n => '₹' + Number(n).toLocaleString('en-IN');
+function payLines(pay) {
+  return [['Receipt', pay.receipt], ['Date', fmtDate(pay.paidAt)], ['Plan', PLAN_NAMES[pay.plan]], ['Amount paid', inrTxt(pay.amount)],
+    pay.plan === 'lifetime' ? ['Valid', 'Lifetime'] : pay.until && pay.plan !== 'updates' ? ['Active until', fmtDate(pay.until)] : null,
+    pay.updatesUntil && (pay.plan === 'lifetime' || pay.plan === 'updates') ? ['Updates until', fmtDate(pay.updatesUntil)] : null,
+    pay.mode === 'manual' ? (pay.paymentId ? ['Reference', pay.paymentId] : null) : ['Razorpay payment ID', pay.paymentId || '-'], pay.method ? ['Paid by', pay.method === 'netbanking' ? 'Netbanking' : pay.method.length <= 4 ? pay.method.toUpperCase() : pay.method[0].toUpperCase() + pay.method.slice(1)] : null].filter(Boolean);
+}
+async function payEmail(r, pay) {
+  const cfg = smtpCfg(); if (!cfg || !r.email) return;
+  const lines = payLines(pay);
+  const text = `Hi ${r.ownerName || r.name},\n\nThank you for buying Veyra Dine In. Your payment is received and your plan is already active. There is no key to enter: just open your admin.\n\nRestaurant: ${r.name}\n${lines.map(([a, b]) => a + ': ' + b).join('\n')}\n\nAdmin: https://dinein.veyracreatives.com/admin/${r.slug}\n\nNo GST is charged. Need help? Just reply to this email.\n\nVeyra Creative & Digital Lab`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:520px;color:#1f1a14"><h2 style="margin:0 0 6px">Payment received</h2><p>Hi ${escH(r.ownerName || r.name)},<br>Thank you for buying Veyra Dine In. Your plan is already active. There is no key to enter: just open your admin.</p>
+<table style="border-collapse:collapse;width:100%;font-size:14px"><tr><td style="padding:6px 0;color:#7a6f63">Restaurant</td><td style="padding:6px 0;font-weight:bold">${escH(r.name)}</td></tr>${lines.map(([a, b]) => `<tr><td style="padding:6px 0;color:#7a6f63;border-top:1px solid #eee">${escH(a)}</td><td style="padding:6px 0;font-weight:bold;border-top:1px solid #eee">${escH(b)}</td></tr>`).join('')}</table>
+<p><a href="https://dinein.veyracreatives.com/admin/${encodeURIComponent(r.slug)}" style="display:inline-block;background:#E4572E;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open my admin</a></p><p style="color:#7a6f63;font-size:13px">No GST is charged. Need help? Just reply to this email.<br>Veyra Creative &amp; Digital Lab</p></div>`;
+  await mailer.send(cfg, { to: r.email, subject: `Payment received: Veyra Dine In ${PLAN_NAMES[pay.plan]} (${pay.receipt})`, text, html });
+  pay.emailed = now(); save();
+}
+async function payOrder(r, plan, req) {
+  const cfg = rzpCfg(); if (!cfg) { const e = new Error('Online payment is not set up yet'); e.status = 400; throw e; }
+  const why = payCheck(r, plan); if (why) { const e = new Error(why); e.status = 400; throw e; }
+  const amount = Number(PLANS[plan]); if (!(amount > 0)) { const e = new Error('This plan has no price yet'); e.status = 400; throw e; }
+  db.payments = db.payments || [];
+  const pid = id(12);
+  const o = await rzp.call(cfg, 'POST', '/v1/orders', { amount: Math.round(amount * 100), currency: 'INR', receipt: pid, notes: { restaurant: r.name.slice(0, 200), restaurant_id: r.id, slug: r.slug, plan } });
+  db.payments.push({ id: pid, rid: r.id, name: r.name, plan, amount, orderId: o.id, status: 'created', mode: cfg.mode, createdAt: now(), ip: clientIp(req) });
+  if (db.payments.length > 5000) db.payments = db.payments.filter(x => x.status === 'paid').concat(db.payments.filter(x => x.status !== 'paid').slice(-500));
+  save();
+  return { keyId: cfg.keyId, orderId: o.id, amount: o.amount, currency: 'INR', mode: cfg.mode, plan, planName: PLAN_NAMES[plan], payId: pid,
+    name: 'Veyra Dine In', description: `${PLAN_NAMES[plan]} for ${r.name}`, prefill: { name: r.ownerName || '', email: r.email || '', contact: (r.ownerPhone || '').replace(/[^\d+]/g, '') } };
+}
+function payVerify(r, b) {
+  const cfg = rzpCfg(); if (!cfg) { const e = new Error('Online payment is not set up'); e.status = 400; throw e; }
+  const pay = (db.payments || []).find(x => x.orderId === b.razorpay_order_id && x.rid === r.id);
+  if (!pay) { const e = new Error('Payment not found'); e.status = 404; throw e; }
+  if (!rzp.checkPayment(cfg, b.razorpay_order_id, b.razorpay_payment_id, b.razorpay_signature)) { const e = new Error('We could not confirm this payment. If money was taken, it will be activated automatically within a few minutes, or refunded.'); e.status = 400; throw e; }
+  applyPayment(pay, { paymentId: str(b.razorpay_payment_id, 60), via: 'checkout' });
+  return pay;
+}
+const payView = x => ({ id: x.id, plan: x.plan, planName: PLAN_NAMES[x.plan], amount: x.amount, status: x.status, receipt: x.receipt || '', paidAt: x.paidAt || null, createdAt: x.createdAt, paymentId: x.paymentId || '', orderId: x.orderId, method: x.method || '', mode: x.mode, until: x.until || null, updatesUntil: x.updatesUntil || null, emailed: !!x.emailed });
+// Pay link for the Windows app: payment opens in the normal browser (no login there), signed and valid for 2 hours.
+const payToken = (r, plan) => sign(['pay', r.id, plan, Date.now() + 2 * 3600000].join('|'));
+function payTokenOf(t) {
+  const v = unsign(String(t || '')); if (!v) return null;
+  const [k, rid, plan, exp] = v.split('|');
+  if (k !== 'pay' || Date.now() > Number(exp)) return null;
+  const r = db.restaurants.find(x => x.id === rid);
+  return r ? { r, plan } : null;
+}
+function receiptHtml(r, pay) {
+  const rows = payLines(pay).map(([a, b]) => `<tr><td>${escH(a)}</td><td>${escH(b)}</td></tr>`).join('');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Receipt ${escH(pay.receipt)} · Veyra Dine In</title>
+<style>body{font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#FBF6EE;color:#1f1a14;margin:0;padding:24px 16px}.r{max-width:560px;margin:0 auto;background:#fff;border-radius:18px;padding:32px;box-shadow:0 10px 40px rgba(60,40,20,.08)}h1{font-size:22px;margin:0}.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:22px;flex-wrap:wrap}.paid{background:#E7F6EC;color:#166534;font-weight:800;border-radius:99px;padding:4px 12px;font-size:13px}table{width:100%;border-collapse:collapse}td{padding:10px 0;border-top:1px solid #eee;vertical-align:top}td:first-child{color:#7a6f63;width:45%}td:last-child{font-weight:700;word-break:break-word}.muted{color:#7a6f63;font-size:13px;margin-top:20px}button{margin-top:20px;font:inherit;font-weight:700;background:#E4572E;color:#fff;border:0;border-radius:10px;padding:11px 20px;cursor:pointer}@media print{body{background:#fff;padding:0}.r{box-shadow:none}button{display:none}}</style></head>
+<body><div class="r"><div class="top"><div><h1>Payment receipt</h1><div class="muted" style="margin:2px 0 0">Veyra Creative &amp; Digital Lab · Veyra Dine In</div></div><span class="paid">PAID</span></div>
+<table><tr><td>Billed to</td><td>${escH(r.name)}${r.ownerName ? '<br>' + escH(r.ownerName) : ''}${r.email ? '<br>' + escH(r.email) : ''}</td></tr>${rows}</table>
+<p class="muted">Software delivered online. No GST is charged.${pay.mode === 'test' ? ' TEST PAYMENT: no real money was taken.' : ''}</p><button onclick="print()">Print or save as PDF</button></div></body></html>`;
+}
+
 // Lifetime keys include 1 year of updates (payload.u, or 1 year from the issue date for older keys). Yearly plans get updates while paid.
 function updatesUntilOf(pl) {
   if (!pl) return null;
@@ -273,7 +378,7 @@ function updatesUntilOf(pl) {
   const d = new Date((pl.iat || new Date().toISOString().slice(0, 10)) + 'T00:00:00Z'); d.setUTCFullYear(d.getUTCFullYear() + 1); return d.toISOString().slice(0, 10);
 }
 const BILL_DEFAULT = { width: '80', gstin: '', fssai: '', footer: 'Thank you! Please visit again.', autoKot: false, showUpi: true };
-function adminRestaurant(r) { return { ...publicRestaurant(r), hasWaiterPin: !!r.waiterPin, upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null) } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}), service: Object.assign({ autoAccept: false, payFirst: false }, r.service || {}), loyaltyCfg: Object.assign({}, LOYALTY_DEFAULT, r.loyalty || {}), wifiCfg: Object.assign({ on: false, ssid: '', pass: '' }, r.wifi || {}), gamesCfg: Object.assign({}, GAMES_DEFAULT, r.games || {}) }; }
+function adminRestaurant(r) { return { ...publicRestaurant(r), hasWaiterPin: !!r.waiterPin, upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null) } : r.paidVia === 'razorpay' && r.plan !== 'trial' ? { code: null, key: '', online: true, to: r.name, at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.plan === 'lifetime' ? null : r.paidUntil ? r.paidUntil.slice(0, 10) : null) } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}), service: Object.assign({ autoAccept: false, payFirst: false }, r.service || {}), loyaltyCfg: Object.assign({}, LOYALTY_DEFAULT, r.loyalty || {}), wifiCfg: Object.assign({ on: false, ssid: '', pass: '' }, r.wifi || {}), gamesCfg: Object.assign({}, GAMES_DEFAULT, r.games || {}) }; }
 function newRestaurant({ name, slug, password, email, ownerName, phone, plan = 'trial' }) {
   let s = slugify(slug || name), n = 2;
   while (db.restaurants.some(r => r.slug === s)) s = slugify(slug || name) + '-' + n++;
@@ -641,10 +746,31 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
   if (m === 'GET' && /^\/waiter(\/[a-z0-9-]+)?\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'waiter.html'));
   if (m === 'GET' && p === '/platform') return serveFile(res, path.join(PUBLIC_DIR, 'platform.html'));
   if (m === 'GET' && p === '/print-qr') return serveFile(res, path.join(PUBLIC_DIR, 'print-qr.html'));
+  if (m === 'GET' && p === '/pay') return serveFile(res, path.join(PUBLIC_DIR, 'pay.html'));
+  if (m === 'GET' && /^\/receipt\/[A-Za-z0-9]+$/.test(p)) { // plan payment receipt: for the restaurant's admin, the platform, or the pay page (signed link)
+    const pay = (db.payments || []).find(x => x.id === p.slice(9) && x.status === 'paid');
+    const me = adminOf(req), r = pay && db.restaurants.find(x => x.id === pay.rid);
+    if (!pay || !r || !((me && me.id === pay.rid) || isPlatform(req) || unsign(url.searchParams.get('t') || '') === 'rcpt|' + pay.id)) return send(res, 404, 'Receipt not found. Log in to your Veyra Dine In admin first.');
+    return send(res, 200, receiptHtml(r, pay), { 'Content-Type': 'text/html; charset=utf-8' });
+  }
   if (m === 'GET' && p.startsWith('/uploads/')) { const f = safeJoin(UPLOAD_DIR, p.slice(9)); return f ? serveFile(res, f, 'public, max-age=31536000, immutable') : fail(res, 404, 'Not found'); }
   if (m === 'GET' && p.startsWith('/assets/')) { const f = safeJoin(PUBLIC_DIR, p); return f ? serveFile(res, f) : fail(res, 404, 'Not found'); }
 
   if (!p.startsWith('/api/')) return fail(res, 404, 'Not found');
+  if (m === 'POST' && p === '/api/razorpay/webhook') { // Razorpay calls this when a payment is captured, so the plan starts even if the buyer closed the window
+    const chunks = []; let size = 0;
+    try { await new Promise((ok, no) => { req.on('data', c => { size += c.length; if (size > 1e6) { no(new Error('too big')); req.destroy(); } else chunks.push(c); }); req.on('end', ok); req.on('error', no); }); } catch { return fail(res, 400, 'Bad request'); }
+    const raw = Buffer.concat(chunks), cfg = rzpCfg();
+    if (!cfg || !rzp.checkWebhook(cfg.webhookSecret, raw, req.headers['x-razorpay-signature'])) return fail(res, 400, 'Bad signature');
+    let ev = {}; try { ev = JSON.parse(raw.toString('utf8')); } catch {}
+    const pe = ev.payload && ev.payload.payment && ev.payload.payment.entity, oe = ev.payload && ev.payload.order && ev.payload.order.entity;
+    const orderId = (oe && oe.id) || (pe && pe.order_id);
+    const pay = orderId && (db.payments || []).find(x => x.orderId === orderId);
+    if (pay && pay.status === 'paid' && pe && pe.method && !pay.method) { pay.method = str(pe.method, 20); save(); } // checkout already applied it; just note how they paid
+    else if (pay && (ev.event === 'order.paid' || ev.event === 'payment.captured') && (!pe || pe.status === 'captured') && (!pe || Number(pe.amount) === Math.round(pay.amount * 100))) applyPayment(pay, { paymentId: pe ? str(pe.id, 60) : '', method: pe ? str(pe.method, 20) : '', via: 'webhook' });
+    if (pay && ev.event === 'payment.failed' && pay.status === 'created') { pay.lastError = str(pe && pe.error_description, 200); save(); }
+    return send(res, 200, { ok: true });
+  }
   let body = {};
   if (m === 'POST' || m === 'PUT' || m === 'PATCH') {
     try { body = await readBody(req); } catch (e) { return fail(res, 400, e.message); }
@@ -660,6 +786,16 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     db.leads = db.leads || []; db.leads.push(lead); if (db.leads.length > 5000) db.leads = db.leads.slice(-5000);
     trackEvent(type === 'custom' ? 'custom_enquiry' : 'feature_idea'); save();
     return send(res, 201, { ok: true });
+  }
+  if (m === 'POST' && (p === '/api/pay/info' || p === '/api/pay/order' || p === '/api/pay/verify')) { // pay page opened from the Windows app (signed link, no login)
+    const t = payTokenOf(body.t); if (!t) return fail(res, 401, 'This payment link has expired. Go back to the app and tap Buy again.');
+    const { r, plan } = t;
+    try {
+      if (p === '/api/pay/info') { const a = access(r); return send(res, 200, { restaurant: r.name, plan, planName: PLAN_NAMES[plan], amount: PLANS[plan], on: !!rzpCfg(), why: payCheck(r, plan), access: a }); }
+      if (p === '/api/pay/order') return send(res, 200, await payOrder(r, plan, req));
+      const pay = payVerify(r, body);
+      return send(res, 200, { ok: true, payment: payView(pay), receiptUrl: '/receipt/' + pay.id + '?t=' + encodeURIComponent(sign('rcpt|' + pay.id)), access: access(r) });
+    } catch (e) { return fail(res, e.status || 400, e.message); }
   }
   if (m === 'POST' && p === '/api/t') { trackView(req, body && typeof body === 'object' ? body : {}); saveSoon(); res.writeHead(204); return res.end(); }
   let mt;
@@ -1095,7 +1231,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       if (p === '/api/hq/site/save') {
         const c = body.content || {};
         db.siteContent = { texts: c.texts || {}, images: c.images || {}, prices: c.prices || {}, banner: c.banner || {}, testimonials: (c.testimonials || []).slice(0, 30), testimonialsTitle: str(c.testimonialsTitle, 80), faqs: (c.faqs || []).slice(0, 40), logo: c.logo || '', updatedAt: now() };
-        for (const k of ['lifetime', 'yearly', 'monthly']) if (Number(db.siteContent.prices[k]) > 0) PLANS[k] = Number(db.siteContent.prices[k]); // admin "Buy" buttons use the same prices
+        for (const k of ['lifetime', 'yearly', 'monthly', 'updates']) if (Number(db.siteContent.prices[k]) > 0) PLANS[k] = Number(db.siteContent.prices[k]); // admin "Buy" buttons use the same prices
         siteCache = null; save(); return send(res, 200, { ok: true });
       }
       if (p === '/api/hq/site/media') { // logo or picture for the landing page
@@ -1128,7 +1264,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     const codes = {}; for (const [c, x] of Object.entries(db.licenseCodes)) codes[c] = codeView(c, x);
     const A = db.analytics || {}, analytics = {}; for (const k of Object.keys(A).sort().slice(-120)) analytics[k] = A[k];
     let appVersion = null; try { appVersion = (/^version:\s*(\S+)/m.exec(fs.readFileSync(path.join(DL_DIR, 'latest.yml'), 'utf8')) || [])[1] || null; } catch {}
-    return send(res, 200, { at: now(), restaurants, codes, downloads: db.config.downloads || {}, analytics, leads: (db.leads || []).slice(-1000), appVersion, emailCodes: !!smtpCfg() });
+    return send(res, 200, { at: now(), restaurants, codes, downloads: db.config.downloads || {}, analytics, leads: (db.leads || []).slice(-1000), appVersion, emailCodes: !!smtpCfg(), payments: (db.payments || []).filter(x => x.status === 'paid').map(x => ({ ...payView(x), rid: x.rid, restaurant: x.name })), onlinePay: rzpCfg() ? rzpCfg().mode : null });
   }
 
   if (HUB && p.startsWith('/api/hub/')) { // only the Windows app on this computer may call these
@@ -1187,7 +1323,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     const mine = list => list.filter(x => x.restaurantId === r.id);
 
     if (m === 'GET' && p === '/api/admin/me') {
-      return send(res, 200, { restaurant: adminRestaurant(r), hubMode: HUB, baseUrl: baseUrl(req), lan: lanAddresses(), port: PORT, publicUrlSet: !!process.env.PUBLIC_URL, plans: PLANS, buyUrl: BUY_URL });
+      return send(res, 200, { restaurant: adminRestaurant(r), hubMode: HUB, baseUrl: baseUrl(req), lan: lanAddresses(), port: PORT, publicUrlSet: !!process.env.PUBLIC_URL, plans: PLANS, buyUrl: BUY_URL, pay: rzpCfg() ? { on: true, mode: rzpCfg().mode, email: !!smtpCfg() } : { on: false } });
     }
     if (m === 'POST' && p === '/api/admin/activate') {
       const code = normShort(body.key);
@@ -1206,6 +1342,15 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       save();
       return send(res, 200, { ok: true, restaurant: adminRestaurant(r) });
     }
+    // ---- buy a plan online (Razorpay) ----
+    if (m === 'POST' && p === '/api/admin/pay/order') { try { return send(res, 200, await payOrder(r, str(body.plan, 20), req)); } catch (e) { return fail(res, e.status || 400, e.message); } }
+    if (m === 'POST' && p === '/api/admin/pay/verify') { try { payVerify(r, body); return send(res, 200, { ok: true, restaurant: adminRestaurant(r), payment: payView((db.payments || []).find(x => x.orderId === body.razorpay_order_id)) }); } catch (e) { return fail(res, e.status || 400, e.message); } }
+    if (m === 'POST' && p === '/api/admin/pay/link') { // Windows app: open the payment in the normal browser
+      if (!rzpCfg()) return fail(res, 400, 'Online payment is not set up yet');
+      const why = payCheck(r, str(body.plan, 20)); if (why) return fail(res, 400, why);
+      return send(res, 200, { url: baseUrl(req) + '/pay?t=' + encodeURIComponent(payToken(r, str(body.plan, 20))) });
+    }
+    if (m === 'GET' && p === '/api/admin/pay/history') return send(res, 200, (db.payments || []).filter(x => x.rid === r.id && x.status === 'paid').sort((a, b) => b.paidAt.localeCompare(a.paidAt)).map(payView));
     if (m === 'POST' && p === '/api/admin/ping') return send(res, 200, { ok: true });
     if (m === 'GET' && p === '/api/admin/stream') return openStream(req, res, streams, r.id);
 
@@ -1704,6 +1849,52 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       if (body.test) { try { await mailer.send(n, { to: str(body.test, 160), subject: 'Veyra Dine In test email', text: 'Email codes for password reset are working.' }); } catch (e) { return fail(res, 400, e.message); } }
       db.config.smtp = n; save(); return send(res, 200, { ok: true });
     }
+    if (m === 'GET' && p === '/api/platform/razorpay') { const c = rzpCfg() || {}; return send(res, 200, { keyId: c.keyId || '', hasSecret: !!c.keySecret, hasWebhook: !!c.webhookSecret, mode: c.mode || '', fromEnv: !!c.fromEnv, webhookUrl: baseUrl(req) + '/api/razorpay/webhook', prices: PLANS }); }
+    if (m === 'POST' && p === '/api/platform/razorpay') {
+      const c = db.config.razorpay || {};
+      const keyId = str(body.keyId, 60);
+      if (!keyId) { delete db.config.razorpay; save(); return send(res, 200, { ok: true, off: true }); }
+      if (!/^rzp_(test|live)_[A-Za-z0-9]{8,}$/.test(keyId)) return fail(res, 400, 'The Key ID starts with rzp_test_ or rzp_live_');
+      const n = { keyId, keySecret: body.keySecret ? str(body.keySecret, 100) : (c.keyId === keyId ? c.keySecret : ''), webhookSecret: body.webhookSecret ? str(body.webhookSecret, 200) : c.webhookSecret || '' };
+      if (!n.keySecret) return fail(res, 400, 'Paste the Key Secret too');
+      try { await rzp.call(n, 'GET', '/v1/orders?count=1'); } catch (e) { return fail(res, e.status || 400, e.message); }
+      db.config.razorpay = n; save(); return send(res, 200, { ok: true, mode: /^rzp_live_/.test(keyId) ? 'live' : 'test' });
+    }
+    if (m === 'POST' && (mt = /^\/api\/platform\/restaurants\/([A-Za-z0-9]+)\/payment$/.exec(p))) { // "Mark as paid": UPI, cash or bank transfer taken by hand
+      const r = db.restaurants.find(x => x.id === mt[1]); if (!r) return fail(res, 404, 'Not found');
+      const plan = str(body.plan, 20), why = payCheck(Object.assign({}, r, { suspended: false }), plan); if (why) return fail(res, 400, why);
+      const amount = body.amount === '' || body.amount == null ? Number(PLANS[plan]) : money(body.amount);
+      const method = ['upi', 'cash', 'bank transfer', 'cheque', 'other'].includes(str(body.method, 20).toLowerCase()) ? str(body.method, 20).toLowerCase() : 'upi';
+      db.payments = db.payments || [];
+      const pay = { id: id(12), rid: r.id, name: r.name, plan, amount, orderId: '', status: 'created', mode: 'manual', createdAt: now(), note: str(body.note, 200) };
+      db.payments.push(pay);
+      if (r.suspended) r.suspended = false;
+      applyPayment(pay, { paymentId: str(body.reference, 80), method, via: 'manual' });
+      return send(res, 200, { ok: true, payment: payView(pay), access: access(r), emailed: !!(smtpCfg() && r.email) });
+    }
+    if (m === 'POST' && p === '/api/platform/razorpay/test') { // "Try a ₹1 payment": checks the live keys end to end, then refunds the ₹1
+      const cfg = rzpCfg(); if (!cfg) return fail(res, 400, 'Save the Razorpay keys first');
+      db.payments = db.payments || [];
+      if (!body.razorpay_order_id) {
+        let o; try { o = await rzp.call(cfg, 'POST', '/v1/orders', { amount: 100, currency: 'INR', receipt: 'selftest-' + id(8), notes: { purpose: 'Veyra Dine In ₹1 test, refunded automatically' } }); } catch (e) { return fail(res, e.status || 400, e.message); }
+        db.payments.push({ id: id(12), rid: null, name: 'Test', plan: 'selftest', amount: 1, orderId: o.id, status: 'selftest', mode: cfg.mode, createdAt: now() }); save();
+        return send(res, 200, { keyId: cfg.keyId, orderId: o.id, amount: 100, currency: 'INR', mode: cfg.mode, name: 'Veyra Dine In', description: '₹1 test payment (refunded automatically)' });
+      }
+      const t = db.payments.find(x => x.orderId === body.razorpay_order_id && x.plan === 'selftest');
+      if (!t) return fail(res, 404, 'Test payment not found');
+      if (!rzp.checkPayment(cfg, body.razorpay_order_id, body.razorpay_payment_id, body.razorpay_signature)) return fail(res, 400, 'The payment signature did not match. Check that the Key Secret is right.');
+      const pid = str(body.razorpay_payment_id, 60); t.paymentId = pid;
+      let refunded = false, note = '';
+      try {
+        const pm = await rzp.call(cfg, 'GET', '/v1/payments/' + encodeURIComponent(pid));
+        if (pm.status === 'authorized') await rzp.call(cfg, 'POST', '/v1/payments/' + encodeURIComponent(pid) + '/capture', { amount: 100, currency: 'INR' });
+        const rf = await rzp.call(cfg, 'POST', '/v1/payments/' + encodeURIComponent(pid) + '/refund', { amount: 100 });
+        refunded = !!rf.id; t.refundId = rf.id || '';
+      } catch (e) { note = e.message; }
+      t.checkedAt = now(); save();
+      return send(res, 200, { ok: true, refunded, note, paymentId: pid, webhook: !!cfg.webhookSecret });
+    }
+    if (m === 'GET' && p === '/api/platform/payments') return send(res, 200, (db.payments || []).filter(x => x.status === 'paid' || url.searchParams.get('all')).sort((a, b) => (b.paidAt || b.createdAt).localeCompare(a.paidAt || a.createdAt)).slice(0, 500).map(x => ({ ...payView(x), restaurant: (db.restaurants.find(y => y.id === x.rid) || {}).name || x.name, slug: (db.restaurants.find(y => y.id === x.rid) || {}).slug || '' })));
     if (m === 'GET' && p === '/api/platform/google') return send(res, 200, { clientId: googleClientId(), fromEnv: !!process.env.GOOGLE_CLIENT_ID });
     if (m === 'POST' && p === '/api/platform/google') {
       const cid = str(body.clientId, 200);

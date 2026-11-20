@@ -2351,6 +2351,160 @@
    "tag": "a",
    "text": "@veyralab.in",
    "section": "Footer"
+  },
+  {
+   "k": "tbfd51cd2",
+   "type": "text",
+   "tag": "span",
+   "text": "New · Counter display",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "tca19440c",
+   "type": "text",
+   "tag": "h2",
+   "text": "A screen your customers can see",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "ta889dce0",
+   "type": "text",
+   "tag": "p",
+   "text": "Put a second monitor, a TV or an old tablet at your counter. Customers watch their order and bill fill in as you type, then pay with one scan. No extra app and no extra cost.",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "t30edd28f",
+   "type": "text",
+   "tag": "b",
+   "text": "Bill and UPI QR, live",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "t10a161c8",
+   "type": "text",
+   "tag": "span",
+   "text": "Every dish shows the moment you add it, with the total and a UPI QR for the exact amount. Split bills show each person’s share.",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "t89e3e15f",
+   "type": "text",
+   "tag": "b",
+   "text": "Order numbers when food is ready",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "ted222759",
+   "type": "text",
+   "tag": "span",
+   "text": "Numbers move from Preparing to Ready to collect with a soft chime. Fewer people asking “is mine ready?”",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "t5ccda812",
+   "type": "text",
+   "tag": "b",
+   "text": "Menu, WiFi and offers in between",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "t962470d7",
+   "type": "text",
+   "tag": "span",
+   "text": "When nobody is paying, it shows your menu QR, guest WiFi, a welcome line and today’s coupon codes.",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "t7f31adeb",
+   "type": "text",
+   "tag": "small",
+   "text": "Turn it on in Settings › Counter display. Open the link on the screen, or scan its QR with the tablet.",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "ieabcd136",
+   "type": "img",
+   "src": "img/display-board.jpg",
+   "alt": "Counter display: order numbers preparing and ready to collect, with the menu QR and guest WiFi",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "if3162aee",
+   "type": "img",
+   "src": "img/display-bill.jpg",
+   "alt": "Counter display while billing: the dishes, the total and a UPI QR for the exact amount",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "tdef412da",
+   "type": "text",
+   "tag": "h3",
+   "text": "Counter display",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t2e9e8d76",
+   "type": "text",
+   "tag": "p",
+   "text": "A customer screen at the counter: the bill with a UPI QR, and order numbers when food is ready.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "tcc4d3c36",
+   "type": "text",
+   "tag": "b",
+   "text": "Turn it on",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "te883c01d",
+   "type": "text",
+   "tag": "p",
+   "text": "Settings › Counter display: switch it on and add a welcome line if you like.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "te77d4c64",
+   "type": "text",
+   "tag": "b",
+   "text": "Open it on the screen",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t5b02facd",
+   "type": "text",
+   "tag": "p",
+   "text": "Second monitor: tap Open on this computer and drag it there. Tablet or TV: scan the QR.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tee14ed26",
+   "type": "text",
+   "tag": "b",
+   "text": "Bill as usual",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "td354fc2e",
+   "type": "text",
+   "tag": "p",
+   "text": "Take a New order or open Bill and split. The customer sees the dishes, the total and a UPI QR.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t21f69c54",
+   "type": "text",
+   "tag": "b",
+   "text": "Call out orders",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "ta09659d3",
+   "type": "text",
+   "tag": "p",
+   "text": "Mark food ready and the number moves to Ready to collect with a chime.",
+   "section": "Step-by-step guides"
   }
  ],
  "prices": {

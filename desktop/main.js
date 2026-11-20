@@ -134,6 +134,11 @@ function createWindow() {
   win.once('ready-to-show', () => win.show());
   // open outside links (email, buy, test menu, print) in the normal browser
   win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith(baseUrl + '/display/') || url.startsWith(baseUrl + '/kitchen/')) { // counter or kitchen display: opens full screen on the second monitor when there is one
+      const { screen } = require('electron'), main = screen.getDisplayMatching(win.getBounds()), other = screen.getAllDisplays().find(d => d.id !== main.id);
+      const b = (other || main).workArea;
+      return { action: 'allow', overrideBrowserWindowOptions: { x: b.x + 40, y: b.y + 40, width: Math.min(1280, b.width - 80), height: Math.min(760, b.height - 80), fullscreen: !!other, icon: ICON, autoHideMenuBar: true, backgroundColor: '#FBF6EE', title: url.includes('/kitchen/') ? 'Kitchen display' : 'Counter display', webPreferences: { contextIsolation: true, sandbox: true, autoplayPolicy: 'no-user-gesture-required' } } };
+    }
     if (url.startsWith(baseUrl + '/print-qr') || (hub.base && url.startsWith(hub.base + '/print-qr'))) return { action: 'allow', overrideBrowserWindowOptions: { width: 1000, height: 800, icon: ICON, autoHideMenuBar: true } };
     shell.openExternal(url); return { action: 'deny' };
   });

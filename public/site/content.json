@@ -2351,6 +2351,300 @@
    "tag": "a",
    "text": "@veyralab.in",
    "section": "Footer"
+  },
+  {
+   "k": "tbfd51cd2",
+   "type": "text",
+   "tag": "span",
+   "text": "New · Counter display",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "tca19440c",
+   "type": "text",
+   "tag": "h2",
+   "text": "A screen your customers can see",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "ta889dce0",
+   "type": "text",
+   "tag": "p",
+   "text": "Put a second monitor, a TV or an old tablet at your counter. Customers watch their order and bill fill in as you type, then pay with one scan. No extra app and no extra cost.",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "t30edd28f",
+   "type": "text",
+   "tag": "b",
+   "text": "Bill and UPI QR, live",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "t10a161c8",
+   "type": "text",
+   "tag": "span",
+   "text": "Every dish shows the moment you add it, with the total and a UPI QR for the exact amount. Split bills show each person’s share.",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "t89e3e15f",
+   "type": "text",
+   "tag": "b",
+   "text": "Order numbers when food is ready",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "ted222759",
+   "type": "text",
+   "tag": "span",
+   "text": "Numbers move from Preparing to Ready to collect with a soft chime. Fewer people asking “is mine ready?”",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "t5ccda812",
+   "type": "text",
+   "tag": "b",
+   "text": "Menu, WiFi and offers in between",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "t962470d7",
+   "type": "text",
+   "tag": "span",
+   "text": "When nobody is paying, it shows your menu QR, guest WiFi, a welcome line and today’s coupon codes.",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "t7f31adeb",
+   "type": "text",
+   "tag": "small",
+   "text": "Turn it on in Settings › Counter display. Open the link on the screen, or scan its QR with the tablet.",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "ieabcd136",
+   "type": "img",
+   "src": "img/display-board.jpg",
+   "alt": "Counter display: order numbers preparing and ready to collect, with the menu QR and guest WiFi",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "if3162aee",
+   "type": "img",
+   "src": "img/display-bill.jpg",
+   "alt": "Counter display while billing: the dishes, the total and a UPI QR for the exact amount",
+   "section": "A screen your customers can see"
+  },
+  {
+   "k": "tdef412da",
+   "type": "text",
+   "tag": "h3",
+   "text": "Counter display",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t2e9e8d76",
+   "type": "text",
+   "tag": "p",
+   "text": "A customer screen at the counter: the bill with a UPI QR, and order numbers when food is ready.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "tcc4d3c36",
+   "type": "text",
+   "tag": "b",
+   "text": "Turn it on",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "te883c01d",
+   "type": "text",
+   "tag": "p",
+   "text": "Settings › Counter display: switch it on and add a welcome line if you like.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "te77d4c64",
+   "type": "text",
+   "tag": "b",
+   "text": "Open it on the screen",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t5b02facd",
+   "type": "text",
+   "tag": "p",
+   "text": "Second monitor: tap Open on this computer and drag it there. Tablet or TV: scan the QR.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tee14ed26",
+   "type": "text",
+   "tag": "b",
+   "text": "Bill as usual",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "td354fc2e",
+   "type": "text",
+   "tag": "p",
+   "text": "Take a New order or open Bill and split. The customer sees the dishes, the total and a UPI QR.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t21f69c54",
+   "type": "text",
+   "tag": "b",
+   "text": "Call out orders",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "ta09659d3",
+   "type": "text",
+   "tag": "p",
+   "text": "Mark food ready and the number moves to Ready to collect with a chime.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "ifecba6ce",
+   "type": "img",
+   "src": "img/kitchen-display.jpg",
+   "alt": "Kitchen display: every order as a big ticket with the table, dishes, notes, a timer and a Ready button",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "t2bac54f7",
+   "type": "text",
+   "tag": "span",
+   "text": "New · Kitchen display",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "t0f135bf8",
+   "type": "text",
+   "tag": "h2",
+   "text": "A kitchen screen instead of paper KOTs",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "tea27dcb0",
+   "type": "text",
+   "tag": "p",
+   "text": "Put a TV, a monitor or a tablet in the kitchen. Every order shows up as a big ticket with a bell, so nothing gets lost in a pile of paper.",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "t5e3d596d",
+   "type": "text",
+   "tag": "b",
+   "text": "Every order, the second it comes in",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "tca449256",
+   "type": "text",
+   "tag": "span",
+   "text": "Table, dishes, veg and non-veg marks and notes like less spicy. QR, counter and waiter orders all land here.",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "t2cae2616",
+   "type": "text",
+   "tag": "b",
+   "text": "Two taps: Start cooking, then Ready",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "t9da570e9",
+   "type": "text",
+   "tag": "span",
+   "text": "The counter, the waiter app and the guest’s phone update at once. Tapped Ready by mistake? Bring it back in one tap.",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "tbf0749fa",
+   "type": "text",
+   "tag": "b",
+   "text": "Timers and a “to make” list",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "t18acf74c",
+   "type": "text",
+   "tag": "span",
+   "text": "Each ticket turns amber at 10 minutes and red when it is late. The top row adds up how many of each dish to make.",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "tb574fdf7",
+   "type": "text",
+   "tag": "small",
+   "text": "Turn it on in Settings › Kitchen display. Open the link on the kitchen screen, or scan its QR with the tablet.",
+   "section": "A kitchen screen instead of paper KOTs"
+  },
+  {
+   "k": "t69c63e10",
+   "type": "text",
+   "tag": "h3",
+   "text": "Kitchen display",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t53ec29e9",
+   "type": "text",
+   "tag": "p",
+   "text": "Orders as big tickets on a kitchen screen, with timers, a bell and one-tap Ready. No paper KOT needed.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t4639e320",
+   "type": "text",
+   "tag": "p",
+   "text": "Settings › Kitchen display: switch it on. Keep the bell on so cooks hear new orders.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t1b924872",
+   "type": "text",
+   "tag": "b",
+   "text": "Open it in the kitchen",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tf13f27ed",
+   "type": "text",
+   "tag": "p",
+   "text": "Scan the QR with the kitchen tablet, or open the link on the kitchen TV and tap Start.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t48cdf3aa",
+   "type": "text",
+   "tag": "b",
+   "text": "Cook from the tickets",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t127c033b",
+   "type": "text",
+   "tag": "p",
+   "text": "Tap Start cooking on a new ticket. The timer and the To make row show what comes first.",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "tb687a6ad",
+   "type": "text",
+   "tag": "b",
+   "text": "Tap Ready",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "td16c87d4",
+   "type": "text",
+   "tag": "p",
+   "text": "The ticket moves to Ready, and the counter, waiters and guests see it at once.",
+   "section": "Step-by-step guides"
   }
  ],
  "prices": {

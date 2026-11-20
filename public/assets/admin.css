@@ -441,3 +441,6 @@ button.buy small { margin-bottom: 14px; }
 .pay-tot small { display: block; color: var(--ink-3); font-size: 12px; }
 .pay-tot b { font-size: 17px; }
 @media (max-width: 560px) { .pay-row { flex-wrap: wrap; } .pay-row > div { flex-basis: 100%; } }
+/* counter display settings + bill row picked for the customer screen */
+.disp-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 10px 16px; }
+.cb-row.sel { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent); }

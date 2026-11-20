@@ -31,7 +31,7 @@
   {
    "k": "t3c3d7921",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Waiter app",
    "section": "Built for Indian restaurants"
   },
@@ -75,6 +75,13 @@
    "type": "text",
    "tag": "a",
    "text": "Waiter login",
+   "section": "Top of page"
+  },
+  {
+   "k": "tfa8c9b50",
+   "type": "text",
+   "tag": "a",
+   "text": "Waiter sign in",
    "section": "Top of page"
   },
   {
@@ -169,10 +176,24 @@
    "section": "Top of page"
   },
   {
+   "k": "t326cf8d3",
+   "type": "text",
+   "tag": "a",
+   "text": "Start your free trial",
+   "section": "Top of page"
+  },
+  {
    "k": "te03d007c",
    "type": "text",
    "tag": "a",
    "text": "Download for Windows",
+   "section": "Top of page"
+  },
+  {
+   "k": "t8869eeb5",
+   "type": "text",
+   "tag": "a",
+   "text": "Install on Windows",
    "section": "Top of page"
   },
   {
@@ -612,7 +633,7 @@
   {
    "k": "tc3d5cebe",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Loyalty points",
    "section": "No waiter needed. Never stops, even without internet."
   },
@@ -780,7 +801,7 @@
   {
    "k": "t58b8a272",
    "type": "text",
-   "tag": "div",
+   "tag": "p",
    "text": "WiFi backup",
    "section": "Have waiters? Give them the app"
   },
@@ -1067,7 +1088,7 @@
   {
    "k": "te8e53ca8",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "One QR per table",
    "section": "Built for Indian restaurants"
   },
@@ -1081,7 +1102,7 @@
   {
    "k": "tfa6313ba",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Live order board",
    "section": "Built for Indian restaurants"
   },
@@ -1095,7 +1116,7 @@
   {
    "k": "tf6ea6c5b",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Easy menu editor",
    "section": "Built for Indian restaurants"
   },
@@ -1109,7 +1130,7 @@
   {
    "k": "t33f52ba6",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Veg and non-veg marks",
    "section": "Built for Indian restaurants"
   },
@@ -1123,7 +1144,7 @@
   {
    "k": "tdb92cb9d",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Your brand",
    "section": "Built for Indian restaurants"
   },
@@ -1137,7 +1158,7 @@
   {
    "k": "t6d5c92f7",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Waiter and bill requests",
    "section": "Built for Indian restaurants"
   },
@@ -1151,7 +1172,7 @@
   {
    "k": "t2c09ad7c",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Sales at a glance",
    "section": "Built for Indian restaurants"
   },
@@ -1165,7 +1186,7 @@
   {
    "k": "t66cf3182",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Offline mode",
    "section": "Built for Indian restaurants"
   },
@@ -1186,7 +1207,7 @@
   {
    "k": "tc22ff693",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Guest WiFi",
    "section": "Built for Indian restaurants"
   },
@@ -1207,7 +1228,7 @@
   {
    "k": "t6ed92985",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Kitchen online status",
    "section": "Built for Indian restaurants"
   },
@@ -1228,7 +1249,7 @@
   {
    "k": "t81849f4a",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Google login and email code",
    "section": "Built for Indian restaurants"
   },
@@ -1242,7 +1263,7 @@
   {
    "k": "t81f903f3",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Split bill and UPI",
    "section": "Built for Indian restaurants"
   },
@@ -1342,6 +1363,13 @@
    "type": "text",
    "tag": "b",
    "text": "Keep the admin open",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t77dcc412",
+   "type": "text",
+   "tag": "b",
+   "text": "Stay logged in",
    "section": "Step-by-step guides"
   },
   {
@@ -1753,7 +1781,7 @@
   {
    "k": "t22357ca6",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Free trial",
    "section": "Try it free. Pay only when you love it."
   },
@@ -1802,7 +1830,7 @@
   {
    "k": "td31edb7b",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Monthly",
    "section": "Try it free. Pay only when you love it."
   },
@@ -1851,7 +1879,7 @@
   {
    "k": "t7622eb5a",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Yearly",
    "section": "Try it free. Pay only when you love it."
   },
@@ -1893,7 +1921,7 @@
   {
    "k": "t8d33f31b",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Lifetime",
    "section": "Try it free. Pay only when you love it."
   },
@@ -2439,7 +2467,7 @@
   {
    "k": "tdef412da",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Counter display",
    "section": "Built for Indian restaurants"
   },
@@ -2455,6 +2483,13 @@
    "type": "text",
    "tag": "b",
    "text": "Turn it on",
+   "section": "Step-by-step guides"
+  },
+  {
+   "k": "t3d651559",
+   "type": "text",
+   "tag": "b",
+   "text": "Switch on the kitchen screen",
    "section": "Step-by-step guides"
   },
   {
@@ -2586,7 +2621,7 @@
   {
    "k": "t69c63e10",
    "type": "text",
-   "tag": "h3",
+   "tag": "p",
    "text": "Kitchen display",
    "section": "Built for Indian restaurants"
   },

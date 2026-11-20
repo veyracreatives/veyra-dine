@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Pay · Veyra Dine In</title>
+<link rel="icon" href="/favicon-32.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+  :root { --brand: #E4572E; --ink: #1F1A14; --ink-2: #4B443C; --ink-3: #8A8580; --line: #E7E5E1; --bg: #FBF6EE; --green: #15803D; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font: 16px/1.5 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--bg); color: var(--ink); display: grid; place-items: center; padding: 24px 16px; }
+  .card { width: 100%; max-width: 460px; background: #fff; border-radius: 24px; box-shadow: 0 20px 60px rgba(60,40,20,.12); padding: 36px 32px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; margin-bottom: 26px; }
+  .brand i { width: 34px; height: 34px; border-radius: 10px; background: var(--brand); display: grid; place-items: center; color: #fff; font-style: normal; font-size: 16px; }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -.01em; }
+  .muted { color: var(--ink-2); margin: 0 0 22px; }
+  .box { display: grid; grid-template-columns: auto 1fr; gap: 8px 20px; background: var(--bg); border-radius: 14px; padding: 16px 18px; margin-bottom: 22px; font-size: 15px; }
+  .box span { color: var(--ink-3); } .box b { word-break: break-word; }
+  .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 52px; border: 0; border-radius: 14px; background: var(--brand); color: #fff; font: inherit; font-weight: 800; font-size: 17px; cursor: pointer; text-decoration: none; }
+  .btn:disabled { opacity: .6; cursor: wait; }
+  .btn.line { background: #fff; color: var(--ink); border: 1.5px solid var(--line); margin-top: 10px; font-size: 15px; min-height: 46px; }
+  .note { color: var(--ink-3); font-size: 13.5px; margin: 16px 0 0; text-align: center; }
+  .ok { width: 60px; height: 60px; border-radius: 18px; background: #DCFCE7; color: var(--green); display: grid; place-items: center; font-size: 30px; font-weight: 800; margin-bottom: 16px; }
+  .err { background: #FDECEA; color: #B42318; border-radius: 12px; padding: 12px 14px; font-size: 14.5px; margin-bottom: 16px; display: none; }
+  .test { display: inline-block; background: #FEF3C7; color: #92400E; border-radius: 99px; padding: 2px 10px; font-size: 12.5px; font-weight: 800; margin-left: 6px; vertical-align: middle; }
+  @media (max-width: 420px) { .card { padding: 28px 20px; } h1 { font-size: 23px; } }
+</style>
+</head>
+<body>
+<div class="card" id="c"><div class="brand"><i>V</i> Veyra Dine In</div><p class="muted">Loading…</p></div>
+<script src="https://checkout.razorpay.com/v1/checkout.js" async></script>
+<script>
+(function () {
+  const c = document.getElementById('c');
+  const t = new URLSearchParams(location.search).get('t') || '';
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  const inr = n => '₹' + Number(n).toLocaleString('en-IN');
+  const head = '<div class="brand"><i>V</i> Veyra Dine In</div>';
+  const post = (p, b) => fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ t }, b || {})) }).then(r => r.json().then(j => { if (!r.ok) throw new Error(j.error || 'Something went wrong'); return j; }));
+  const fail = m => { c.innerHTML = head + `<h1>Can't open the payment</h1><p class="muted">${esc(m)}</p>`; };
+  const fmtD = iso => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  post('/api/pay/info').then(info => {
+    if (!info.on) return fail('Online payment is not switched on yet. Please contact Veyra.');
+    if (info.why) return fail(info.why);
+    c.innerHTML = head + `<h1>${esc(info.planName)}</h1><p class="muted">Pay by UPI, card or netbanking. Your plan starts the moment you pay. There is no key to enter.</p>
+      <div class="err" id="er"></div>
+      <div class="box"><span>Restaurant</span><b>${esc(info.restaurant)}</b><span>Plan</span><b>${esc(info.planName)}</b><span>Amount</span><b>${inr(info.amount)}</b></div>
+      <button class="btn" id="go">Pay ${inr(info.amount)}</button><p class="note">Secure payment by Razorpay. No GST is charged.</p>`;
+    const go = document.getElementById('go'), er = document.getElementById('er');
+    const showErr = m => { er.textContent = m; er.style.display = 'block'; };
+    go.onclick = async () => {
+      go.disabled = true; er.style.display = 'none';
+      try {
+        for (let i = 0; !window.Razorpay && i < 50; i++) await new Promise(r => setTimeout(r, 200));
+        if (!window.Razorpay) throw new Error('Could not load Razorpay. Check the internet and try again.');
+        const o = await post('/api/pay/order');
+        if (o.mode === 'test') document.querySelector('h1').insertAdjacentHTML('beforeend', '<span class="test">TEST MODE</span>');
+        const rz = new window.Razorpay({ key: o.keyId, order_id: o.orderId, amount: o.amount, currency: o.currency, name: o.name, description: o.description, prefill: o.prefill, theme: { color: '#E4572E' },
+          handler: async resp => {
+            try {
+              const v = await post('/api/pay/verify', resp), p = v.payment;
+              c.innerHTML = head + `<div class="ok">✓</div><h1>Payment received</h1><p class="muted">Thank you. Your plan is active now. Go back to the Veyra Dine In app: it updates by itself in a few seconds. You can close this tab.</p>
+                <div class="box"><span>Plan</span><b>${esc(p.planName)}</b><span>Paid</span><b>${inr(p.amount)}</b>${p.until ? `<span>Active until</span><b>${fmtD(p.until)}</b>` : ''}${p.updatesUntil && (p.plan === 'lifetime' || p.plan === 'updates') ? `<span>Updates until</span><b>${fmtD(p.updatesUntil + 'T00:00:00')}</b>` : ''}<span>Receipt</span><b>${esc(p.receipt)}</b></div>
+                <a class="btn" href="${esc(v.receiptUrl)}" target="_blank">Open receipt</a>`;
+            } catch (e) { showErr(e.message); go.disabled = false; }
+          },
+          modal: { ondismiss: () => { go.disabled = false; } } });
+        rz.on('payment.failed', r => showErr((r.error && r.error.description) || 'Payment failed. No money was taken. Please try again.'));
+        rz.open();
+      } catch (e) { showErr(e.message); go.disabled = false; }
+    };
+  }, e => fail(e.message));
+})();
+</script>
+</body>
+</html>

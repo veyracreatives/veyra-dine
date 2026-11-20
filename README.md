@@ -73,3 +73,15 @@ To put it online for a real restaurant it needs a server with a fixed web addres
 Render or Railway) so the QR codes keep working. Set `PUBLIC_URL=https://your-address` so QR codes use that
 address. Data is stored in `data/db.json` and photos in `data/uploads/`; back up the `data` folder.
 Payments (UPI / Razorpay) and printing kitchen tickets are not built yet.
+
+## Online payments for plans (Razorpay)
+
+Restaurants buy Monthly, Yearly, Lifetime and the lifetime update renewal from their admin (Settings › Plan and license, the trial bar, or the "trial ended" screen) and from the website's Buy buttons (`/admin?buy=monthly|yearly|lifetime`). The plan starts as soon as Razorpay confirms the payment. No license key is needed, and a receipt is emailed if email is set up on /platform › Email codes. Razorpay is only for plan payments to Veyra: guests still pay restaurant bills to the restaurant's own UPI.
+
+Setup on the online server:
+1. Razorpay › Account & Settings › API keys › Generate key. Copy the Key ID and Key Secret.
+2. /platform › Online payments: paste them, add a webhook secret (any long password) and save. The keys are checked with Razorpay before they are saved.
+3. Razorpay › Webhooks › Add new webhook: the URL shown on that screen (`https://<server>/api/razorpay/webhook`), the same secret, and the events `payment.captured`, `order.paid` and `payment.failed`.
+4. Press "Try a ₹1 payment" to check the keys end to end. The ₹1 is refunded automatically.
+
+You can also set the keys with the environment variables `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET`, which take priority. Payments taken by UPI, cash or bank transfer are recorded with /platform › Mark as paid, which starts the plan and sends the same receipt. All payments are listed on /platform › Payments and are sent to Veyra HQ. Receipts are numbered VDP-YYYY-NNNN, with no GST.

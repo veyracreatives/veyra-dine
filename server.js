@@ -310,11 +310,14 @@ const tableCarts = new Map();   // tableId -> { lines: [{ gid, name, itemId, qty
 const tableStreams = new Map(); // tableId -> Set(res)
 const tableShares = new Map();  // tableId -> Set(lineKey) dishes the table shares equally
 const BILL_WINDOW = 8 * 3600e3;
+const CART_IDLE = 2 * 3600e3;
 const gidOk = g => /^[A-Za-z0-9_-]{6,40}$/.test(g || '');
 function cartOf(tableId) { if (!tableCarts.has(tableId)) tableCarts.set(tableId, { lines: [] }); return tableCarts.get(tableId); }
 function cartView(table) {
   const c = cartOf(table.id);
-  c.lines = c.lines.filter(l => { const it = db.items.find(i => i.id === l.itemId && i.restaurantId === table.restaurantId && !i.hidden); return it && it.available !== false && l.qty > 0; });
+  // a guest who added dishes and left without sending them: their dishes drop off after 2 hours, so the next people at the table don't see them
+  const last = {}; for (const l of c.lines) last[l.gid] = Math.max(last[l.gid] || 0, l.at || 0);
+  c.lines = c.lines.filter(l => { const it = db.items.find(i => i.id === l.itemId && i.restaurantId === table.restaurantId && !i.hidden); return it && it.available !== false && l.qty > 0 && Date.now() - (last[l.gid] || Date.now()) < CART_IDLE; });
   const people = []; for (const l of c.lines) if (!people.some(x => x.gid === l.gid)) people.push({ gid: l.gid, name: l.name });
   return { lines: c.lines.map(l => ({ gid: l.gid, name: l.name, itemId: l.itemId, qty: l.qty })), people };
 }
@@ -879,8 +882,9 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       let line = cart.lines.find(l => l.gid === body.gid && l.itemId === item.id);
       const others = [...new Set(cart.lines.filter(l => l.gid !== body.gid).map(l => l.gid))].length;
       const myName = name || (cart.lines.find(l => l.gid === body.gid) || {}).name || `Guest ${others + 1}`;
-      if (qty && !line) cart.lines.push(line = { gid: body.gid, name: myName, itemId: item.id, qty });
+      if (qty && !line) cart.lines.push(line = { gid: body.gid, name: myName, itemId: item.id, qty, at: Date.now() });
       else if (line) line.qty = qty;
+      cart.lines.forEach(l => { if (l.gid === body.gid) l.at = Date.now(); });
       cart.lines.forEach(l => { if (l.gid === body.gid) l.name = myName; });
       cart.lines = cart.lines.filter(l => l.qty > 0);
       emitTable(table.id, 'cart', cartView(table));
@@ -1523,6 +1527,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     if (m === 'POST' && (mt = /^\/api\/admin\/tables\/([A-Za-z0-9]+)\/settle$/.exec(p))) {
       const table = db.tables.find(t => t.id === mt[1] && t.restaurantId === r.id);
       if (!table) return fail(res, 404, 'Table not found');
+      tableCarts.delete(table.id); // the table is cleared for the next guests: no leftover dishes in the shared order
       for (const o of db.orders) if (o.tableId === table.id && !o.settled) { o.settled = true; earnFor(r, o); }
       for (const q of db.requests) if (q.tableId === table.id && (q.type === 'bill' || q.type === 'paid') && !q.done) { q.done = true; q.settled = true; emit(r.id, 'request-done', { id: q.id }); }
       for (const q of db.requests) if (q.tableId === table.id && q.type === 'paid') q.settled = true;
@@ -1874,7 +1879,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       const r = db.restaurants.find(x => x.id === mt[1]);
       if (!r) return fail(res, 404, 'Not found');
       if (body.poweredBy != null) r.poweredBy = !!body.poweredBy;
-      if (body.extendTrialDays) { const base = Math.max(Date.now(), Date.parse(r.trialEnds || 0) || 0); r.plan = 'trial'; r.trialEnds = new Date(base + Number(body.extendTrialDays) * DAY).toISOString(); }
+      if (body.extendTrialDays && r.plan !== 'lifetime' && !TERM_PLANS.includes(r.plan)) { const base = Math.max(Date.now(), Date.parse(r.trialEnds || 0) || 0); r.plan = 'trial'; r.trialEnds = new Date(base + Number(body.extendTrialDays) * DAY).toISOString(); }
       if (body.plan === 'lifetime') { r.plan = 'lifetime'; r.paidUntil = null; }
       save(); return send(res, 200, publicRestaurant(r));
     }

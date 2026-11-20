@@ -85,3 +85,7 @@ Setup on the online server:
 4. Press "Try a ₹1 payment" to check the keys end to end. The ₹1 is refunded automatically.
 
 You can also set the keys with the environment variables `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET`, which take priority. Payments taken by UPI, cash or bank transfer are recorded with /platform › Mark as paid, which starts the plan and sends the same receipt. All payments are listed on /platform › Payments and are sent to Veyra HQ. Receipts are numbered VDP-YYYY-NNNN, with no GST.
+
+### Plan-ending reminder emails
+
+The server checks every hour and emails the restaurant owner before access runs out: a free trial 3 days, 1 day and on the day it ends; Monthly and Yearly 7, 3 and 1 day before and on the day; Lifetime 7 days before and on the day the year of updates ends. Each email has Pay/Renew buttons that open the admin with the right plan ready to pay (`/admin/<slug>?buy=<plan>`). Each reminder is sent once, nothing is sent after a renewal, and accounts that ended more than 2 days ago, are suspended or have no email are skipped. Reminders need email set up on /platform › Email codes. Set `REMINDERS=0` to turn them off, and `PUBLIC_URL` if the links should use a different address.

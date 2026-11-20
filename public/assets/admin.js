@@ -1559,8 +1559,8 @@
       S.offline = false; goOffline(); renderShell(); return;
     }
     if (window.vdDesktop) { window.vdDesktop.ready({ name: S.me.restaurant.name, access: S.me.restaurant.access }); unlockAudio(); }
-    const buyQ = (/[?&]buy=(monthly|yearly|lifetime)\b/.exec(location.search) || [])[1];
-    if (buyQ) { history.replaceState(null, '', location.pathname + location.hash); if (S.me.restaurant.access.plan !== 'lifetime') setTimeout(() => startPay(buyQ), 300); }
+    const buyQ = (/[?&]buy=(monthly|yearly|lifetime|updates)\b/.exec(location.search) || [])[1];
+    if (buyQ) { history.replaceState(null, '', location.pathname + location.hash); if ((S.me.restaurant.access.plan === 'lifetime') === (buyQ === 'updates')) setTimeout(() => startPay(buyQ), 300); }
     if (!S.me.restaurant.access.active) return renderActivate();
     const h = location.hash.slice(1); if (TABS.some(t => t[0] === h)) S.tab = h;
     await loadLive().catch(() => {});

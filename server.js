@@ -371,6 +371,69 @@ function receiptHtml(r, pay) {
 <p class="muted">Software delivered online. No GST is charged. Questions: ${CONTACT_EMAIL}.${pay.mode === 'test' ? ' TEST PAYMENT: no real money was taken.' : ''}</p><button onclick="print()">Print or save as PDF</button></div></body></html>`;
 }
 
+// ---------- Reminder emails before a trial or plan ends ----------
+// Trials: 3 days and 1 day before, and on the day it ends. Monthly/Yearly: 7, 3 and 1 day before, and on the day.
+// Lifetime: 7 days before the year of updates ends, and on the day. Sent once each (r.reminded), from /platform > Email codes.
+// Only the online server sends them (it has the email settings). Turn off with REMINDERS=0.
+const SITE_URL = (process.env.PUBLIC_URL || LICENSE_SERVER).replace(/\/$/, '');
+function reminderDue(r) {
+  if (r.suspended || !r.email) return null;
+  const a = access(r);
+  let until, stages, kind;
+  if (a.plan === 'lifetime') { until = r.updatesUntil ? r.updatesUntil + 'T23:59:59Z' : null; stages = [7, 0]; kind = 'updates'; }
+  else { until = a.plan === 'trial' ? r.trialEnds : r.paidUntil; stages = a.plan === 'trial' ? [3, 1, 0] : [7, 3, 1, 0]; kind = a.plan; }
+  if (!until || !kind) return null;
+  const left = Math.ceil((Date.parse(until) - Date.now()) / DAY);
+  if (left < -2) return null; // ended more than 2 days ago: no mail (also stops old accounts getting one on the first run)
+  const stage = stages.filter(d => left <= d).sort((x, y) => x - y)[0];
+  if (stage == null) return null;
+  const sent = (r.reminded && r.reminded.until === until) ? r.reminded.stages : [];
+  if (sent.includes(stage)) return null;
+  return { until, stage, kind, left: Math.max(0, left), stages };
+}
+function reminderMail(r, d) {
+  const P = PLANS, on = !!rzpCfg(), when = d.left <= 0 ? 'today' : d.left === 1 ? 'tomorrow' : `in ${d.left} days`;
+  const ended = Date.parse(d.until) <= Date.now();
+  const link = (plan) => `${SITE_URL}/admin/${encodeURIComponent(r.slug)}${plan && on ? '?buy=' + plan : ''}`;
+  let subject, lead, btns;
+  if (d.kind === 'updates') {
+    subject = ended ? 'Your Veyra Dine In updates have ended' : `Your Veyra Dine In updates end ${when}`;
+    lead = `${ended ? 'Your year of updates for ' + r.name + ' has ended.' : 'Your year of updates for ' + r.name + ' ends ' + when + ' (' + fmtDate(d.until) + ').'} Your app keeps working as it is. To keep getting new features and fixes, renew updates for one more year for ${inrTxt(P.updates)} in Settings › Plan and license.`;
+    btns = [[`Renew updates ${inrTxt(P.updates)}`, link('')]];
+  } else {
+    const what = d.kind === 'trial' ? 'free trial' : d.kind + ' plan';
+    subject = ended ? `Your Veyra Dine In ${what} has ended` : `Your Veyra Dine In ${what} ends ${when}`;
+    lead = ended ? `Your ${what} for ${r.name} has ended, so guests can't order from the QR menu right now. Your menu, tables and QR codes are all saved. Choose a plan and you're taking orders again in a minute.`
+      : `Your ${what} for ${r.name} ends ${when} (${fmtDate(d.until)}). ${d.kind === 'trial' ? 'Choose a plan to keep taking orders. Everything you set up stays as it is.' : 'Renew now so orders keep coming in. Paying early adds the new time after your current plan ends.'}`;
+    btns = d.kind === 'trial' || ended && d.kind === 'trial' ? [[`Monthly ${inrTxt(P.monthly)}`, link('monthly')], [`Yearly ${inrTxt(P.yearly)}`, link('yearly')], [`Lifetime ${inrTxt(P.lifetime)}`, link('lifetime')]]
+      : [[`Renew ${d.kind} ${inrTxt(P[d.kind])}`, link(d.kind)], d.kind === 'monthly' ? [`Switch to yearly ${inrTxt(P.yearly)}`, link('yearly')] : [`Lifetime ${inrTxt(P.lifetime)}`, link('lifetime')]];
+  }
+  const payTxt = on ? 'Pay online by UPI, card or netbanking. Your plan starts the moment you pay, with no key to enter. No GST.' : 'Reply to this email and we will send you the payment details.';
+  const text = `Hi ${r.ownerName || r.name},\n\n${lead}\n\n${btns.map(([l, u]) => l + ': ' + u).join('\n')}\n\n${payTxt}\nQuestions? Write to ${CONTACT_EMAIL}.\n\nVeyra Creative & Digital Lab`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:520px;color:#1f1a14"><h2 style="margin:0 0 10px">${escH(subject.replace(/^Your Veyra Dine In /, 'Your '))}</h2><p>Hi ${escH(r.ownerName || r.name)},</p><p>${escH(lead)}</p>
+<p>${btns.map(([l, u], i) => `<a href="${escH(u)}" style="display:inline-block;margin:0 8px 8px 0;background:${i ? '#1f1a14' : '#E4572E'};color:#fff;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:bold">${escH(l)}</a>`).join('')}</p>
+<p style="color:#7a6f63;font-size:13px">${escH(payTxt)}<br>Questions? Write to ${escH(CONTACT_EMAIL)}.<br>Veyra Creative &amp; Digital Lab</p></div>`;
+  return { to: r.email, subject, text, html };
+}
+let remindBusy = false;
+async function sendReminders() {
+  const cfg = smtpCfg(); if (!cfg || remindBusy || HUB || process.env.REMINDERS === '0') return;
+  remindBusy = true;
+  try {
+    for (const r of db.restaurants) {
+      const d = reminderDue(r); if (!d) continue;
+      try {
+        await mailer.send(cfg, reminderMail(r, d));
+        const prev = r.reminded && r.reminded.until === d.until ? r.reminded.stages : [];
+        r.reminded = { until: d.until, stages: [...new Set([...prev, ...d.stages.filter(x => x >= d.stage)])], at: now() }; // skip earlier stages that were missed
+        r.reminders = [{ at: now(), kind: d.kind, stage: d.stage }, ...(r.reminders || [])].slice(0, 20);
+        save(); console.log(`[remind] ${r.name}: ${d.kind}, ${d.stage} day stage`);
+      } catch (e) { console.log('[remind] failed for', r.name, e.message); }
+    }
+  } finally { remindBusy = false; }
+}
+if (!HUB && !process.versions.electron && process.env.REMINDERS !== '0') { setTimeout(() => sendReminders().catch(() => {}), 60000).unref(); setInterval(() => sendReminders().catch(() => {}), 60 * 60000).unref(); }
+
 // Lifetime keys include 1 year of updates (payload.u, or 1 year from the issue date for older keys). Yearly plans get updates while paid.
 function updatesUntilOf(pl) {
   if (!pl) return null;
@@ -1428,7 +1491,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     // overview: restaurants on the online server, activations and installer downloads
     const lastOrder = {}, orders = {};
     for (const o of db.orders) { orders[o.restaurantId] = (orders[o.restaurantId] || 0) + 1; if (!lastOrder[o.restaurantId] || o.createdAt > lastOrder[o.restaurantId]) lastOrder[o.restaurantId] = o.createdAt; }
-    const restaurants = db.restaurants.map(r => ({ id: r.id, slug: r.slug, name: r.name, ownerName: r.ownerName || '', phone: r.ownerPhone || r.phone || '', email: r.email || '', createdAt: r.createdAt, access: access(r), suspended: !!r.suspended, licenseCode: r.licenseCode || null, licensedTo: r.licensedTo || '', updatesUntil: r.updatesUntil || null, google: !!r.google, items: db.items.filter(i => i.restaurantId === r.id).length, tables: db.tables.filter(t => t.restaurantId === r.id).length, orders: orders[r.id] || 0, lastOrderAt: lastOrder[r.id] || null, hqNote: r.hqNote || '', kitchenOnline: kitchenOnline(r), seenAt: adminSeen.get(r.id) ? new Date(adminSeen.get(r.id)).toISOString() : null, waiterPin: !!r.waiterPin, wifiBackupAt: r.hubAt || null, loyalty: !!(r.loyalty && r.loyalty.on), games: !!(r.games && r.games.on), guestWifi: !!(r.wifi && r.wifi.on) }));
+    const restaurants = db.restaurants.map(r => ({ id: r.id, slug: r.slug, name: r.name, ownerName: r.ownerName || '', phone: r.ownerPhone || r.phone || '', email: r.email || '', createdAt: r.createdAt, access: access(r), suspended: !!r.suspended, licenseCode: r.licenseCode || null, licensedTo: r.licensedTo || '', updatesUntil: r.updatesUntil || null, google: !!r.google, items: db.items.filter(i => i.restaurantId === r.id).length, tables: db.tables.filter(t => t.restaurantId === r.id).length, orders: orders[r.id] || 0, lastOrderAt: lastOrder[r.id] || null, hqNote: r.hqNote || '', lastReminder: (r.reminders || [])[0] || null, kitchenOnline: kitchenOnline(r), seenAt: adminSeen.get(r.id) ? new Date(adminSeen.get(r.id)).toISOString() : null, waiterPin: !!r.waiterPin, wifiBackupAt: r.hubAt || null, loyalty: !!(r.loyalty && r.loyalty.on), games: !!(r.games && r.games.on), guestWifi: !!(r.wifi && r.wifi.on) }));
     const codes = {}; for (const [c, x] of Object.entries(db.licenseCodes)) codes[c] = codeView(c, x);
     const A = db.analytics || {}, analytics = {}; for (const k of Object.keys(A).sort().slice(-120)) analytics[k] = A[k];
     let appVersion = null; try { appVersion = (/^version:\s*(\S+)/m.exec(fs.readFileSync(path.join(DL_DIR, 'latest.yml'), 'utf8')) || [])[1] || null; } catch {}
@@ -2122,7 +2185,7 @@ function start(port = PORT, host) {
   });
 }
 
-module.exports = { db, save, saveNow, newRestaurant, id, hashPassword, sign, start, lanAddresses, access };
+module.exports = { db, save, saveNow, newRestaurant, id, hashPassword, sign, start, lanAddresses, access, sendReminders };
 
 if (require.main === module) {
   start().then(() => {

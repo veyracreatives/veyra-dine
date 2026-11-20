@@ -258,6 +258,8 @@ async function claimShort(code, r, req) {
   return j.key;
 }
 // Is this restaurant allowed to take orders? (trial running, or paid)
+// Search engines only list menus that are live and have a real menu (at least 5 dishes), so test and empty accounts stay out of Google
+function menuIndexable(r) { return access(r).active && !r.suspended && db.items.filter(i => i.restaurantId === r.id && !i.hidden).length >= 5; }
 function access(r) {
   if (r.suspended) return { plan: 'suspended', active: false, daysLeft: 0 };
   const plan = r.plan || 'lifetime'; // restaurants made before plans existed keep working
@@ -804,7 +806,7 @@ function serveMenuPage(req, res, url, slug) {
     const head = `<title>${e(title)}</title>
 <meta name="description" content="${e(desc.slice(0, 300))}">
 <link rel="canonical" href="${e(canon)}">
-<meta name="robots" content="${url.searchParams.get('t') || !access(r).active ? 'noindex, follow' : 'index, follow, max-image-preview:large'}">
+<meta name="robots" content="${url.searchParams.get('t') || !menuIndexable(r) ? 'noindex, follow' : 'index, follow, max-image-preview:large'}">
 <meta property="og:type" content="restaurant.restaurant"><meta property="og:url" content="${e(canon)}"><meta property="og:title" content="${e(r.name + ' · Menu')}"><meta property="og:description" content="${e(desc.slice(0, 200))}">${img ? `<meta property="og:image" content="${e(img)}"><meta name="twitter:card" content="summary_large_image">` : ''}
 <script type="application/ld+json">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script>`;
     page = page.replace('<title>Menu</title>', head).replace('<html lang="en">', '<html lang="en-IN">')
@@ -852,7 +854,7 @@ function isPlatform(req) { return unsign(cookies(req).vd_platform) === 'platform
 async function handle(req, res) {
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
-  const m = req.method;
+  const m = req.method === 'HEAD' && !req.url.startsWith('/api/') ? 'GET' : req.method; // HEAD (used by crawlers and SEO checkers) answers like GET; Node leaves out the body
 
   // ---- pages ----
   // product website (landing page) at the root; restaurants use /admin and /signup
@@ -860,7 +862,9 @@ async function handle(req, res) {
   if (m === 'GET' && (p === '/' || p === '/index.html')) {
     // picture links carry ?v=<file time>, so browsers fetch a picture again as soon as it changes on an update
     if (!siteCache) { const stockFile = path.join(SITE_DIR, 'content.json'), raw = fs.readFileSync(path.join(SITE_DIR, 'index.html'), 'utf8'); siteCache = db.siteContent ? siteContent.render(raw, db.siteContent, fs.existsSync(stockFile) ? JSON.parse(fs.readFileSync(stockFile, 'utf8')) : null) : raw; siteCache = siteCache.replace(/(src|content|href)="((?:https:\/\/[^"\/]+)?\/?(?:img\/[A-Za-z0-9._-]+|og\.jpg))"/g, (m, a, u) => { try { const f = path.join(SITE_DIR, u.replace(/^https:\/\/[^\/]+/, '').replace(/^\//, '')); return a + '="' + u + '?v=' + Math.round(fs.statSync(f).mtimeMs).toString(36) + '"'; } catch (e) { return m; } }); }
-    return send(res, 200, siteCache, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+    const etag = '"' + crypto.createHash('sha1').update(siteCache).digest('base64url').slice(0, 20) + '"';
+    if (req.headers['if-none-match'] === etag) { res.writeHead(304, { ETag: etag, 'Cache-Control': 'no-cache' }); return res.end(); } // browsers and crawlers that already have the page get a tiny 304
+    return send(res, 200, siteCache, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', ETag: etag });
   }
   if (m === 'GET' && /^\/(privacy|terms|refund|contact)\/?$/.test(p)) return serveFile(res, path.join(SITE_DIR, p.replace(/\//g, ''), 'index.html'), 'no-cache');
   if (m === 'GET' && /^\/site-media\/[A-Za-z0-9]+\.(png|jpg|webp|svg)$/.test(p)) { const f = safeJoin(path.join(DATA_DIR, 'site-media'), p.slice(11)); return f ? serveFile(res, f, 'public, max-age=31536000, immutable') : fail(res, 404, 'Not found'); }
@@ -907,7 +911,7 @@ self.addEventListener('notificationclick', e => {
   if (m === 'GET' && /^\/m\/[a-z0-9-]+\/?$/.test(p)) return serveMenuPage(req, res, url, p.split('/')[2]);
   if (m === 'GET' && p === '/robots.txt') return send(res, 200, `User-agent: *\nDisallow: /admin\nDisallow: /platform\nDisallow: /api/\nDisallow: /print-qr\nDisallow: /display/\nDisallow: /kitchen/\nAllow: /m/\n\nSitemap: ${baseUrl(req)}/sitemap.xml\n`, { 'Content-Type': 'text/plain; charset=utf-8' });
   if (m === 'GET' && p === '/sitemap.xml') { const b = baseUrl(req), d = new Date().toISOString().slice(0, 10), u = (loc, freq, pri) => `  <url><loc>${b}${loc}</loc><lastmod>${d}</lastmod><changefreq>${freq}</changefreq><priority>${pri}</priority></url>`;
-    return send(res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[u('/', 'weekly', '1.0'), u('/signup', 'monthly', '0.8'), ...['contact', 'privacy', 'terms', 'refund'].map(x => u('/' + x, 'yearly', '0.3')), ...db.restaurants.filter(r => access(r).active).map(r => u('/m/' + r.slug, 'weekly', '0.6'))].join('\n')}\n</urlset>\n`, { 'Content-Type': 'application/xml; charset=utf-8' }); }
+    return send(res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[u('/', 'weekly', '1.0'), u('/signup', 'monthly', '0.8'), ...['contact', 'privacy', 'terms', 'refund'].map(x => u('/' + x, 'yearly', '0.3')), ...db.restaurants.filter(menuIndexable).map(r => u('/m/' + r.slug, 'weekly', '0.6'))].join('\n')}\n</urlset>\n`, { 'Content-Type': 'application/xml; charset=utf-8' }); }
   if (m === 'GET' && p === '/admin/google-link') {
     const cid = googleClientId(req);
     return send(res, 200, `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in to Veyra Dine In</title>

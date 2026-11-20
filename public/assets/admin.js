@@ -94,7 +94,7 @@
     if (es) { es.close(); es = null; }
     mode = mode || (location.pathname.startsWith('/signup') ? 'signup' : 'login');
     const pre = location.pathname.split('/')[2] || localStorage.getItem('vd_slug') || '';
-    document.title = mode === 'signup' ? 'Start your free trial' : mode === 'forgot' ? 'Reset your password' : 'Log in';
+    document.title = mode === 'signup' ? (location.pathname === '/signup' ? 'Free trial: QR Code Ordering for Restaurants · Veyra Dine In' : 'Start your free trial') : mode === 'forgot' ? 'Reset your password' : 'Log in';
     app.innerHTML = `<div class="auth">
       <div class="brand-side"><div class="logo"><span class="mark">${icon('qr', 24)}</span>Veyra Dine In</div>
         <h1>Orders from every table, <em>right here.</em></h1><p>Guests scan the QR on their table and order from their phone. You see it here with the table number and a sound.</p>

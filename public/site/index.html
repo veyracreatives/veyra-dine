@@ -265,6 +265,9 @@
   @media (max-width: 420px) { .nav-cta > .login-link { display: none !important; } .menu-btn { width: 40px; height: 40px; } }
   /* how-to guides */
   .guides { margin-top: 44px; }
+  .cd.kd { grid-template-columns: 1.15fr 1fr; }
+  .cd.kd .cd-shots { padding-bottom: 0; }
+  @media (max-width: 980px) { .cd.kd { grid-template-columns: 1fr; } .cd.kd .cd-shots { order: 2; } }
   .gtabs { display: grid; grid-template-columns: repeat(4, minmax(0, 220px)); gap: 10px; justify-content: center; }
   .gtabs button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 99px; border: 1.5px solid var(--line); background: var(--white); color: var(--ink); font: 700 15px/1 var(--sans, inherit); cursor: pointer; white-space: nowrap; }
   .gtabs button svg { color: var(--saffron-d); }
@@ -281,6 +284,17 @@
   @media (max-width: 560px) { .gtabs { display: flex; flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; margin: 0 -16px; padding: 0 16px 6px; scrollbar-width: none; } .gtabs::-webkit-scrollbar { display: none; } .gpanel { grid-template-columns: 1fr; gap: 12px; } .gpanel li { display: grid; grid-template-columns: 36px 1fr; column-gap: 14px; padding: 18px; } .gpanel .gn { grid-row: span 2; } .gpanel b { margin: 6px 0 4px; } }
 
   /* waiter app + WiFi backup */
+  /* counter display section */
+  .cd { display: grid; grid-template-columns: 1fr 1.15fr; gap: 56px; align-items: center; }
+  .cd h2 { margin-top: 14px; }
+  .cd-shots { position: relative; padding: 0 0 70px; }
+  .cd-tv { border: 10px solid #1B1714; border-bottom-width: 16px; border-radius: 18px; overflow: hidden; background: #1B1714; box-shadow: 0 24px 50px rgba(60,40,20,.18); }
+  .cd-tv img, .cd-tab img { display: block; width: 100%; height: auto; aspect-ratio: 16/9; object-fit: cover; }
+  .cd-tab { position: absolute; right: 0; bottom: 0; width: 50%; border: 8px solid #1B1714; border-radius: 16px; overflow: hidden; background: #1B1714; box-shadow: 0 20px 40px rgba(60,40,20,.25); }
+  @media (min-width: 1300px) { .cd-tab { right: -18px; } }
+  @media (max-width: 980px) { .cd { grid-template-columns: 1fr; gap: 36px; } }
+  @media (max-width: 560px) { .cd-shots { padding-bottom: 50px; } .cd-tv { border-width: 6px; border-bottom-width: 10px; border-radius: 12px; } .cd-tab { width: 58%; border-width: 5px; border-radius: 12px; } }
+  @media (min-width: 561px) { .gtabs { display: flex; flex-wrap: wrap; } }
   .wt { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
   .wt-ph { display: flex; align-items: flex-start; justify-content: center; gap: 18px; background: var(--cream-2); border-radius: 30px; padding: 40px 20px; }
   .wt-ph .ph { width: 220px; border-radius: 30px; border: 8px solid #1B1714; overflow: hidden; box-shadow: 0 20px 40px rgba(60,40,20,.18); background: #1B1714; flex: none; }
@@ -459,7 +473,7 @@
   <symbol id="i-user" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></g></symbol>
   <symbol id="i-game" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10a5 5 0 0 1 4.6 7l-1 2.4a2.5 2.5 0 0 1-4.2.6L15 15H9l-1.4 2a2.5 2.5 0 0 1-4.2-.6l-1-2.4A5 5 0 0 1 7 7Z"/><path d="M8 10v3M6.5 11.5h3M15.5 11h.01M17.5 12.5h.01"/></g></symbol>
   <symbol id="i-dot" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.5" fill="currentColor"/><circle cx="12" cy="12" r="8.5"/></g></symbol>
-  <symbol id="i-qr" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1"/><rect x="13.5" y="3.5" width="7" height="7" rx="1"/><rect x="3.5" y="13.5" width="7" height="7" rx="1"/><path d="M14 14h2.5v2.5H14zM18 18h2.5v2.5H18zM18 14h2.5M14 18v2.5"/></g></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></g></symbol><symbol id="i-chef" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 14a4 4 0 1 1 1.4-7.8 4 4 0 0 1 7.2 0A4 4 0 1 1 17 14"/><path d="M7 14v6h10v-6M7 17h10"/></g></symbol><symbol id="i-qr" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1"/><rect x="13.5" y="3.5" width="7" height="7" rx="1"/><rect x="3.5" y="13.5" width="7" height="7" rx="1"/><path d="M14 14h2.5v2.5H14zM18 18h2.5v2.5H18zM18 14h2.5M14 18v2.5"/></g></symbol>
   <symbol id="i-win" viewBox="0 0 24 24"><path fill="currentColor" d="M3 5.5 10.5 4.4v7.1H3zM11.5 4.3 21 3v8.5h-9.5zM3 12.5h7.5v7.1L3 18.5zM11.5 12.5H21V21l-9.5-1.3z"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10a6 6 0 1 1 12 0c0 5 2 6.5 2 6.5H4S6 15 6 10Z"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></g></symbol>
@@ -609,6 +623,45 @@
   </div>
 </div></section>
 
+<section id="kitchen" style="padding-top:20px"><div class="wrap">
+  <div class="cd kd">
+    <div class="cd-shots rv">
+      <div class="cd-tv"><img data-k="ifecba6ce" loading="lazy" width="1920" height="1080" decoding="async" src="img/kitchen-display.jpg" alt="Kitchen display: every order as a big ticket with the table, dishes, notes, a timer and a Ready button"></div>
+    </div>
+    <div class="rv" style="--d:1">
+      <span class="newtag" data-k="t2bac54f7">New · Kitchen display</span>
+      <h2 data-k="t0f135bf8">A kitchen screen instead of paper KOTs</h2>
+      <p class="sub" data-k="tea27dcb0">Put a TV, a monitor or a tablet in the kitchen. Every order shows up as a big ticket with a bell, so nothing gets lost in a pile of paper.</p>
+      <ul class="list">
+      <li><span class="bi"><svg class="ic" width="20" height="20"><use href="#i-bell"/></svg></span><div><b data-k="t5e3d596d">Every order, the second it comes in</b><span data-k="tca449256">Table, dishes, veg and non-veg marks and notes like less spicy. QR, counter and waiter orders all land here.</span></div></li>
+      <li><span class="bi"><svg class="ic" width="20" height="20"><use href="#i-check"/></svg></span><div><b data-k="t2cae2616">Two taps: Start cooking, then Ready</b><span data-k="t9da570e9">The counter, the waiter app and the guest’s phone update at once. Tapped Ready by mistake? Bring it back in one tap.</span></div></li>
+      <li><span class="bi"><svg class="ic" width="20" height="20"><use href="#i-chef"/></svg></span><div><b data-k="tbf0749fa">Timers and a “to make” list</b><span data-k="t18acf74c">Each ticket turns amber at 10 minutes and red when it is late. The top row adds up how many of each dish to make.</span></div></li>
+      </ul>
+      <div class="wt-cta"><small data-k="tb574fdf7">Turn it on in Settings › Kitchen display. Open the link on the kitchen screen, or scan its QR with the tablet.</small></div>
+    </div>
+  </div>
+</div></section>
+
+<section id="display" style="padding-top:20px"><div class="wrap">
+  <div class="cd">
+    <div class="rv">
+      <span class="newtag" data-k="tbfd51cd2">New · Counter display</span>
+      <h2 data-k="tca19440c">A screen your customers can see</h2>
+      <p class="sub" data-k="ta889dce0">Put a second monitor, a TV or an old tablet at your counter. Customers watch their order and bill fill in as you type, then pay with one scan. No extra app and no extra cost.</p>
+      <ul class="list">
+      <li><span class="bi"><svg class="ic" width="20" height="20"><use href="#i-check"/></svg></span><div><b data-k="t30edd28f">Bill and UPI QR, live</b><span data-k="t10a161c8">Every dish shows the moment you add it, with the total and a UPI QR for the exact amount. Split bills show each person’s share.</span></div></li>
+      <li><span class="bi"><svg class="ic" width="20" height="20"><use href="#i-bell"/></svg></span><div><b data-k="t89e3e15f">Order numbers when food is ready</b><span data-k="ted222759">Numbers move from Preparing to Ready to collect with a soft chime. Fewer people asking “is mine ready?”</span></div></li>
+      <li><span class="bi"><svg class="ic" width="20" height="20"><use href="#i-qr"/></svg></span><div><b data-k="t5ccda812">Menu, WiFi and offers in between</b><span data-k="t962470d7">When nobody is paying, it shows your menu QR, guest WiFi, a welcome line and today’s coupon codes.</span></div></li>
+      </ul>
+      <div class="wt-cta"><small data-k="t7f31adeb">Turn it on in Settings › Counter display. Open the link on the screen, or scan its QR with the tablet.</small></div>
+    </div>
+    <div class="cd-shots rv" style="--d:1">
+      <div class="cd-tv"><img data-k="ieabcd136" loading="lazy" width="1920" height="1080" decoding="async" src="img/display-board.jpg" alt="Counter display: order numbers preparing and ready to collect, with the menu QR and guest WiFi"></div>
+      <div class="cd-tab"><img data-k="if3162aee" loading="lazy" width="1920" height="1080" decoding="async" src="img/display-bill.jpg" alt="Counter display while billing: the dishes, the total and a UPI QR for the exact amount"></div>
+    </div>
+  </div>
+</div></section>
+
 <section id="together" style="padding-top:20px"><div class="wrap">
   <div class="center rv"><span class="newtag" data-k="t6403f2b7">New</span><h2 data-k="t7c087ef3">Made for tables that order together</h2><p class="sub" data-k="t45b18302">Big groups, shared starters and "who pays what". Sorted from the guests' own phones.</p></div>
   <div class="groups">
@@ -664,13 +717,15 @@
     <div class="rv feat" style="--d:1"><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-win"/></svg></span><h3 data-k="t58b8a272">WiFi backup</h3><p data-k="t10d5e907">No internet? The Windows app takes over on your own WiFi and sends every order online later.</p></div>
     <div class="rv feat" style="--d:2"><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-lock"/></svg></span><h3 data-k="t81849f4a">Google login and email code</h3><p data-k="t8419ca88">Log in with Google in one tap. Forgot the password? Get a 6-digit code by email.</p></div>
     <div class="rv feat" style="--d:3"><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-check"/></svg></span><h3 data-k="t81f903f3">Split bill and UPI</h3><p data-k="tbf422890">Split by person or equally and pay by GPay or PhonePe with the exact share.</p></div>
+    <div class="rv feat" style="--d:0"><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-monitor"/></svg></span><h3 data-k="tdef412da">Counter display</h3><p data-k="t2e9e8d76">A customer screen at the counter: the bill with a UPI QR, and order numbers when food is ready.</p></div>
+    <div class="rv feat" style="--d:1"><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-chef"/></svg></span><h3 data-k="t69c63e10">Kitchen display</h3><p data-k="t53ec29e9">Orders as big tickets on a kitchen screen, with timers, a bell and one-tap Ready. No paper KOT needed.</p></div>
   </div>
 </div></section>
 
 <section id="guides"><div class="wrap">
   <div class="center rv"><div class="kicker" data-k="tdd45fd3f">How to use</div><h2 data-k="t0ad07e03">Step-by-step guides</h2><p class="sub" data-k="t5526215b">Every main feature in four simple steps. Pick one to see how it works.</p></div>
   <div class="guides rv">
-    <div class="gtabs" role="tablist"><button type="button" role="tab" data-g="0" aria-selected="true" class="on"><svg class="ic" width="18" height="18"><use href="#i-user"/></svg><span data-k="t90e40d50">Get started</span></button><button type="button" role="tab" data-g="1" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-qr"/></svg><span data-k="te9fb1e19">Guests order</span></button><button type="button" role="tab" data-g="2" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-phone"/></svg><span data-k="t3c3d7921">Waiter app</span></button><button type="button" role="tab" data-g="3" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-dot"/></svg><span data-k="tc7d1699c">Kitchen online</span></button><button type="button" role="tab" data-g="4" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-wifi"/></svg><span data-k="t58b8a272">WiFi backup</span></button><button type="button" role="tab" data-g="5" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-gift"/></svg><span data-k="ta92e6a80">Loyalty and coupons</span></button><button type="button" role="tab" data-g="6" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-game"/></svg><span data-k="t398ed329">Games</span></button><button type="button" role="tab" data-g="7" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-lock"/></svg><span data-k="t46d69925">Login and password</span></button></div>
+    <div class="gtabs" role="tablist"><button type="button" role="tab" data-g="0" aria-selected="true" class="on"><svg class="ic" width="18" height="18"><use href="#i-user"/></svg><span data-k="t90e40d50">Get started</span></button><button type="button" role="tab" data-g="1" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-qr"/></svg><span data-k="te9fb1e19">Guests order</span></button><button type="button" role="tab" data-g="2" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-phone"/></svg><span data-k="t3c3d7921">Waiter app</span></button><button type="button" role="tab" data-g="3" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-dot"/></svg><span data-k="tc7d1699c">Kitchen online</span></button><button type="button" role="tab" data-g="4" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-wifi"/></svg><span data-k="t58b8a272">WiFi backup</span></button><button type="button" role="tab" data-g="5" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-gift"/></svg><span data-k="ta92e6a80">Loyalty and coupons</span></button><button type="button" role="tab" data-g="6" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-game"/></svg><span data-k="t398ed329">Games</span></button><button type="button" role="tab" data-g="7" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-lock"/></svg><span data-k="t46d69925">Login and password</span></button><button type="button" role="tab" data-g="9" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-chef"/></svg><span data-k="t69c63e10">Kitchen display</span></button><button type="button" role="tab" data-g="8" aria-selected="false"><svg class="ic" width="18" height="18"><use href="#i-monitor"/></svg><span data-k="tdef412da">Counter display</span></button></div>
     <ol class="gpanel on" data-gp="0" role="tabpanel"><li><span class="gn">1</span><b data-k="tf3534216">Get the app</b><p data-k="t8e955fbe">Download the Windows app for your counter, or sign up on the website and use your phone.</p></li><li><span class="gn">2</span><b data-k="t1d8d90a2">Add your menu</b><p data-k="tf889b8db">Menu tab: add categories, dishes, prices and photos. Mark veg or non-veg.</p></li><li><span class="gn">3</span><b data-k="t5f2257ea">Print table QR codes</b><p data-k="tdb2f951d">Tables &amp; QR tab: add your tables and print the QR cards, four to an A4 page.</p></li><li><span class="gn">4</span><b data-k="tec51f77d">Keep the admin open</b><p data-k="t433da6ad">New orders ring and pop up. The green Online dot means guests can order.</p></li></ol>
     <ol class="gpanel" data-gp="1" role="tabpanel"><li><span class="gn">1</span><b data-k="tf9f90c39">Scan the table QR</b><p data-k="tc37e2458">Guests open the phone camera and scan. The menu opens with no app to install.</p></li><li><span class="gn">2</span><b data-k="t9f0c677e">Add dishes together</b><p data-k="t6bfb531d">Everyone at the table can add to one shared order, with notes like less spicy.</p></li><li><span class="gn">3</span><b data-k="tf5dba701">Pay their way</b><p data-k="t3dd0cb02">Pay by UPI from the phone, split the bill, or pay at the counter.</p></li><li><span class="gn">4</span><b data-k="tf24cd6de">Call, ask, play</b><p data-k="te989bf31">Tap to call a waiter or ask for the bill, and play games while the food cooks.</p></li></ol>
     <ol class="gpanel" data-gp="2" role="tabpanel"><li><span class="gn">1</span><b data-k="te54375b7">Set a waiter PIN</b><p data-k="t0e73a2fa">Settings › Waiters: choose a 4 to 6 digit PIN.</p></li><li><span class="gn">2</span><b data-k="tdfb541e8">Share the waiter link</b><p data-k="t929f5db3">Give each waiter your restaurant ID and the PIN, plus the link or the QR shown there.</p></li><li><span class="gn">3</span><b data-k="t1c4ef918">Waiters log in</b><p data-k="t651d9586">They enter the restaurant ID and PIN you gave them, and their own name. Works on any phone.</p></li><li><span class="gn">4</span><b data-k="t7d42d4ac">Tap a table and send</b><p data-k="t83563a52">Add dishes, add a note and tap Send. The KOT reaches the kitchen.</p></li></ol>
@@ -679,6 +734,8 @@
     <ol class="gpanel" data-gp="5" role="tabpanel"><li><span class="gn">1</span><b data-k="tb5865f05">Set your rules</b><p data-k="tee3f0517">Settings › Loyalty: how much a guest spends for one point and what a point is worth.</p></li><li><span class="gn">2</span><b data-k="t97a43ac4">Guests add their number</b><p data-k="td10e0f50">They enter their phone number when they order. Points are added when the table is cleared.</p></li><li><span class="gn">3</span><b data-k="t7c25f7ec">Use points at billing</b><p data-k="t946a97a0">Look up the number on the bill and use the points as payment.</p></li><li><span class="gn">4</span><b data-k="te48975f3">Make coupon codes</b><p data-k="tb455778d">Coupons tab: % or ₹ off, minimum order, expiry and use limit.</p></li></ol>
     <ol class="gpanel" data-gp="6" role="tabpanel"><li><span class="gn">1</span><b data-k="t336e0a5a">Turn on games</b><p data-k="tbb9d5af4">Settings › Games: switch them on and choose this week's prize.</p></li><li><span class="gn">2</span><b data-k="t5ed4049e">Guests play while waiting</b><p data-k="tb253d981">They tap Play and win on the menu. Games are always free.</p></li><li><span class="gn">3</span><b data-k="tad577b38">Weekly leaderboard</b><p data-k="t4f2b6748">The best scores show on your menu, first names only.</p></li><li><span class="gn">4</span><b data-k="t840b05ed">Give the prize</b><p data-k="te7d01a79">The week's top player shows the screen and gets the prize.</p></li></ol>
     <ol class="gpanel" data-gp="7" role="tabpanel"><li><span class="gn">1</span><b data-k="tf8ce4ace">Log in with Google</b><p data-k="ta20125fa">Tap Continue with Google. In the Windows app it opens your browser to sign in.</p></li><li><span class="gn">2</span><b data-k="t0f20fe9d">Or use your password</b><p data-k="t2021e963">Your restaurant ID or email and your password.</p></li><li><span class="gn">3</span><b data-k="t60737e3e">Forgot the password?</b><p data-k="td13f8c30">Tap Forgot password and enter your email. We send a 6-digit code.</p></li><li><span class="gn">4</span><b data-k="t1e83ae49">Set a new password</b><p data-k="t06963bab">Type the code within 10 minutes and choose a new password.</p></li></ol>
+    <ol class="gpanel" data-gp="8" role="tabpanel"><li><span class="gn">1</span><b data-k="tcc4d3c36">Turn it on</b><p data-k="te883c01d">Settings › Counter display: switch it on and add a welcome line if you like.</p></li><li><span class="gn">2</span><b data-k="te77d4c64">Open it on the screen</b><p data-k="t5b02facd">Second monitor: tap Open on this computer and drag it there. Tablet or TV: scan the QR.</p></li><li><span class="gn">3</span><b data-k="tee14ed26">Bill as usual</b><p data-k="td354fc2e">Take a New order or open Bill and split. The customer sees the dishes, the total and a UPI QR.</p></li><li><span class="gn">4</span><b data-k="t21f69c54">Call out orders</b><p data-k="ta09659d3">Mark food ready and the number moves to Ready to collect with a chime.</p></li></ol>
+    <ol class="gpanel" data-gp="9" role="tabpanel"><li><span class="gn">1</span><b data-k="tcc4d3c36">Turn it on</b><p data-k="t4639e320">Settings › Kitchen display: switch it on. Keep the bell on so cooks hear new orders.</p></li><li><span class="gn">2</span><b data-k="t1b924872">Open it in the kitchen</b><p data-k="tf13f27ed">Scan the QR with the kitchen tablet, or open the link on the kitchen TV and tap Start.</p></li><li><span class="gn">3</span><b data-k="t48cdf3aa">Cook from the tickets</b><p data-k="t127c033b">Tap Start cooking on a new ticket. The timer and the To make row show what comes first.</p></li><li><span class="gn">4</span><b data-k="tb687a6ad">Tap Ready</b><p data-k="td16c87d4">The ticket moves to Ready, and the counter, waiters and guests see it at once.</p></li></ol>
   </div>
 </div></section>
 

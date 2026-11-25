@@ -25,8 +25,8 @@ function render(cfg, IC) {
   return `<div class="lp">
   <header class="lp-head"><div class="wrap">
     <a class="brand" href="#">${logo()}<div><b>VEYRA ACADEMY</b><small>Academy app</small></div></a>
-    <nav class="lp-nav" aria-label="Main"><a href="#features" data-scroll="features">Features</a><a href="#apps" data-scroll="apps">Apps</a><a href="#connected" data-scroll="connected">How it connects</a><a href="#pricing" data-scroll="pricing">Pricing</a><a href="#faq" data-scroll="faq">FAQ</a></nav>
-    <div class="lp-cta"><a class="btn btn-ghost login" href="#login">Log in</a><a class="btn btn-primary" href="#signup">Free trial</a></div>
+    <nav class="lp-nav" aria-label="Main"><a href="#features" data-scroll="features">Features</a><a href="#apps" data-scroll="apps">Apps</a><a href="#connected" data-scroll="connected">How it connects</a><a href="#pricing" data-scroll="pricing">Pricing</a><a href="#get-app" data-scroll="get-app">Install</a><a href="#faq" data-scroll="faq">FAQ</a></nav>
+    <div class="lp-cta"><button class="btn btn-ghost get-app" type="button" data-act="install" aria-label="Install the app">${ic('phone')}<span>Get the app</span></button><a class="btn btn-ghost login" href="#login">Log in</a><a class="btn btn-primary" href="#signup">Free trial</a></div>
   </div></header>
   <main>
   <section class="hero"><div class="wrap">
@@ -82,12 +82,17 @@ function render(cfg, IC) {
     <div class="sec-head"><span class="eyebrow" style="justify-self:start">Every feature</span><h2 class="disp">Everything your academy needs, <em>in one place</em></h2><p>No spreadsheets, no WhatsApp groups for fees, no paper registers.</p></div>
     <div class="fgrid rv">${feats.map(([i, h, p]) => `<div class="fitem">${ic(i)}<div><h3>${h}</h3><p>${p}</p></div></div>`).join('')}</div>
   </div></section>
+  <section class="sec" id="get-app" style="padding-top:0"><div class="wrap">
+    <div class="sec-head"><span class="eyebrow" style="justify-self:start">Install the app</span><h2 class="disp">On every phone, <em>no app store</em></h2><p>Admin, manager, coach and parent apps install straight from this page. They open full screen like any app and update on their own.</p></div>
+    <div class="get-grid rv">${[['Android', 'Chrome: tap Install below, or ⋮ menu › Install app.'], ['iPhone and iPad', 'Safari: tap Share, then Add to Home Screen.'], ['Laptop and PC', 'Chrome or Edge: tap Install below, or the install icon in the address bar.']].map(([h, p]) => `<div class="get-card"><b>${h}</b><p>${p}</p></div>`).join('')}</div>
+    <div class="hstack" style="margin-top:24px"><button class="btn btn-primary btn-lg" type="button" data-act="install">${ic('phone')}Install Veyra Academy</button><span class="faint" style="font-size:13.5px">Always the latest version. Nothing to download from a store.</span></div>
+  </div></section>
   <section class="sec" id="pricing" style="background:var(--surface);border-block:1px solid var(--line)"><div class="wrap">
     <div class="sec-head"><span class="eyebrow" style="justify-self:start">Pricing</span><h2 class="disp">One plan. <em>Everything in it.</em></h2><p>Unlimited players, coaches and parents. Start with ${P.trial} days free, then pay securely with Razorpay.</p></div>
     <div class="price-wrap rv">
       <div class="price"><span class="label">Monthly</span><div class="amt">${r(P.monthly)}<small>per month</small></div><p class="muted">Cancel any time.</p><a class="btn btn-ghost btn-lg btn-block" href="#signup">Start free trial</a>
         <ul>${['Admin, manager, coach and parent apps', 'Attendance for players and coaches', 'UPI fee collection and receipts', 'Tournaments, training and kit', 'Fee reminders', 'Google sign-in'].map(x => `<li>${ic('ok')}${x}</li>`).join('')}</ul></div>
-      <div class="price best"><div class="between"><span class="label" style="color:var(--brand)">Yearly</span>${free ? `<span class="pill p-brand plain">${free} months free</span>` : ''}</div><div class="amt">${r(P.yearly)}<small>per year</small></div><p class="muted">Works out to ${r(perMo)} a month.</p><a class="btn btn-primary btn-lg btn-block" href="#signup">Start free trial</a>
+      <div class="price best"><div class="between"><span class="label" style="color:var(--brand)">Yearly</span>${save > 0 ? `<span class="pill p-brand plain">Save ₹${save.toLocaleString('en-IN')}</span>` : ''}</div><div class="amt">${r(P.yearly)}<small>per year</small></div><p class="muted">Works out to ${r(perMo)} a month.</p><a class="btn btn-primary btn-lg btn-block" href="#signup">Start free trial</a>
         <ul>${['Everything in Monthly', save > 0 ? `Saves ${r(save)} a year` : 'Best value', 'Priority help by email', 'Free setup call for your batches'].map(x => `<li>${ic('ok')}${x}</li>`).join('')}</ul></div>
     </div>
     <div class="rzp-strip rv">${ic('shield')}<div><b>Pay for your plan with Razorpay</b><small>UPI, debit and credit cards, net banking and wallets. Your plan turns on the moment the payment goes through. No GST added.</small></div><div class="hstack rzp-tags"><span class="pill p-mute plain">UPI</span><span class="pill p-mute plain">Cards</span><span class="pill p-mute plain">Net banking</span><span class="pill p-mute plain">Wallets</span></div></div>

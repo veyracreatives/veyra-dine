@@ -10,7 +10,7 @@ self.addEventListener('fetch', e => {
     e.respondWith(fetch(e.request).then(r => { if (r.ok && u.pathname === '/') { const c = r.clone(); caches.open(V).then(x => x.put('/', c)); } return r; }).catch(() => caches.match('/')));
     return;
   }
-  e.respondWith(caches.match(e.request, { ignoreSearch: true }).then(hit => {
+  e.respondWith(caches.match(e.request).then(hit => {
     const net = fetch(e.request).then(r => { if (r.ok) { const c = r.clone(); caches.open(V).then(x => x.put(e.request, c)); } return r; }).catch(() => hit);
     return hit || net;
   }));

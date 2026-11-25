@@ -248,6 +248,10 @@ function reveal() {
   render(); countUp(); reveal();
   API.subscribe(liveUpdate);
   if (LIVE) { flush(); if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {}); }
+  /* installed app opens the user's own app, not the website */
+  if ((window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) && !location.hash) location.hash = '#app';
+  /* new version on the server: reload by itself when the person is not in the middle of something */
+  if (LIVE && CFG.version) { const check = () => fetch('/healthz', { cache: 'no-store' }).then(r => r.json()).then(j => { if (j.version && j.version !== CFG.version) { const busy = U.modal || (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)); if (busy) U.newVersion = true; else location.reload(); } }).catch(() => {}); setInterval(check, 10 * 60e3); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); }); }
   setInterval(() => { if (B && !U.modal && !drag && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) { const t = B.today; refresh(true).then(() => { if (B && B.today !== t) { U.draft = {}; rerender(); } }); } }, 5 * 60 * 1000);
 })();
 })();

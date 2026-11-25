@@ -1,6 +1,6 @@
 {
   "name": "veyra-academy",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Veyra Academy: football academy management (admin, manager, coach, parent apps + Veyra HQ)",
   "main": "server.js",

@@ -377,3 +377,11 @@ a.tick{text-decoration:none}
 /* small phones: give player names room on the marking list */
 @media (max-width:400px){.tally{gap:4px 10px}.mark{gap:8px;padding:10px 12px}.pal{grid-template-columns:repeat(3,38px);gap:4px}.pal button{height:38px}}
 @media (max-width:360px){.tally .faint{display:none}}
+
+/* install section */
+.get-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.get-card{padding:20px;border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--line);display:grid;gap:6px}
+.get-card b{font:800 18px/1.2 var(--f-display)}
+.get-card p{color:var(--ink-2);font-size:14px}
+@media (max-width:760px){.get-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:560px){.lp-cta .get-app span{display:none}.lp-cta .get-app{width:40px;padding:0}}

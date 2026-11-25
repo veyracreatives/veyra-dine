@@ -132,7 +132,7 @@ function page(mode) {
   return h;
 }
 function staticFile(res, rel) {
-  if (rel === 'hq.html' || rel === 'index.html') return false;
+  if (/^(hq\.html|hq\.js|index\.html)$/.test(rel)) return false;
   const f = path.normalize(path.join(PUB, rel)); if (!f.startsWith(PUB) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) return false;
   const ext = path.extname(f); const long = /\.(png|svg|css|js)$/.test(ext) && rel !== 'sw.js';
   send(res, 200, fs.readFileSync(f), MIME[ext] || 'application/octet-stream', { 'cache-control': long ? 'public, max-age=86400' : 'no-cache' }); return true;
@@ -164,7 +164,8 @@ function daily() {
 setInterval(daily, 30 * 60 * 1000); setTimeout(daily, 5000);
 
 /* ---------------- HQ ---------------- */
-function hqSession(req) { const t = cookies(req).vfhq; const s = t && db.hq.hqSessions[t]; if (!s || s.exp < Date.now()) return null; s.exp = Date.now() + 30 * 60 * 1000; return s; }
+function hqToken(req) { return String(req.headers['x-hq-token'] || '') || cookies(req).vfhq; }
+function hqSession(req) { const t = hqToken(req); const s = t && db.hq.hqSessions[t]; if (!s || s.exp < Date.now()) return null; s.exp = Date.now() + 30 * 60 * 1000; return s; }
 function hqState() {
   const now = Date.now();
   const acs = Object.values(db.academies).map(ac => { const owner = db.users[(ac.admins || [])[0]] || {}; return { id: ac.id, name: ac.name, place: ac.place, plan: ac.plan.type, until: ac.plan.until, active: C.planActive(ac, now), suspended: !!ac.suspended, players: ac.players.filter(p => !p.left).length, staff: ac.staff.length, batches: ac.batches.length, createdAt: ac.createdAt, owner: owner.name || '', email: owner.email || '', lastActive: ac.updatedAt || ac.createdAt }; }).sort((a, b) => b.createdAt - a.createdAt);
@@ -201,9 +202,9 @@ const server = http.createServer(async (req, res) => {
   try {
     if (p === '/' || p === '/index.html') return send(res, 200, page('live'), MIME['.html'], { 'cache-control': 'no-cache' });
     if (p === '/demo' || p === '/demo/') return send(res, 200, page('demo'), MIME['.html'], { 'cache-control': 'no-cache', 'x-robots-tag': 'noindex' });
-    if (p === '/hq' || p === '/hq/') return send(res, 200, fs.readFileSync(path.join(PUB, 'hq.html'), 'utf8').replace('<!--CFG-->', `<script>window.HQ_CFG={mode:'live'}</script>`).replace(/(href|src)="(style\.css|app\.css|core\.js|icons\.js|hq\.js)"/g, `$1="/$2?v=${VERSION}"`), MIME['.html'], { 'cache-control': 'no-cache', 'x-robots-tag': 'noindex' });
+    /* Veyra HQ is a Windows app only (user, 2026-11-25). The website never serves it. */
     if (p === '/sw.js') return send(res, 200, fs.readFileSync(path.join(PUB, 'sw.js'), 'utf8').replace('__VERSION__', VERSION), MIME['.js'], { 'cache-control': 'no-cache' });
-    if (p === '/robots.txt') return send(res, 200, `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /hq\nDisallow: /demo\nSitemap: ${BASE}/sitemap.xml\n`, MIME['.txt']);
+    if (p === '/robots.txt') return send(res, 200, `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /demo\nSitemap: ${BASE}/sitemap.xml\n`, MIME['.txt']);
     if (p === '/sitemap.xml') return send(res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${BASE}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url></urlset>`, 'application/xml');
     if (p === '/healthz') return send(res, 200, { ok: true, version: VERSION });
 
@@ -268,12 +269,12 @@ const server = http.createServer(async (req, res) => {
           if (limited(req, 'hq', 10, 15 * 60e3)) return bad(res, 'Too many tries. Wait 15 minutes.', 429);
           if (!db.hq.pw) { const code = fs.readFileSync(path.join(DATA, 'hq-setup-code.txt'), 'utf8').trim(); if (String(b.code || '').trim().toUpperCase() !== code) return bad(res, 'Wrong setup code', 401); if (String(b.pw || '').length < 10) return bad(res, 'Use at least 10 characters'); db.hq.pw = hashPw(b.pw); fs.unlinkSync(path.join(DATA, 'hq-setup-code.txt')); hqLog('HQ password set'); }
           else if (!checkPw(b.pw, db.hq.pw)) return bad(res, 'Wrong password', 401);
-          const t = tok(); db.hq.hqSessions[t] = { exp: Date.now() + 30 * 60 * 1000 }; res.setHeader('Set-Cookie', `vfhq=${t}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400${SECURE ? '; Secure' : ''}`); save(); return send(res, 200, { ok: true });
+          const t = tok(); db.hq.hqSessions[t] = { exp: Date.now() + 30 * 60 * 1000 }; res.setHeader('Set-Cookie', `vfhq=${t}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400${SECURE ? '; Secure' : ''}`); save(); return send(res, 200, { ok: true, token: t });
         }
         if (p === '/api/hq/needs-setup') return send(res, 200, { setup: !db.hq.pw });
         if (!hqSession(req)) return bad(res, 'Log in to HQ', 401);
         if (p === '/api/hq/state') return send(res, 200, hqState());
-        if (p === '/api/hq/logout') { delete db.hq.hqSessions[cookies(req).vfhq]; save(); return send(res, 200, { ok: true }); }
+        if (p === '/api/hq/logout') { delete db.hq.hqSessions[hqToken(req)]; save(); return send(res, 200, { ok: true }); }
         if (p === '/api/hq/act') { const r = hqAct(b); save(); return send(res, 200, Object.assign(typeof r === 'string' ? { msg: r } : r, { state: hqState() })); }
         if (p === '/api/hq/backup') { saveNow(); return send(res, 200, fs.readFileSync(DBF), 'application/json', { 'content-disposition': `attachment; filename="veyra-academy-db-${C.T.date()}.json"` }); }
         return bad(res, 'Not found', 404);

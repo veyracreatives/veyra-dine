@@ -3,23 +3,25 @@
    Preview: reads and writes the same in-browser demo data the academy apps use, so a key made here works in the admin app. */
 (function () {
   const C = window.VFC, T = C.T, { ic, logo } = IC; const $ = s => document.querySelector(s);
-  const LIVE = (window.HQ_CFG || {}).mode === 'live';
+  const MODE = (window.HQ_CFG || {}).mode; const DESK = MODE === 'desktop' && !!window.hqBridge; const LIVE = MODE === 'live' || DESK;
   const DAY = 864e5;
   const inr = n => '₹' + Math.round(n || 0).toLocaleString('en-IN');
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const cap = s => s ? s[0].toUpperCase() + s.slice(1) : '';
   const day = t => T.full(T.date(t));
-  const appUrl = LIVE ? '/' : './';
+  const appUrl = DESK ? window.hqBridge.server() + '/' : LIVE ? '/' : './';
 
   /* ---------- data: live server or preview ---------- */
   const Live = {
-    async req(url, body) { const r = await fetch(url, { method: body ? 'POST' : 'GET', headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' }); const j = await r.json().catch(() => ({})); if (!r.ok) { const e = new Error(j.error || 'Something went wrong'); e.status = r.status; throw e; } return j; },
+    async req(url, body) {
+      if (DESK) { const r = await window.hqBridge.req(body ? 'POST' : 'GET', url, body); if (r.status >= 400 || !r.status) { const e = new Error((r.json && r.json.error) || (r.status ? 'Something went wrong' : 'Cannot reach ' + window.hqBridge.server() + '. Check the internet.')); e.status = r.status; throw e; } return r.json || {}; }
+      const r = await fetch(url, { method: body ? 'POST' : 'GET', headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' }); const j = await r.json().catch(() => ({})); if (!r.ok) { const e = new Error(j.error || 'Something went wrong'); e.status = r.status; throw e; } return j; },
     needsSetup() { return this.req('/api/hq/needs-setup').then(j => j.setup); },
     login(pw, code) { return this.req('/api/hq/login', { pw, code }); },
     state() { return this.req('/api/hq/state'); },
     act(p) { return this.req('/api/hq/act', p); },
     logout() { return this.req('/api/hq/logout', {}); },
-    backup() { location.href = '/api/hq/backup'; }
+    backup() { if (DESK) return window.hqBridge.backup().then(f => f && toast('Backup saved: ' + f)).catch(e => toast(e.message)); location.href = '/api/hq/backup'; }
   };
   const Demo = (() => {
     const KEY = 'vf-demo-v3'; let db;
@@ -189,11 +191,11 @@
 
   /* ---------- shell ---------- */
   function lockScreen() {
-    return `<div class="lock"><form id="lockForm" autocomplete="on"><div class="hstack">${logo()}<span class="hq-badge">HQ</span></div><h1 class="disp" style="font-size:44px">Veyra <em>HQ</em></h1><p class="muted">${S.setup ? 'First time here. Enter the setup code from the server (data/hq-setup-code.txt) and choose the HQ password.' : 'Private admin for Veyra Academy. Only for Veyra.'}</p>
+    return `<div class="lock"><form id="lockForm" autocomplete="on"><div class="hstack">${logo()}<span class="hq-badge">HQ</span></div><h1 class="disp" style="font-size:44px">Veyra <em>HQ</em></h1><p class="muted">${S.setup ? 'First time here. Enter the HQ setup code the server printed when it was installed, then choose the HQ password.' : 'Private admin for Veyra Academy. Only for Veyra.'}</p>
       ${S.setup ? F('hqcode', 'Setup code', '', { cls: 'mono', ph: '12 characters' }) : ''}
       <label class="field" for="hqpw"><span>${S.setup ? 'New HQ password' : 'HQ password'}</span><input class="input" id="hqpw" type="password" autocomplete="${S.setup ? 'new-password' : 'current-password'}" placeholder="${LIVE ? (S.setup ? 'At least 10 characters' : '') : 'Any password works in this preview'}" ${LIVE ? 'required' : ''}></label>
       ${S.err ? `<p class="err" role="alert">${esc(S.err)}</p>` : ''}
-      <button class="btn btn-primary btn-lg btn-block" type="submit">${S.setup ? 'Set password and open' : 'Unlock'}</button><a class="btn btn-quiet btn-block" href="${appUrl}">← Back to academy apps</a></form></div>`;
+      <button class="btn btn-primary btn-lg btn-block" type="submit">${S.setup ? 'Set password and open' : 'Unlock'}</button>${DESK ? `<details style="font-size:13px;color:var(--ink-3)"><summary style="cursor:pointer">Server: ${esc(window.hqBridge.server().replace(/^https?:\/\//, ''))}</summary><div class="hstack" style="margin-top:10px;flex-wrap:nowrap"><input class="input" id="hqsrv" value="${esc(window.hqBridge.server())}" aria-label="Server address"><button class="btn btn-ghost" type="button" data-act="setServer">Save</button></div></details>` : ''}<a class="btn btn-quiet btn-block" href="${appUrl}" ${DESK ? 'target="_blank"' : ''}>${DESK ? 'Open the academy website' : '← Back to academy apps'}</a></form></div>`;
   }
   function render() {
     if (S.locked || !S.st) { $('#app').innerHTML = lockScreen(); const f = $('#hqcode') || $('#hqpw'); if (f && window.innerWidth > 720) f.focus(); return; }
@@ -234,7 +236,8 @@
       saveMail: () => act({ type: 'settings.save', smtp: { host: val('m-host'), port: +val('m-port') || 465, user: val('m-user'), pass: val('m-pass'), from: val('m-from') } }),
       testMail: () => act({ type: 'mail.test' }),
       savePw: () => { if (val('h-pw') !== val('h-pw2')) return toast('The two passwords do not match'); act({ type: 'password', pw: val('h-pw') }, () => { if (LIVE) { S.locked = true; S.st = null; } }); },
-      backup: () => API.backup()
+      backup: () => API.backup(),
+      setServer: async () => { await window.hqBridge.setServer(val('hqsrv')); location.reload(); }
     };
     (H[d.act] || (() => {}))();
   });

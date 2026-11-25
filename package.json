@@ -1,0 +1,10 @@
+{
+  "name": "veyra-academy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Veyra Academy: football academy management (admin, manager, coach, parent apps + Veyra HQ)",
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "build": "sh build.sh" },
+  "engines": { "node": ">=18" },
+  "optionalDependencies": { "nodemailer": "^6.9.16" }
+}

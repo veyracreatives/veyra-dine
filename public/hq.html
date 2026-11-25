@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Veyra Academy HQ</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0B6B45">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+[hidden]{display:none!important}
+.hq-badge{font:700 10.5px/1 var(--f-mono);letter-spacing:.12em;padding:4px 7px;border-radius:6px;background:var(--gold-grad);color:var(--brand-ink)}
+.keybox{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:18px;border-radius:14px;background:var(--panel-hi);border:1px solid var(--brand);box-shadow:var(--glow)}
+.keybox code{font:700 clamp(16px,3.4vw,24px)/1.2 var(--f-mono);letter-spacing:.06em;color:var(--brand);word-break:break-all}
+.lock{min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+.lock form{width:min(400px,100%);display:grid;gap:18px;padding:28px;border-radius:20px;background:var(--surface);border:1px solid color-mix(in srgb,var(--brand) 40%,transparent);box-shadow:var(--glow)}
+.disp{font-family:var(--f-display);font-weight:900;font-stretch:72%;text-transform:uppercase;line-height:.95}
+.disp em{font-family:var(--f-serif);font-style:italic;font-weight:400;text-transform:none;font-stretch:normal;background:var(--gold-grad);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.06em}
+.lock .mk{width:40px;height:40px}
+.err{color:var(--bad);font-size:13.5px;font-weight:600}
+.acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.set-row{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:16px 24px;padding:20px;border-bottom:1px solid var(--line)}
+.set-row:last-child{border-bottom:0}
+.set-row h4{font-size:15px;font-family:var(--f-body);font-weight:700}
+.set-row p{font-size:13px;color:var(--ink-3);margin-top:4px}
+.set-row .f{display:grid;gap:12px;min-width:0}
+.copyline{display:flex;gap:8px;align-items:center;min-width:0}
+.copyline code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 12.5px/1.4 var(--f-mono);padding:10px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line)}
+.ok-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:middle}
+.no-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--line-2);margin-right:6px;vertical-align:middle}
+.act-row{display:flex;gap:12px;align-items:flex-start;padding:12px 20px;border-bottom:1px solid var(--line);font-size:14px}
+.act-row time{flex:none;width:120px;color:var(--ink-3);font:500 12px/1.6 var(--f-mono)}
+.demo-strip{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;padding:8px 16px;background:var(--brand-soft);color:var(--brand);font-size:13px;font-weight:600;text-align:center}
+.more-list{display:grid}
+.more-list a{display:flex;align-items:center;gap:12px;padding:14px 4px;border-bottom:1px solid var(--line);text-decoration:none;font-weight:600;cursor:pointer}
+.more-list a svg{width:20px;height:20px;color:var(--ink-3)}
+@media (max-width:420px){.seg button{padding:0 10px}}
+.only-xs{display:none}
+@media (max-width:560px){.only-xs{display:block}.hide-xs{display:none}}
+@media (max-width:720px){.set-row{grid-template-columns:minmax(0,1fr);padding:16px}.act-row{flex-direction:column;gap:2px;padding:12px 16px}.act-row time{width:auto}}
+</style>
+<!--CFG-->
+</head>
+<body>
+<div id="app"></div>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<script src="core.js"></script>
+<script src="icons.js"></script>
+<script src="hq.js"></script>
+</body>
+</html>

@@ -27,7 +27,7 @@
   const section = el => { const s = el.closest('[data-track-section], section, header, footer, nav, form, [role=dialog]'); if (!s) return ''; return s.getAttribute('data-track-section') || s.id || (s.tagName === 'HEADER' ? 'header' : s.tagName === 'FOOTER' ? 'footer' : s.tagName === 'NAV' ? 'menu' : (s.classList[0] || s.tagName.toLowerCase())); };
   document.addEventListener('click', e => {
     const el = e.target.closest && e.target.closest('a, button, summary, [data-track], [role=button]'); if (!el || el.closest('[data-notrack]')) return;
-    const n = label(el); if (!n) return; const href = el.getAttribute('href') || '';
+    const n = label(el); if (!n || /^(show|hide) password$/i.test(n)) return; const href = el.getAttribute('href') || '';
     track('click', { n, sec: section(el), x: href && !/^javascript:/i.test(href) ? href.slice(0, 200) : undefined });
     if (href && !href.startsWith('#') && el.tagName === 'A') send();
   }, true);

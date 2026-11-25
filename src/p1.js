@@ -41,6 +41,7 @@ const first = n => String(n || '').split(' ')[0];
 const tStatus = t => t.end < B.today ? 'done' : t.start <= B.today ? 'ongoing' : 'upcoming';
 
 function toast(msg, link) {
+  if (typeof i18nOn === 'function' && i18nOn()) msg = trS(String(msg));
   const t = document.createElement('div'); t.className = 'toast';
   t.innerHTML = ic('ok') + '<span>' + esc(msg) + '</span>' + (link ? ` <a href="${link.href}" style="color:inherit;font-weight:700;margin-left:6px">${esc(link.label)}</a>` : '');
   $('#toasts').appendChild(t); setTimeout(() => t.remove(), link ? 5200 : 3000);

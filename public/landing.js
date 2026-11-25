@@ -6,7 +6,10 @@ function faqs(P) {
   const r = n => '₹' + Math.round(n).toLocaleString('en-IN');
   return [['What is football academy management software?', 'It is one app that replaces the attendance register, fee notebook and WhatsApp groups. Veyra Academy keeps players, batches, coaches, attendance, UPI fees, reminders, tournaments and parent updates together, on phone and laptop.'],
     ['Do parents need to download anything?', 'Parents open a link and tap Add to Home Screen. It works like an app on Android and iPhone, and it also works in a normal browser.'],
-    ['How do parents pay fees?', 'They pay to your academy UPI ID from any UPI app, then paste the 12-digit transaction ID. You approve it and the receipt goes out. Money goes to your bank, not to us.'],
+    ['How do parents pay fees?', 'They pay to your academy UPI ID from any UPI app, then paste the 12-digit transaction ID or upload the payment screenshot. You approve it and the receipt goes out. Cash paid at the turf counts too: you record it in one tap. Money goes to your bank, not to us.'],
+    ['Can I bring my players in from Excel?', 'Yes. Download the template in the Players page, fill one row per player, save it as CSV and import everyone at once. Parents get their app login by email.'],
+    ['Is the app in Hindi or Marathi?', 'Yes. Parents and coaches can switch the app to हिंदी or मराठी from the language button. Admin screens stay in English.'],
+    ['How do I get help?', 'Email marketing@veyracreatives.com. We reply the same day, and every plan gets a free setup call to add your batches and players with you.'],
     ['Do the apps update for everyone at once?', 'Yes. When a coach saves attendance or you approve a fee, the admin, manager and parent apps update within seconds.'],
     ['Can coaches mark attendance with weak signal?', 'Yes. If the turf has no signal, the marks wait on the phone and send as soon as the network is back.'],
     ['Can I manage tournaments and match results?', 'Yes. Pick squads, add fixtures and scores, track scorers and send player of the match certificates to parents.'],
@@ -120,9 +123,9 @@ function render(cfg, IC) {
     <div class="sec-head"><span class="eyebrow" style="justify-self:start">Pricing</span><h2 class="disp">One plan. <em>Everything in it.</em></h2><p>Unlimited players, coaches and parents. Start with ${P.trial} days free, then pay securely with Razorpay.</p></div>
     <div class="price-wrap rv">
       <div class="price"><span class="label">Monthly</span><div class="amt">${r(P.monthly)}<small>per month</small></div><p class="muted">Cancel any time.</p><a class="btn btn-ghost btn-lg btn-block" href="#signup">Start free trial</a>
-        <ul>${['Admin, manager, coach and parent apps', 'Attendance for players and coaches', 'UPI fee collection and receipts', 'Tournaments, training and kit', 'Fee reminders', 'Google sign-in'].map(x => `<li>${ic('ok')}${x}</li>`).join('')}</ul></div>
+        <ul>${['Admin, manager, coach and parent apps', 'Attendance for players and coaches', 'UPI fee collection and receipts', 'Tournaments, training and kit', 'Fee reminders', 'Excel / CSV player import', 'Hindi and Marathi for parents and coaches', 'Free setup call for your batches'].map(x => `<li>${ic('ok')}${x}</li>`).join('')}</ul></div>
       <div class="price best"><div class="between"><span class="label" style="color:var(--brand)">Yearly</span>${save > 0 ? `<span class="pill p-brand plain">Save ₹${save.toLocaleString('en-IN')}</span>` : ''}</div><div class="amt">${r(P.yearly)}<small>per year</small></div><p class="muted">Works out to ${r(perMo)} a month.</p><a class="btn btn-primary btn-lg btn-block" href="#signup">Start free trial</a>
-        <ul>${['Everything in Monthly', save > 0 ? `Saves ${r(save)} a year` : 'Best value', 'Priority help by email', 'Free setup call for your batches'].map(x => `<li>${ic('ok')}${x}</li>`).join('')}</ul></div>
+        <ul>${['Everything in Monthly', save > 0 ? `Saves ${r(save)} a year` : 'Best value', 'Priority help by email', 'One payment for the whole year'].map(x => `<li>${ic('ok')}${x}</li>`).join('')}</ul></div>
     </div>
     <div class="rzp-strip rv">${ic('shield')}<div><b>Pay for your plan with Razorpay</b><small>UPI, debit and credit cards, net banking and wallets. Your plan turns on the moment the payment goes through. No GST added.</small></div><div class="hstack rzp-tags"><span class="pill p-mute plain">UPI</span><span class="pill p-mute plain">Cards</span><span class="pill p-mute plain">Net banking</span><span class="pill p-mute plain">Wallets</span></div></div>
   </div></section>
@@ -134,7 +137,7 @@ function render(cfg, IC) {
   </div></section>
   <section class="sec" style="padding-top:0"><div class="wrap"><div class="final rv"><h2 class="disp">Your academy, <em>sorted by Monday</em></h2><p class="muted" style="max-width:520px">Set up batches, invite coaches and send the parent link in one afternoon.</p><div class="hstack" style="justify-content:center"><a class="btn btn-primary btn-lg" href="#signup">Start free trial</a><a class="btn btn-ghost btn-lg" href="#login">Log in</a></div></div></div></section>
   </main>
-  <footer class="lp-foot"><div class="wrap"><a class="brand" href="#">${logo()}<div><b>VEYRA ACADEMY</b><small>by Veyra Creatives</small></div></a><span>Questions? <a href="mailto:marketing@veyracreatives.com" style="color:inherit">marketing@veyracreatives.com</a></span><span><a href="/privacy" style="color:inherit">Privacy policy</a></span><span>© ${new Date().getFullYear()} Veyra Creatives</span></div></footer>
+  <footer class="lp-foot"><div class="wrap"><a class="brand" href="#">${logo()}<div><b>VEYRA ACADEMY</b><small>by Veyra Creatives</small></div></a><span>Questions? <a href="mailto:marketing@veyracreatives.com" style="color:inherit">marketing@veyracreatives.com</a> · same-day reply</span><span><a href="/privacy" style="color:inherit">Privacy policy</a></span><span>© ${new Date().getFullYear()} Veyra Creatives</span></div></footer>
   </div>`;
 }
 const L = { render, ld, faqs };

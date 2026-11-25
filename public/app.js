@@ -41,6 +41,7 @@ const first = n => String(n || '').split(' ')[0];
 const tStatus = t => t.end < B.today ? 'done' : t.start <= B.today ? 'ongoing' : 'upcoming';
 
 function toast(msg, link) {
+  if (typeof i18nOn === 'function' && i18nOn()) msg = trS(String(msg));
   const t = document.createElement('div'); t.className = 'toast';
   t.innerHTML = ic('ok') + '<span>' + esc(msg) + '</span>' + (link ? ` <a href="${link.href}" style="color:inherit;font-weight:700;margin-left:6px">${esc(link.label)}</a>` : '');
   $('#toasts').appendChild(t); setTimeout(() => t.remove(), link ? 5200 : 3000);
@@ -221,10 +222,10 @@ function auth(kind, token) {
     ${pitchSVG()}<a class="faint" href="mailto:marketing@veyracreatives.com" style="position:relative;font-size:13px">marketing@veyracreatives.com</a></aside>
   <main class="auth-form"><form class="auth-box" id="authForm" data-track-form="${kind}" data-kind="${kind}" data-token="${esc(token || '')}" novalidate>
     <a href="#" class="faint" style="font-size:14px;font-weight:600;text-decoration:none">← Back to home</a>
-    <a class="brand" href="#" style="padding:0">${logo()}<div><b>VEYRA ACADEMY</b><small>Academy app</small></div></a>
+    <a class="brand auth-brand" href="#" style="padding:0">${logo()}<div><b>VEYRA ACADEMY</b><small>Academy app</small></div></a>
     <div><h1>${head[0]}</h1><p class="muted" style="margin-top:6px">${head[1]}</p></div>
     ${B && !up && !rs ? `<div class="banner">${ic('ok')}<span class="grow">You are logged in as <b>${esc(B.me.name)}</b>.</span><a class="btn btn-primary btn-sm" href="#${B.me.role}">Open my app</a></div>` : ''}
-    ${google ? `<div id="gbtn" style="min-height:48px;display:grid">${LIVE ? '' : `<button class="btn btn-google btn-block" type="button" data-act="google">${ic('google')}Continue with Google</button>`}</div><div class="or">or with email</div>` : ''}
+    ${google ? `<div id="gbtn" class="gwrap"><button class="btn btn-google btn-lg btn-block" type="button" data-act="google">${ic('google')}Continue with Google</button>${LIVE ? '<div class="glayer" aria-hidden="false"></div>' : ''}</div><div class="or">or with email</div>` : ''}
     ${up ? `<label class="field" for="f-ac"><span>Academy name</span><input class="input" id="f-ac" placeholder="e.g. Kickstart FC Academy" autocomplete="organization" required></label>
     <div class="grid g2"><label class="field" for="f-nm"><span>Your name</span><input class="input" id="f-nm" autocomplete="name" required></label><label class="field" for="f-city"><span>Area or city</span><input class="input" id="f-city" placeholder="Kharghar, Navi Mumbai"></label></div>
     <label class="field" for="f-ph"><span>Phone or WhatsApp <span class="faint" style="font-weight:500">(optional)</span></span><input class="input" id="f-ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="So we can help you set up"></label>` : ''}
@@ -234,14 +235,17 @@ function auth(kind, token) {
     <button class="btn btn-primary btn-lg btn-block" type="submit">${up ? 'Create academy' : fg ? 'Email me a link' : rs ? 'Save password' : 'Log in'}</button>
     <p class="muted" style="text-align:center;font-size:14px">${up ? 'Already have an account? <a href="#login" style="color:var(--brand);font-weight:600">Log in</a>' : 'New academy? <a href="#signup" style="color:var(--brand);font-weight:600">Start free trial</a>'}</p>
     ${!up && !LIVE ? `<div class="divider"></div><span class="label">Try the apps (demo logins)</span><div class="demo-roles">${[['admin', 'Admin', 'shield'], ['manager', 'Manager', 'whistle'], ['coach', 'Coach', 'check'], ['parent', 'Parent', 'parent']].map(([h, n, i]) => `<a href="#${h}">${ic(i)}${n}</a>`).join('')}</div><span class="faint" style="font-size:12.5px">Or log in with owner@kickstart.demo and demo1234.</span>` : ''}
-    ${!up && LIVE && CFG.demoBase ? `<div class="divider"></div><a class="btn btn-ghost btn-block" href="${CFG.demoBase}#admin">See the demo academy</a>` : ''}
+    ${!up && LIVE && CFG.demoBase ? `<div class="divider"></div><a class="btn btn-ghost btn-lg btn-block" href="${CFG.demoBase}#admin">See the demo academy</a>` : ''}
   </form></main></div>`;
 }
 function mountGoogle() {
   if (!LIVE || !CFG.googleClientId || !$('#gbtn')) return;
-  const draw = () => { if (!window.google || !google.accounts) return; google.accounts.id.initialize({ client_id: CFG.googleClientId, callback: r => API.google(r.credential).then(afterLogin).catch(e => showAuthErr(e.message)) }); google.accounts.id.renderButton($('#gbtn'), { theme: 'outline', size: 'large', text: 'continue_with', width: Math.min(360, $('#gbtn').clientWidth || 320) }); };
+  const draw = () => { if (!window.google || !google.accounts) return; google.accounts.id.initialize({ client_id: CFG.googleClientId, callback: r => API.google(r.credential).then(afterLogin).catch(e => showAuthErr(e.message)) }); const L = $('#gbtn .glayer'); if (!L) return; L.innerHTML = ''; google.accounts.id.renderButton(L, { theme: 'outline', size: 'large', text: 'continue_with', width: 400 }); fitG(); setTimeout(fitG, 600); };
+  if (!mountGoogle.rs) { mountGoogle.rs = 1; addEventListener('resize', fitG); }
   if (window.google && google.accounts) draw(); else { const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.onload = draw; document.head.appendChild(s); }
 }
+/* Google's own button can't be wider than 400px, so our full-width button shows and Google's sits on top, invisible, stretched to the same size */
+function fitG() { const w = $('#gbtn'), L = w && w.querySelector('.glayer'); if (!L || !L.firstElementChild) return; L.style.transform = ''; const r = L.firstElementChild.getBoundingClientRect(); if (!r.width || !r.height) return; L.style.transform = `scale(${w.clientWidth / r.width},${w.clientHeight / r.height})`; w.classList.add('g-ready'); }
 const showAuthErr = m => { const e = $('#authErr'); if (e) e.textContent = m; else toast(m); };
 async function afterLogin(r) { await refresh(); if (!B) return showAuthErr('Could not open your academy. Try again.'); toast(r && r.msg ? r.msg : `Welcome, ${first(B.me.name)}`); go(B.me.role + (r && r.created ? '-setup' : '')); }
 
@@ -268,7 +272,7 @@ function shell(role, tab, body) {
       <div class="top-actions">
         <div class="role-switch"><button class="btn btn-ghost btn-sm" type="button" data-act="menu" aria-expanded="${U.menu}">${ic(LIVE ? 'players' : 'swap')}<span class="hide-sm">${LIVE ? esc(first(B.me.name)) : 'Preview as ' + R.label}</span><span class="sr">Menu</span></button>
         ${U.menu ? `<div class="menu" role="menu">${menuItems}</div>` : ''}</div>
-        <button class="icon-btn" type="button" data-act="bell" aria-label="Notifications${B.unread ? ', ' + B.unread + ' new' : ''}">${ic('bell')}${B.unread ? `<span class="dot-n">${B.unread > 9 ? '9+' : B.unread}</span>` : ''}</button>
+        ${langPicker()}<button class="icon-btn" type="button" data-act="bell" aria-label="Notifications${B.unread ? ', ' + B.unread + ' new' : ''}">${ic('bell')}${B.unread ? `<span class="dot-n">${B.unread > 9 ? '9+' : B.unread}</span>` : ''}</button>
       </div>
     </header>
     <main class="content ${role === 'parent' || role === 'coach' ? 'narrow' : ''}">${banners(role)}${body}</main>
@@ -300,7 +304,7 @@ function sessionsCard(role) {
 function queueCard(compact) {
   const q = B.queue || [];
   return `<div class="card ${compact ? '' : 'glow'}"><div class="card-h"><div><h3>UPI payments to check</h3><div class="sub">Match each ID in your bank app, then approve</div></div><span class="pill ${q.length ? 'p-info' : 'p-ok'}">${q.length ? q.length + ' waiting' : 'All clear'}</span></div>
-  <div class="list">${q.length ? q.map(x => { const p = player(x.pid) || { name: 'Past player', batch: '', no: '' }; return `<div class="row qrow"><div class="who grow" style="min-width:180px">${jersey(p)}<div><b>${esc(p.name)}</b><small>${esc(p.parentName || x.by)} · ${T.monthOnly(x.m)} · ${when(x.at)}</small></div></div><div class="end"><span class="hstack" style="flex-wrap:nowrap"><span class="utr">${esc(x.utr)}</span><b class="tnum" style="min-width:60px;text-align:right">${inr(x.amt)}</b></span><span class="hstack" style="flex-wrap:nowrap"><button class="btn btn-quiet btn-sm" type="button" data-act="reject" data-id="${x.id}">Reject</button><button class="btn btn-primary btn-sm" type="button" data-act="approve" data-id="${x.id}">${ic('ok')}Approve</button></span></div></div>`; }).join('') : `<div class="empty">No payments waiting. New ones show here the moment a parent sends one.</div>`}</div></div>`;
+  <div class="list">${q.length ? q.map(x => { const p = player(x.pid) || { name: 'Past player', batch: '', no: '' }; return `<div class="row qrow"><div class="who grow" style="min-width:180px">${jersey(p)}<div><b>${esc(p.name)}</b><small>${esc(p.parentName || x.by)} · ${T.monthOnly(x.m)} · ${when(x.at)}</small></div></div><div class="end"><span class="hstack" style="flex-wrap:nowrap">${x.utr ? `<span class="utr">${esc(x.utr)}</span>` : x.shot && x.shot !== 'demo' ? `<a class="btn btn-ghost btn-sm" href="/api/file/${x.shot}" target="_blank" rel="noopener">${ic('eye')}Screenshot</a>` : '<span class="pill plain">Screenshot</span>'}<b class="tnum" style="min-width:60px;text-align:right">${inr(x.amt)}</b></span><span class="hstack" style="flex-wrap:nowrap"><button class="btn btn-quiet btn-sm" type="button" data-act="reject" data-id="${x.id}">Reject</button><button class="btn btn-primary btn-sm" type="button" data-act="approve" data-id="${x.id}">${ic('ok')}Approve</button></span></div></div>`; }).join('') : `<div class="empty">No payments waiting. New ones show here the moment a parent sends one.</div>`}</div></div>`;
 }
 function staffTodayCard(link) {
   const list = B.staff;
@@ -335,7 +339,7 @@ function markCard(bid, role, day) {
   ${off ? `<div class="note" style="margin:12px 20px 0">${ic('calendar')}<span>${esc(b.name)} has no session on ${T.dayShort(iso)}. You can still mark it if you trained.</span></div>` : ''}
   ${list.length ? `<div class="mark-list">${list.map(p => { const v = m[p.id]; return `<div class="mark"><div class="who">${jersey(p)}<div><b>${esc(p.name)}</b><small>#${p.no} · ${p.att == null ? 'new this month' : p.att + '% this month'}</small></div></div><div class="pal" role="group" aria-label="${esc(p.name)}">${['P', 'L', 'A'].map(x => `<button type="button" data-act="mark" data-k="${key}" data-p="${p.id}" data-v="${x}" aria-pressed="${v === x}" ${v === x ? `data-on="${x}"` : ''} aria-label="${{ P: 'Present', L: 'Late', A: 'Absent' }[x]}">${x}</button>`).join('')}</div></div>`; }).join('')}</div>
   <div class="sum-bar"><div class="tally"><span><span class="dot" style="background:var(--brand)"></span> Present <b>${t.P}</b></span><span><span class="dot" style="background:var(--warn)"></span> Late <b>${t.L}</b></span><span><span class="dot" style="background:var(--bad)"></span> Absent <b>${t.A}</b></span><span class="faint">of ${t.n}</span></div>
-  <div class="hstack"><button class="btn btn-ghost btn-sm" type="button" data-act="allP" data-k="${key}" data-b="${bid}">All present</button><button class="btn btn-primary btn-sm" type="button" data-act="saveAtt" data-k="${key}" data-b="${bid}" data-d="${iso}" ${B.plan.active ? '' : 'disabled'}>${ic('ok')}Save and tell parents</button></div></div>` : `<div class="card-b">${empty('players', 'No players in this batch yet.', role === 'admin' || role === 'manager' ? `<button class="btn btn-primary btn-sm" type="button" data-act="addPlayer" data-b="${bid}">${ic('plus')}Add player</button>` : '')}</div>`}</div>`;
+  <div class="hstack fill-sm"><button class="btn btn-ghost btn-sm" type="button" data-act="allP" data-k="${key}" data-b="${bid}">All present</button><button class="btn btn-primary btn-sm" type="button" data-act="saveAtt" data-k="${key}" data-b="${bid}" data-d="${iso}" ${B.plan.active ? '' : 'disabled'}>${ic('ok')}Save and tell parents</button></div></div>` : `<div class="card-b">${empty('players', 'No players in this batch yet.', role === 'admin' || role === 'manager' ? `<button class="btn btn-primary btn-sm" type="button" data-act="addPlayer" data-b="${bid}">${ic('plus')}Add player</button>` : '')}</div>`}</div>`;
 }
 function batchPicker(cur, ids, act) {
   if (!ids.length) return '';
@@ -385,7 +389,7 @@ function feedRow(f) {
 function playersView(role) {
   const list = B.players.filter(p => (U.pb === 'all' || p.batch === U.pb) && (!U.pq || (p.name + ' ' + (p.parentName || '') + ' ' + (p.parentEmail || '')).toLowerCase().includes(U.pq.toLowerCase())));
   const adm = role === 'admin';
-  return `<div class="page-head"><div><h2>Players</h2><p>${B.players.length} active players in ${B.batches.length} batches.</p></div><div class="hstack">${adm ? `<button class="btn btn-ghost" type="button" data-act="exportPlayers">${ic('down')}Export CSV</button>` : ''}<button class="btn btn-primary" type="button" data-act="addPlayer">${ic('plus')}Add player</button></div></div>
+  return `<div class="page-head"><div><h2>Players</h2><p>${B.players.length} active players in ${B.batches.length} batches.</p></div><div class="hstack">${adm ? `<button class="btn btn-ghost" type="button" data-act="importPlayers">${ic('up')}Import</button><button class="btn btn-ghost hide-sm" type="button" data-act="exportPlayers">${ic('down')}Export CSV</button>` : ''}<button class="btn btn-primary" type="button" data-act="addPlayer">${ic('plus')}Add player</button></div></div>
   <div class="card"><div class="card-h" style="flex-wrap:wrap"><div class="toolbar" style="flex:1"><label class="search" for="pq">${ic('search')}<input class="input input-sm" id="pq" type="search" placeholder="Search player or parent" value="${esc(U.pq)}"></label>
     <select class="select select-sm" id="pb" style="width:auto" aria-label="Batch"><option value="all">All batches</option>${B.batches.map(b => `<option value="${b.id}" ${U.pb === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div><span class="faint mono hide-sm" style="font-size:12px">${list.length} SHOWN</span></div>
   ${B.players.length ? `<div class="table-wrap"><table class="t"><thead><tr><th>Player</th><th class="hide-sm">Batch</th><th class="hide-sm">Parent</th><th class="hide-xs">Attend.</th>${adm ? `<th>${T.monthShort(B.month)} fee</th><th class="r hide-sm">Fee/mo</th>` : '<th>App</th>'}<th class="hide-sm"></th></tr></thead><tbody>
@@ -498,7 +502,7 @@ function setupView() {
   return `<div class="page-head"><div><h2>Settings & plan</h2><p>${esc(B.academy.name)}</p></div></div>
   <section class="card glow"><div class="card-h"><div><h3>Your plan</h3><div class="sub">${P.type === 'trial' ? 'Free trial' : P.type === 'yearly' ? 'Yearly plan' : 'Monthly plan'} · ${P.active ? `${P.daysLeft} day${P.daysLeft === 1 ? '' : 's'} left · ends ${T.full(T.date(P.until))}` : 'ended ' + T.full(T.date(P.until))}</div></div><span class="pill ${!P.active ? 'p-bad' : P.type === 'trial' ? 'p-warn' : 'p-ok'}">${!P.active ? 'Ended' : P.type === 'trial' ? 'Trial' : 'Active'}</span></div>
   <div class="card-b" style="display:grid;gap:16px"><div class="grid g2">
-    <button class="plan-opt" type="button" data-act="plan" data-v="monthly" aria-pressed="${!y}"><span class="label">Monthly</span><span class="amt">${inr(pr.monthly)}<small>/month</small></span><span class="faint" style="font-size:13px">30 days, pay again when it ends</span></button>
+    <button class="plan-opt" type="button" data-act="plan" data-v="monthly" aria-pressed="${!y}"><span class="between"><span class="label">Monthly</span></span><span class="amt">${inr(pr.monthly)}<small>/month</small></span><span class="faint" style="font-size:13px">30 days, pay again when it ends</span></button>
     <button class="plan-opt" type="button" data-act="plan" data-v="yearly" aria-pressed="${y}"><span class="between"><span class="label">Yearly</span>${save > 0 ? `<span class="pill p-brand plain">Save ${inr(save)}</span>` : ''}</span><span class="amt">${inr(pr.yearly)}<small>/year</small></span><span class="faint" style="font-size:13px">${inr(Math.round(pr.yearly / 12))} a month</span></button></div>
     <div class="between"><span class="faint" style="font-size:13px">${ic('shield', '')} Secure payment by Razorpay: UPI, cards, net banking. No GST added.${P.active && P.type !== 'trial' ? ' Days are added on top of what you have left.' : ''}</span><button class="btn btn-primary btn-lg" type="button" data-act="buyPlan">Pay ${y ? inr(pr.yearly) : inr(pr.monthly)} with Razorpay</button></div>
     <div class="divider"></div><div class="between"><label class="field" for="lic" style="flex:1;min-width:220px"><span>Have a licence key from Veyra?</span><input class="input mono" id="lic" placeholder="VFB-XXXX-XXXX-XXXX" autocomplete="off"></label><button class="btn btn-ghost" type="button" data-act="lic" style="align-self:end">${ic('key')}Activate key</button></div></div></section>
@@ -619,7 +623,8 @@ function parentFees() {
   const ob = openBills(p); const paid = (B.payments || []).filter(x => x.pid === p.id);
   return `${tabs}<div><h2 style="font-size:24px">Fees</h2><p class="muted" style="margin-top:4px">${inr(p.fee)} a month · due on the ${ord(B.academy.dueDay)} · late fee ${inr(B.academy.lateFee)} after the ${ord(B.academy.lateAfter)}</p></div>
   ${feeCard(p, true)}
-  ${ob.length > 1 ? `<div class="card"><div class="card-h"><h3>Open bills</h3></div><div class="list">${ob.map(b => `<div class="row"><div class="grow"><b>${T.monthName(b.m)}</b><small class="faint" style="display:block;font-size:12.5px">${b.st === 'verify' ? 'Being checked · ID ' + esc(b.utr) : b.st === 'overdue' ? 'Overdue' : 'Due ' + T.short(b.due)}</small></div><b class="tnum">${inr(b.amt)}</b>${b.st === 'verify' ? feePill('verify') : `<button class="btn btn-primary btn-sm" type="button" data-act="pay" data-p="${p.id}" data-m="${b.m}">Pay</button>`}</div>`).join('')}</div></div>` : ''}
+  <div class="note">${ic('rupee')}<span>Paid in cash to the coach or the office? That counts too. The academy marks it paid and you get a receipt here.</span></div>
+  ${ob.length > 1 ? `<div class="card"><div class="card-h"><h3>Open bills</h3></div><div class="list">${ob.map(b => `<div class="row"><div class="grow"><b>${T.monthName(b.m)}</b><small class="faint" style="display:block;font-size:12.5px">${b.st === 'verify' ? (b.utr ? 'Being checked · ID ' + esc(b.utr) : 'Being checked · screenshot sent') : b.st === 'overdue' ? 'Overdue' : 'Due ' + T.short(b.due)}</small></div><b class="tnum">${inr(b.amt)}</b>${b.st === 'verify' ? feePill('verify') : `<button class="btn btn-primary btn-sm" type="button" data-act="pay" data-p="${p.id}" data-m="${b.m}">Pay</button>`}</div>`).join('')}</div></div>` : ''}
   <div class="card"><div class="card-h"><h3>Past payments</h3></div><div class="list">${paid.length ? paid.map(x => `<div class="row"><div class="grow"><b>${T.monthName(x.m)}</b><small class="faint" style="display:block;font-size:12.5px">Paid ${T.short(T.date(x.at))} · ${esc(x.via)} · ${x.receipt}</small></div><span class="tnum" style="font-weight:600">${inr(x.amt)}</span><button class="btn btn-quiet btn-sm" type="button" data-act="receipt" data-p="${p.id}" data-m="${x.m}" aria-label="Receipt ${x.receipt}">${ic('receipt')}</button></div>`).join('') : '<div class="empty">No payments yet.</div>'}</div></div>`;
 }
 function parentProgress() {
@@ -760,6 +765,7 @@ function render() {
   } else if (['login', 'signup', 'forgot', 'reset'].includes(r.view)) html = auth(r.view, r.token);
   else html = VFL.render(CFG, IC);
   $('#app').innerHTML = html + modal(); $('#app').toggleAttribute('data-notrack', r.view === 'app');
+  const tr = i18nOn(); $('#app').classList.toggle('tr', tr); if (tr) trDom($('#app'));
   document.title = r.view === 'landing' ? 'Football Academy Management App India | Veyra Academy' : r.view === 'app' ? `${ROLES[r.role].tabs.find(t => t[0] === r.tab)[1]} · ${B.academy.name}` : 'Veyra Academy';
   if (location.hash !== lastView) { lastView = location.hash; if (r.view === 'login' || r.view === 'signup') mountGoogle(); }
 }
@@ -776,7 +782,7 @@ function countUp() {
 }
 
 /* ---------- pop-ups ---------- */
-const F = (id, label, v, o) => { o = o || {}; return `<label class="field" for="${id}"><span>${label}</span><input class="input ${o.cls || ''}" id="${id}" value="${esc(v == null ? '' : v)}" ${o.type ? `type="${o.type}"` : ''} ${o.im ? `inputmode="${o.im}"` : ''} ${o.ph ? `placeholder="${esc(o.ph)}"` : ''} ${o.ac ? `autocomplete="${o.ac}"` : ''} ${o.max ? `max="${o.max}"` : ''}></label>`; };
+const F = (id, label, v, o) => { o = o || {}; return `<label class="field" for="${id}"><span>${label}</span><input class="input ${o.cls || ''}" id="${id}" value="${esc(v == null ? '' : v)}" ${o.type ? `type="${o.type}"` : ''} ${o.im ? `inputmode="${o.im}"` : ''} ${o.ph ? `placeholder="${esc(o.ph)}"` : ''} ${o.ac ? `autocomplete="${o.ac}"` : ''} ${o.max ? `max="${o.max}"` : ''}>${o.help ? `<small class="faint" style="font-size:12.5px">${o.help}</small>` : ''}</label>`; };
 const SEL = (id, label, opts, cur) => `<label class="field" for="${id}"><span>${label}</span><select class="select" id="${id}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
 const btns = (cancel, main, act, icon) => `<button class="btn btn-ghost" type="button" data-act="close">${cancel}</button><button class="btn btn-primary" type="button" data-act="${act}">${icon ? ic(icon) : ''}${main}</button>`;
 function upiQR(text) {
@@ -795,7 +801,8 @@ function modal() {
     else if (!m.step2) { h = amt + `<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">${upiQR(link)}<div style="display:grid;gap:10px;min-width:0;flex:1"><span class="label">Pay to</span><b>${esc(A.payee)}</b><div class="hstack"><span class="utr">${esc(A.upi)}</span><button class="btn btn-quiet btn-sm" type="button" data-act="copyUpi">${ic('copy')}Copy</button></div><a class="btn btn-primary" href="${link}">${ic('upi')}Open UPI app</a></div></div>
       <div class="note">${ic('phone')}<span>On a phone, tap Open UPI app. On a laptop, scan the code with GPay, PhonePe or Paytm. Then come back and paste the transaction ID.</span></div>`;
       foot = `<button class="btn btn-primary" type="button" data-act="payNext">I have paid ${ic('arrow')}</button>`; }
-    else { h = `<label class="field" for="utr"><span>UPI transaction ID (12 digits)</span><input class="input mono" id="utr" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="e.g. 434512908761" style="font-size:18px;letter-spacing:.08em;height:52px"></label><span class="faint" id="utrErr" style="font-size:13px">In your UPI app, open the payment and look for “UPI transaction ID” or “UTR”.</span>`;
+    else { h = `<label class="field" for="utr"><span>UPI transaction ID (12 digits)</span><input class="input mono" id="utr" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="e.g. 434512908761" style="font-size:18px;letter-spacing:.08em;height:52px"></label><span class="faint" id="utrErr" style="font-size:13px">In your UPI app, open the payment and look for “UPI transaction ID” or “UTR”.</span>
+      <div class="or">or</div>${m.shot ? `<div class="banner">${ic('ok')}<span class="grow">Screenshot added: <b>${esc(m.shot.name)}</b></span><label class="btn btn-quiet btn-sm" style="cursor:pointer">Change<input type="file" accept="image/*" data-shot="1" hidden></label></div>` : `<label class="btn btn-ghost btn-lg btn-block" style="cursor:pointer">${ic('up')}Upload payment screenshot<input type="file" accept="image/*" data-shot="1" hidden></label>`}`;
       foot = `<button class="btn btn-ghost" type="button" data-act="payBack">Back</button><button class="btn btn-primary" type="button" data-act="paySubmit">${ic('ok')}Send to academy</button>`; } }
   if (m.t === 'player') { const p = player(m.p); if (!p) { U.modal = null; return ''; } const b = batch(p.batch); title = p.name; const am = role === 'admin';
     h = `<div class="who">${jersey(p, 'lg')}<div><b style="font-size:18px">${esc(p.name)}</b><small>${esc(b.name)} · #${p.no}${p.dob ? ' · born ' + T.full(p.dob) : ''}</small></div></div><dl class="kv"><dt>Parent</dt><dd>${esc(p.parentName)}</dd><dt>Email</dt><dd>${esc(p.parentEmail || 'Not added')}</dd><dt>Phone</dt><dd>${p.parentPhone ? `<a href="tel:${esc(p.parentPhone)}">${esc(p.parentPhone)}</a>` : 'Not added'}</dd><dt>Batch</dt><dd>${esc(b.name)}, ${C.daysText(b.days)} ${T.t12(b.time)}</dd><dt>Coach</dt><dd>${esc(coachName(b))}</dd><dt>Attendance</dt><dd>${p.att == null ? 'New' : p.att + '% this month'}</dd>${am ? `<dt>Monthly fee</dt><dd>${inr(p.fee)}${p.feeCustom ? ' (own fee)' : ''}</dd><dt>Owes</dt><dd>${p.owes ? inr(p.owes) : 'Nothing'}</dd>` : ''}<dt>Joined</dt><dd>${p.joined ? T.full(p.joined) : ''}</dd>${p.med && p.med.allergy ? `<dt>Allergy</dt><dd style="color:var(--bad)">${esc(p.med.allergy)}</dd>` : ''}</dl>`;
@@ -806,7 +813,7 @@ function modal() {
     <div class="grid g2">${SEL('ap-b', 'Batch', B.batches.map(b => [b.id, `${b.name} · ${inr(b.fee)}/mo`]), p ? p.batch : (m.b || pre.batch || B.batches[0].id))}${F('ap-no', 'Jersey number', p ? p.no : '', { im: 'numeric' })}</div>
     <div class="grid g2">${F('ap-p', 'Parent name', p ? p.parentName : pre.parent)}${F('ap-ph', 'Parent phone', p ? p.parentPhone : pre.phone, { type: 'tel', ph: 'For WhatsApp reminders' })}</div>
     ${F('ap-e', 'Parent email (their login)', p ? p.parentEmail : '', { type: 'email', ph: 'parent@gmail.com' })}
-    ${role === 'admin' ? `<div class="grid g2">${F('ap-fee', 'Own monthly fee (optional)', p && p.feeCustom ? p.fee : '', { im: 'numeric', ph: 'Leave empty to use the batch fee' })}${p ? '' : F('ap-j', 'Joined on', B.today, { type: 'date', max: B.today })}</div>` : ''}
+    ${role === 'admin' ? `<div class="grid g2">${F('ap-fee', 'Own monthly fee (optional)', p && p.feeCustom ? p.fee : '', { im: 'numeric', ph: 'Same as batch', help: 'Only for a special fee. Empty = batch fee.' })}${p ? '' : F('ap-j', 'Joined on', B.today, { type: 'date', max: B.today })}</div>` : ''}
     <div class="note">${ic('mail')}<span>The parent gets a login for the parent app. They can also sign in with Google using this email.</span></div>`;
     foot = btns('Cancel', p ? 'Save' : 'Add player', 'savePlayer', p ? 'ok' : 'plus'); } }
   if (m.t === 'staff') { const s = m.s ? B.staff.find(x => x.id === m.s) : null; title = s ? s.name : 'Add coach or manager';
@@ -817,6 +824,11 @@ function modal() {
   if (m.t === 'creds') { title = 'Login for ' + m.name; const msg = `Hi ${first(m.name)}, here is your Veyra Academy login for ${B.academy.name}.\nOpen: ${location.href.split('#')[0]}#login\nEmail: ${m.login.email}${m.login.temp ? '\nPassword: ' + m.login.temp : ''}\nYou can also tap Continue with Google.`;
     h = `<div class="creds"><span class="label">Email</span><code>${esc(m.login.email)}</code>${m.login.temp ? `<span class="label">Password</span><code>${esc(m.login.temp)}</code>` : '<span class="faint">They already have an account. They use their own password or Google.</span>'}</div><p class="muted" style="font-size:14px">${LIVE && CFG.mail ? 'We also emailed this to them.' : 'Send this to them on WhatsApp. They can change the password after logging in.'}</p>`;
     foot = `<button class="btn btn-ghost" type="button" data-act="copyText" data-t="${esc(msg)}">${ic('copy')}Copy</button><a class="btn btn-primary" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ic('chat')}Send on WhatsApp</a>`; }
+  if (m.t === 'import') { title = 'Import players'; wide = true;
+    if (m.done) { const d = m.done; h = `<div class="banner">${ic('ok')}<span class="grow"><b>${d.added} player${d.added === 1 ? '' : 's'} added.</b> ${d.parents ? `${d.parents} parent${d.parents === 1 ? '' : 's'} got their login by email.` : ''}</span></div>${d.bad.length ? `<span class="label">Skipped rows</span><div class="list">${d.bad.map(x => `<div class="row"><div class="grow"><b>Row ${x.row}${x.name ? ' · ' + esc(x.name) : ''}</b><small class="faint" style="display:block">${esc(x.why)}</small></div></div>`).join('')}</div>` : ''}`; foot = `<button class="btn btn-primary" type="button" data-act="close">Done</button>`; }
+    else if (m.rows) { const rs = m.rows; h = `<p class="muted">${rs.length} player${rs.length === 1 ? '' : 's'} found in <b>${esc(m.file)}</b>. Check the first few:</p><div class="table-wrap"><table class="t"><thead><tr><th>Player</th><th>Batch</th><th class="hide-sm">Parent</th><th class="hide-sm">Parent email</th></tr></thead><tbody>${rs.slice(0, 6).map(r => `<tr><td><b>${esc(r.name || '—')}</b></td><td>${esc(r.batch || '—')}</td><td class="hide-sm">${esc(r.parentName || '—')}</td><td class="hide-sm">${esc(r.parentEmail || '—')}</td></tr>`).join('')}</tbody></table></div>${rs.length > 6 ? `<p class="faint" style="font-size:13px">and ${rs.length - 6} more</p>` : ''}<div class="note">${ic('mail')}<span>Parents with an email get their app login by email, the same as adding them one by one.</span></div>`;
+      foot = `<button class="btn btn-ghost" type="button" data-act="importReset">Pick another file</button><button class="btn btn-primary" type="button" data-act="importGo">${ic('ok')}Add ${rs.length} player${rs.length === 1 ? '' : 's'}</button>`; }
+    else { h = `<p class="muted">Bring all your players in at once from Excel or Google Sheets.</p><ol class="steps-ol"><li>Download the template and fill one row per player. Use your batch names exactly: ${B.batches.map(b => `<b>${esc(b.name)}</b>`).join(', ') || 'add a batch first'}.</li><li>In Excel: File › Save as › <b>CSV</b>. In Google Sheets: File › Download › <b>CSV</b>.</li><li>Pick the file below. You'll see a preview before anything is added.</li></ol>${m.err ? `<div class="banner bad">${ic('x')}<span class="grow">${esc(m.err)}</span></div>` : ''}<div class="grid g2"><button class="btn btn-ghost btn-lg btn-block" type="button" data-act="importTpl">${ic('down')}Download template</button><label class="btn btn-primary btn-lg btn-block" style="cursor:pointer">${ic('up')}Pick CSV file<input type="file" accept=".csv,text/csv" data-import="1" hidden></label></div>`; } }
   if (m.t === 'cash') { title = 'Record a payment'; const owe = B.players.filter(p => p.owes > 0 || openBills(p).length);
     h = owe.length ? `${SEL('c-p', 'Player', owe.map(p => [p.id, `${p.name} · owes ${inr(p.owes)}`]), m.p || owe[0].id)}<div id="c-months">${cashMonths(m.p || owe[0].id, m.m)}</div><div class="grid g2">${SEL('c-how', 'Paid by', [['Cash', 'Cash'], ['UPI', 'UPI (already checked)'], ['Bank transfer', 'Bank transfer'], ['Cheque', 'Cheque']], 'Cash')}${F('c-amt', 'Amount (₹)', '', { im: 'numeric', ph: 'Leave empty for the full bill' })}</div>` : empty('ok', 'Nobody owes anything right now.');
     foot = owe.length ? btns('Cancel', 'Save and send receipt', 'saveCash', 'ok') : ''; }
@@ -915,7 +927,7 @@ document.addEventListener('click', async e => {
     resetDemo: async () => { if (!armed(a, 'Tap again to reset')) return; await DemoAPI.reset(); U.draft = {}; U.prog = {}; await DemoAPI.loginAs(role || 'admin'); await refresh(); U.menu = false; rerender(); toast('Demo data reset'); },
     switchTo: async () => { try { await API.switchTo(d.aid, d.role); await refresh(); U.menu = false; go(d.role); } catch (er) { fail(er); } },
     install: async () => { U.menu = false; if (installEvt) { installEvt.prompt(); installEvt = null; rerender(); } else openModal({ t: 'install' }); },
-    google: () => API.google().catch(er => showAuthErr(er.message)),
+    google: () => LIVE ? showAuthErr('Google sign-in is still loading. Try again in a moment, or use your email.') : API.google().catch(er => showAuthErr(er.message)),
     openMark: () => { U.attBatch = d.b; U.attDay = 'today'; U.attMode = 'players'; go(role === 'coach' ? 'coach-mark' : role + '-attendance'); },
     pickBatch: () => { U.attBatch = d.b; rerender(); },
     pickBatchGo: () => { U.attBatch = d.b; U.attMode = 'players'; U.attDay = 'today'; },
@@ -946,6 +958,10 @@ document.addEventListener('click', async e => {
       if (M.p) f.id = M.p; if (M.pre && M.pre.admId) f.admId = M.pre.admId;
       const r = await act(M.p ? 'player.update' : 'player.add', f); showCreds(r); },
     leave: () => { if (armed(a, 'Tap again: move to past players')) act('player.leave', { id: d.p }); },
+    importPlayers: () => openModal({ t: 'import' }),
+    importReset: () => { U.modal = { t: 'import' }; rerender(); },
+    importTpl: () => download('veyra-academy-players.csv', '\ufeff' + csv([IMPORT_COLS.map(c => c[0]), ['Aarav Patil', (B.batches[0] || { name: 'U-10' }).name, '7', '14/03/2016', 'Sneha Patil', 'sneha@example.com', '9876543210', '', '']])),
+    importGo: async () => { const M = U.modal; const r = await act('player.import', { rows: M.rows }, { quiet: true }); if (r && r.data) { U.modal = { t: 'import', done: r.data }; rerender(); } },
     exportPlayers: () => download('players.csv', csv([['Name', 'Jersey', 'Batch', 'Date of birth', 'Parent', 'Parent email', 'Parent phone', 'Attendance %', 'Monthly fee', 'Owes', 'Joined'], ...B.players.map(p => [p.name, p.no, batch(p.batch).name, p.dob, p.parentName, p.parentEmail, p.parentPhone, p.att == null ? '' : p.att, p.fee, p.owes || 0, p.joined])])),
     exportFees: () => download('fees.csv', csv([['Receipt', 'Paid on', 'Player', 'For month', 'Amount', 'Paid by', 'UPI ID'], ...(B.payments || []).map(x => [x.receipt, T.date(x.at), (player(x.pid) || { name: 'Past player' }).name, x.m, x.amt, x.via, x.utr])])),
     exportAtt: () => { const rows = [['Date', 'Batch', 'Player', 'Mark', 'Marked by']]; Object.keys(B.attHistory || {}).sort().forEach(dt => Object.entries(B.attHistory[dt]).forEach(([bid, r]) => Object.entries(r.marks).forEach(([pid, v]) => rows.push([dt, batch(bid).name, (player(pid) || { name: 'Past player' }).name, { P: 'Present', L: 'Late', A: 'Absent' }[v], r.by])))); download('attendance.csv', csv(rows)); },
@@ -1024,7 +1040,7 @@ document.addEventListener('click', async e => {
     pay: () => openModal({ t: 'pay', p: d.p, m: d.m }),
     payNext: () => { U.modal.step2 = true; rerender(); setTimeout(() => $('#utr') && $('#utr').focus(), 30); },
     payBack: () => { U.modal.step2 = false; rerender(); },
-    paySubmit: async () => { const v = val('utr').replace(/\s/g, ''); if (!/^\d{12}$/.test(v)) { const er = $('#utrErr'); er.textContent = 'The ID has 12 digits. You typed ' + v.length + '.'; er.style.color = 'var(--bad)'; return; } act('fee.pay', { pid: M.p, m: M.m, utr: v }); },
+    paySubmit: async () => { const v = val('utr').replace(/\s/g, ''); if (!v && M.shot) return act('fee.pay', { pid: M.p, m: M.m, shot: M.shot.id }); if (!/^\d{12}$/.test(v)) { const er = $('#utrErr'); er.textContent = 'The ID has 12 digits. You typed ' + v.length + '.'; er.style.color = 'var(--bad)'; return; } act('fee.pay', { pid: M.p, m: M.m, utr: v }); },
     copyUpi: () => copy(B.academy.upi, 'UPI ID copied'),
     copyText: () => copy(d.t, 'Copied'),
     pip: () => { readProg(); U.prog[U.progP].scores[+d.k] = +d.n; rerender(); },
@@ -1061,11 +1077,45 @@ document.addEventListener('change', async e => {
   if (t.dataset.chan) act('reminders.save', { chan: { [t.dataset.chan]: t.checked } }, { quiet: true });
   if (t.id === 's-google') act('academy.save', { google: t.checked }, { quiet: true }).then(() => toast(t.checked ? 'Google sign-in on' : 'Google sign-in off'));
   if (t.dataset.inj) act('injury.status', { id: t.dataset.inj, status: t.value });
+  if (t.dataset.import && t.files && t.files[0]) { const f = t.files[0];
+    if (/\.xlsx?$/i.test(f.name)) { U.modal = { t: 'import', err: 'This is an Excel file. In Excel, use File › Save as › CSV, then pick that file.' }; return rerender(); }
+    const r = readImport(await f.text(), f.name); U.modal = Object.assign({ t: 'import' }, r); rerender(); }
+  if (t.dataset.shot && t.files && t.files[0] && U.modal) {
+    const M = U.modal; try { const f = await shrinkImg(t.files[0]); const r = await API.upload(f, M.p, 'payshot'); M.shot = { id: r.id || 'demo', name: t.files[0].name }; rerender(); } catch (er) { fail(er); }
+  }
   if (t.dataset.up && t.files && t.files[0]) {
     const f = t.files[0]; if (f.size > 4 * 1024 * 1024) return toast('Please pick a file under 4 MB');
     try { const r = await API.upload(f, t.dataset.p, t.dataset.up); await act('doc.set', { pid: t.dataset.p, key: t.dataset.up, file: r.id || '', name: f.name }); } catch (er) { fail(er); }
   }
 });
+/* player import: CSV from Excel or Google Sheets */
+const IMPORT_COLS = [['Player name', 'name', /^(player\s*)?name$|^player$|^child/], ['Batch', 'batch', /^batch|^group|^team/], ['Jersey no', 'no', /jersey|^no\.?$|^number/], ['Date of birth', 'dob', /birth|dob/], ['Parent name', 'parentName', /parent.*name|father|mother|guardian/], ['Parent email', 'parentEmail', /e-?mail/], ['Parent phone', 'parentPhone', /phone|mobile|whatsapp/], ['Monthly fee', 'fee', /fee/], ['Joined on', 'joined', /join/]];
+function parseCSV(text) {
+  text = text.replace(/^\ufeff/, ''); const rows = []; let row = [], f = '', q = false;
+  const sep = (text.split('\n')[0].match(/;/g) || []).length > (text.split('\n')[0].match(/,/g) || []).length ? ';' : ',';
+  for (let i = 0; i < text.length; i++) { const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += ch; }
+    else if (ch === '"') q = true; else if (ch === sep) { row.push(f); f = ''; } else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(f); f = ''; if (row.some(c => c.trim())) rows.push(row); row = []; } else f += ch; }
+  row.push(f); if (row.some(c => c.trim())) rows.push(row); return rows;
+}
+function isoDate(s) { s = String(s || '').trim(); if (!s) return ''; let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/); if (m) { const y = m[3].length === 2 ? (+m[3] > 40 ? '19' : '20') + m[3] : m[3]; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; } return ''; }
+function readImport(text, name) {
+  const rows = parseCSV(text); if (rows.length < 2) return { err: 'This file has no player rows. Use the template and save it as CSV.' };
+  const head = rows[0].map(h => h.trim().toLowerCase()); const map = {}; IMPORT_COLS.forEach(([, k, re]) => { const i = head.findIndex((h, j) => re.test(h) && !Object.values(map).includes(j)); if (i >= 0) map[k] = i; });
+  if (map.name == null) return { err: 'Could not find a "Player name" column. Use the template headings.' };
+  const out = rows.slice(1).map(r => { const o = {}; Object.entries(map).forEach(([k, i]) => { o[k] = String(r[i] || '').trim(); }); o.dob = isoDate(o.dob); o.joined = isoDate(o.joined); o.fee = o.fee.replace(/[^\d]/g, ''); o.no = o.no.replace(/[^\d]/g, ''); return o; }).filter(o => o.name);
+  if (!out.length) return { err: 'No player names found in the file.' };
+  if (out.length > 500) return { err: 'Please import up to 500 players at a time.' };
+  return { rows: out, file: name };
+}
+/* phone screenshots can be big: shrink to a 1600px JPEG before sending */
+function shrinkImg(file) {
+  return new Promise(res => { if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) return res(file); const url = URL.createObjectURL(file); const im = new Image();
+    im.onload = () => { const k = Math.min(1, 1600 / Math.max(im.width, im.height)); const c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      c.toBlob(b => res(b ? new File([b], (file.name || 'screenshot').replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }) : file), 'image/jpeg', 0.82); };
+    im.onerror = () => { URL.revokeObjectURL(url); res(file); }; im.src = url; });
+}
 document.addEventListener('submit', async e => {
   e.preventDefault(); const f = e.target;
   if (f.id === 'authForm') {
@@ -1145,4 +1195,236 @@ function reveal() {
   if (LIVE && CFG.version) { const check = () => fetch('/healthz', { cache: 'no-store' }).then(r => r.json()).then(j => { if (j.version && j.version !== CFG.version) { const busy = U.modal || (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)); if (busy) U.newVersion = true; else location.reload(); } }).catch(() => {}); setInterval(check, 10 * 60e3); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); }); }
   setInterval(() => { if (B && !U.modal && !drag && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) { const t = B.today; refresh(true).then(() => { if (B && B.today !== t) { U.draft = {}; rerender(); } }); } }, 5 * 60 * 1000);
 })();
+
+/* ---------- Hindi and Marathi for the parent and coach apps ----------
+   Buttons, labels and messages are translated. Names, notices, drills and anything the academy types stay as typed. */
+const LANGS = [['en', 'English'], ['hi', 'हिंदी'], ['mr', 'मराठी']];
+let LANG = (() => { try { const v = localStorage.getItem('vf-lang'); return ['hi', 'mr'].includes(v) ? v : 'en'; } catch (_) { return 'en'; } })();
+function setLang(v) { LANG = ['hi', 'mr'].includes(v) ? v : 'en'; try { localStorage.setItem('vf-lang', LANG); } catch (_) {} document.documentElement.lang = LANG === 'en' ? 'en-IN' : LANG; rerender(); }
+const i18nRole = () => !!(B && B.me && (B.me.role === 'parent' || B.me.role === 'coach'));
+const i18nOn = () => LANG !== 'en' && i18nRole() && route().view === 'app';
+function langPicker() { return i18nRole() ? `<label class="lang-pick" title="Language"><span class="sr">Language</span>${ic('globe')}<select data-lang aria-label="Language">${LANGS.map(([k, l]) => `<option value="${k}" ${k === LANG ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''; }
+
+// English | Hindi | Marathi
+const I18 = `Today|आज|आज
+Take attendance|हाज़िरी लें|हजेरी घ्या
+Training plan|ट्रेनिंग प्लान|ट्रेनिंग प्लॅन
+Matches|मैच|सामने
+Player progress|खिलाड़ी की प्रगति|खेळाडूची प्रगती
+My attendance|मेरी हाज़िरी|माझी हजेरी
+Notices|सूचनाएँ|सूचना
+Home|होम|होम
+Mark|हाज़िरी|हजेरी
+Training|ट्रेनिंग|ट्रेनिंग
+More|और|अधिक
+Menu|मेन्यू|मेन्यू
+Attendance|हाज़िरी|हजेरी
+Fees|फ़ीस|फी
+Progress & health|प्रगति और सेहत|प्रगती आणि आरोग्य
+Progress|प्रगति|प्रगती
+Coach app|कोच ऐप|कोच ॲप
+Parent app|पेरेंट ऐप|पालक ॲप
+Coach|कोच|कोच
+Parent|पेरेंट|पालक
+Head coach|मुख्य कोच|मुख्य कोच
+Hi|नमस्ते|नमस्कार
+Check in|चेक इन|चेक इन
+Checked in|चेक इन हो गया|चेक इन झाले
+My sessions today|आज के मेरे सेशन|आजचे माझे सेशन
+Injured players|घायल खिलाड़ी|जखमी खेळाडू
+Out|बाहर|बाहेर
+Next match|अगला मैच|पुढचा सामना
+Open|खोलें|उघडा
+Latest notice|ताज़ा सूचना|नवीन सूचना
+Tap All present, then change the few who missed.|पहले "सब मौजूद" दबाएँ, फिर जो नहीं आए उन्हें बदलें।|आधी "सगळे हजर" दाबा, मग जे आले नाहीत त्यांना बदला.
+Not saved|सेव नहीं हुआ|सेव्ह झाले नाही
+Saved|सेव हो गया|सेव्ह झाले
+Present|मौजूद|हजर
+Late|देर से|उशिरा
+Absent|ग़ैरहाज़िर|गैरहजर
+All present|सब मौजूद|सगळे हजर
+Save and tell parents|सेव करें और पेरेंट्स को बताएँ|सेव्ह करा आणि पालकांना कळवा
+Batch|बैच|बॅच
+Your plan for each batch. Change it any time.|हर बैच का प्लान। कभी भी बदलें।|प्रत्येक बॅचचा प्लॅन. कधीही बदला.
+Edit plan|प्लान बदलें|प्लॅन बदला
+Drill library|ड्रिल लाइब्रेरी|ड्रिल लायब्ररी
+New|नया|नवीन
+Squads, fixtures, results, scorers and certificates.|टीम, मैच, नतीजे, गोल करने वाले और सर्टिफ़िकेट।|संघ, सामने, निकाल, गोल करणारे आणि प्रमाणपत्रे.
+Coming up|आने वाले|येणारे
+in squad|टीम में|संघात
+played|खेले|खेळले
+won|जीते|जिंकले
+Upcoming|आने वाला|येणारा
+Add result|नतीजा जोड़ें|निकाल जोडा
+Squad|टीम|संघ
+Pick squad|टीम चुनें|संघ निवडा
+Goals|गोल|गोल
+Assists|असिस्ट|असिस्ट
+Parents see these ratings and your note in their app.|पेरेंट्स ऐप में ये रेटिंग और आपका नोट देखते हैं।|पालक ॲपमध्ये हे रेटिंग आणि तुमची नोंद पाहतात.
+Player|खिलाड़ी|खेळाडू
+NOT SHARED YET|अभी भेजा नहीं|अजून पाठवले नाही
+Passing|पासिंग|पासिंग
+Dribbling|ड्रिब्लिंग|ड्रिब्लिंग
+Shooting|शूटिंग|शूटिंग
+First touch|फ़र्स्ट टच|फर्स्ट टच
+Fitness|फ़िटनेस|फिटनेस
+Teamwork|टीमवर्क|टीमवर्क
+Note for parents|पेरेंट्स के लिए नोट|पालकांसाठी नोंद
+Save and share|सेव करें और भेजें|सेव्ह करा आणि पाठवा
+What went well, what to work on next|क्या अच्छा रहा, आगे किस पर काम करना है|काय चांगले झाले, पुढे कशावर काम करायचे
+No session|सेशन नहीं|सेशन नाही
+Recent check-ins|हाल के चेक-इन|अलीकडचे चेक-इन
+Post a notice|सूचना भेजें|सूचना पाठवा
+Title|शीर्षक|शीर्षक
+Send to|किसे भेजें|कोणाला पाठवायचे
+Message|संदेश|संदेश
+It shows in their app straight away.|यह तुरंत उनके ऐप में दिखेगा।|हे लगेच त्यांच्या ॲपमध्ये दिसेल.
+Post notice|सूचना भेजें|सूचना पाठवा
+All parents|सभी पेरेंट्स|सर्व पालक
+e.g. Kit day on Saturday|जैसे: शनिवार को किट डे|उदा. शनिवारी किट डे
+What should they know?|उन्हें क्या जानना चाहिए?|त्यांना काय कळायला हवे?
+Next session|अगला सेशन|पुढचे सेशन
+See calendar|कैलेंडर देखें|कॅलेंडर पाहा
+No matches coming up.|अभी कोई मैच नहीं है।|सध्या कोणताही सामना नाही.
+Child|बच्चा|मूल
+Month|महीना|महिना
+Past payments|पिछले भुगतान|मागील पेमेंट
+Paid in cash to the coach or the office? That counts too. The academy marks it paid and you get a receipt here.|कोच या ऑफ़िस में नकद दिया? वह भी गिना जाएगा। अकादमी उसे भरा हुआ मार्क करेगी और आपको यहाँ रसीद मिलेगी।|कोच किंवा ऑफिसमध्ये रोख दिले? तेही चालते. अकादमी ते भरले म्हणून नोंदवेल आणि तुम्हाला इथे पावती मिळेल.
+Player of the match|मैन ऑफ़ द मैच|सामनावीर
+In the squad|टीम में|संघात
+Certificate|सर्टिफ़िकेट|प्रमाणपत्र
+Runners-up|उपविजेता|उपविजेता
+Winners|विजेता|विजेता
+Progress card|प्रगति कार्ड|प्रगती कार्ड
+Coach's note|कोच का नोट|कोचची नोंद
+Badges|बैज|बॅज
+Health & forms|सेहत और फ़ॉर्म|आरोग्य आणि फॉर्म
+Edit|बदलें|बदला
+Blood group|ब्लड ग्रुप|रक्तगट
+Allergies|एलर्जी|ॲलर्जी
+None|कोई नहीं|काही नाही
+Note for coach|कोच के लिए नोट|कोचसाठी नोंद
+Emergency contact|इमरजेंसी संपर्क|आपत्कालीन संपर्क
+Forms|फ़ॉर्म|फॉर्म
+Birth certificate|जन्म प्रमाणपत्र|जन्म दाखला
+Not added yet|अभी नहीं जोड़ा|अजून जोडले नाही
+Upload|अपलोड करें|अपलोड करा
+Photo|फ़ोटो|फोटो
+Added|जोड़ा गया|जोडले
+View|देखें|पाहा
+Medical form|मेडिकल फ़ॉर्म|मेडिकल फॉर्म
+Parent consent|पेरेंट की सहमति|पालकांची संमती
+Amount|रकम|रक्कम
+Pay to|किसे भरें|कोणाला भरायचे
+Copy|कॉपी करें|कॉपी करा
+Copied|कॉपी हो गया|कॉपी झाले
+Open UPI app|UPI ऐप खोलें|UPI ॲप उघडा
+On a phone, tap Open UPI app. On a laptop, scan the code with GPay, PhonePe or Paytm. Then come back and paste the transaction ID.|फ़ोन पर "UPI ऐप खोलें" दबाएँ। लैपटॉप पर GPay, PhonePe या Paytm से कोड स्कैन करें। फिर वापस आकर ट्रांज़ैक्शन ID डालें।|फोनवर "UPI ॲप उघडा" दाबा. लॅपटॉपवर GPay, PhonePe किंवा Paytm ने कोड स्कॅन करा. मग परत येऊन ट्रान्झॅक्शन ID टाका.
+I have paid|मैंने भर दिया|मी भरले आहे
+UPI transaction ID (12 digits)|UPI ट्रांज़ैक्शन ID (12 अंक)|UPI ट्रान्झॅक्शन ID (12 अंक)
+In your UPI app, open the payment and look for “UPI transaction ID” or “UTR”.|अपने UPI ऐप में पेमेंट खोलें और “UPI transaction ID” या “UTR” देखें।|तुमच्या UPI ॲपमध्ये पेमेंट उघडा आणि “UPI transaction ID” किंवा “UTR” पाहा.
+or|या|किंवा
+Upload payment screenshot|पेमेंट का स्क्रीनशॉट भेजें|पेमेंटचा स्क्रीनशॉट पाठवा
+Change|बदलें|बदला
+Back|पीछे|मागे
+Send to academy|अकादमी को भेजें|अकादमीला पाठवा
+Close|बंद करें|बंद करा
+Cancel|रद्द करें|रद्द करा
+Save|सेव करें|सेव्ह करा
+Done|हो गया|झाले
+Notifications|सूचनाएँ|सूचना
+Mark all read|सब पढ़ा हुआ करें|सगळे वाचले
+No notifications yet|अभी कोई सूचना नहीं|अजून सूचना नाहीत
+Paid|भरा हुआ|भरले
+Overdue|बकाया|थकीत
+To check|जाँच बाकी|तपासणी बाकी
+Being checked|जाँच हो रही है|तपासणी सुरू आहे
+Receipt|रसीद|पावती
+Language|भाषा|भाषा
+My account|मेरा अकाउंट|माझे खाते
+Log out|लॉग आउट|लॉग आउट
+Install the app|ऐप इंस्टॉल करें|ॲप इंस्टॉल करा
+Sent. The academy will confirm soon.|भेज दिया। अकादमी जल्द ही पुष्टि करेगी।|पाठवले. अकादमी लवकरच खात्री करेल.
+Checked in. Have a good session.|चेक इन हो गया। अच्छा सेशन हो।|चेक इन झाले. सेशन छान होवो.
+Notice posted|सूचना भेज दी|सूचना पाठवली
+Progress card shared with the parent|प्रगति कार्ड पेरेंट को भेज दिया|प्रगती कार्ड पालकांना पाठवले
+Pick a batch|बैच चुनें|बॅच निवडा
+Some marks are waiting. They send when the network is back.|कुछ हाज़िरी रुकी है। नेटवर्क आते ही भेजी जाएगी।|काही हजेरी थांबली आहे. नेटवर्क आल्यावर पाठवली जाईल.
+Cash|नकद|रोख
+Schedule|शेड्यूल|वेळापत्रक
+Fixture|मैच|सामना
+General|सामान्य|सामान्य
+Kit|किट|किट
+Holiday|छुट्टी|सुट्टी
+Cup|कप|कप
+League|लीग|लीग
+Friendly|फ़्रेंडली|मैत्री सामना
+🤝 Team player|🤝 टीम प्लेयर|🤝 टीम प्लेयर`;
+const I18N = { hi: {}, mr: {} };
+I18.split('\n').forEach(l => { const [en, hi, mr] = l.split('|'); I18N.hi[en] = hi; I18N.mr[en] = mr; });
+const MONS = { hi: ['जनवरी', 'फ़रवरी', 'मार्च', 'अप्रैल', 'मई', 'जून', 'जुलाई', 'अगस्त', 'सितंबर', 'अक्टूबर', 'नवंबर', 'दिसंबर'], mr: ['जानेवारी', 'फेब्रुवारी', 'मार्च', 'एप्रिल', 'मे', 'जून', 'जुलै', 'ऑगस्ट', 'सप्टेंबर', 'ऑक्टोबर', 'नोव्हेंबर', 'डिसेंबर'] };
+const DAYS = { hi: ['रवि', 'सोम', 'मंगल', 'बुध', 'गुरु', 'शुक्र', 'शनि'], mr: ['रवि', 'सोम', 'मंगळ', 'बुध', 'गुरु', 'शुक्र', 'शनि'] };
+const DAYSL = { hi: ['रविवार', 'सोमवार', 'मंगलवार', 'बुधवार', 'गुरुवार', 'शुक्रवार', 'शनिवार'], mr: ['रविवार', 'सोमवार', 'मंगळवार', 'बुधवार', 'गुरुवार', 'शुक्रवार', 'शनिवार'] };
+const EN_M = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const EN_D = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DATEW = /\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sun|Mon|Tue|Wed|Thu|Fri|Sat|AM|PM)\b/g;
+function trDates(s) {
+  // only short date-like labels; sentences the academy typed (notices, notes) stay exactly as written
+  if (!/\d/.test(s) || /[.!?]\s|[.!?]$/.test(s) || (s.replace(DATEW, '').match(/[A-Za-z]{3,}/g) || []).length > 4) return s;
+  s = s.replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/g, w => MONS[LANG][EN_M.findIndex(m => m.startsWith(w))]);
+  return s.replace(/\b(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sun|Mon|Tue|Wed|Thu|Fri|Sat)\b/g, w => (w.length > 3 ? DAYSL : DAYS)[LANG][EN_D.findIndex(d => d.startsWith(w))]);
+}
+const M_ = w => { const i = EN_M.indexOf(w); return i < 0 ? w : MONS[LANG][i]; };
+const num_ = s => String(s).replace(/(st|nd|rd|th)$/, '');
+// patterns for sentences that carry a name, month or number
+const I18P = [
+  [/^Pay (\w+) by UPI$/, (m, a) => ({ hi: `${M_(a)} की फ़ीस UPI से भरें`, mr: `${M_(a)} ची फी UPI ने भरा` })],
+  [/^Pay (\w+) fee$/, (m, a) => ({ hi: `${M_(a)} की फ़ीस भरें`, mr: `${M_(a)} ची फी भरा` })],
+  [/^(January|February|March|April|May|June|July|August|September|October|November|December) fee$/, (m, a) => ({ hi: `${M_(a)} की फ़ीस`, mr: `${M_(a)} ची फी` })],
+  [/^(January|February|March|April|May|June|July|August|September|October|November|December) attendance$/, (m, a) => ({ hi: `${M_(a)} की हाज़िरी`, mr: `${M_(a)} ची हजेरी` })],
+  [/^Due (.+)$/, (m, a) => ({ hi: `${trDates(a)} तक भरें`, mr: `${trDates(a)} पर्यंत भरा` })],
+  [/^(\d+) of (\d+) sessions$/, (m, a, b) => ({ hi: `${b} में से ${a} सेशन`, mr: `${b} पैकी ${a} सेशन` })],
+  [/^(.+) · (\d+) of (\d+) days$/, (m, a, b, c) => ({ hi: `${trDates(a)} · ${c} में से ${b} दिन`, mr: `${trDates(a)} · ${c} पैकी ${b} दिवस` })],
+  [/^#(\d+) · (\d+)% this month$/, (m, a, b) => ({ hi: `#${a} · इस महीने ${b}%`, mr: `#${a} · या महिन्यात ${b}%` })],
+  [/^(.+) · (\d+)% attendance$/, (m, a, b) => ({ hi: `${a} · ${b}% हाज़िरी`, mr: `${a} · ${b}% हजेरी` })],
+  [/^Paid (.+?) · (\w+) · (R-[\d-]+)$/, (m, a, b, c) => ({ hi: `${trDates(a)} को भरा · ${b === 'Cash' ? 'नकद' : b} · ${c}`, mr: `${trDates(a)} ला भरले · ${b === 'Cash' ? 'रोख' : b} · ${c}` })],
+  [/^(.+)'s tournaments and stats$/, (m, a) => ({ hi: `${a} के टूर्नामेंट और आँकड़े`, mr: `${a} च्या स्पर्धा आणि आकडे` })],
+  [/^You get a notification in this app as soon as the coach marks (.+) absent or late\.$/, (m, a) => ({ hi: `कोच जैसे ही ${a} को ग़ैरहाज़िर या देर से मार्क करेंगे, आपको इस ऐप में सूचना मिलेगी।`, mr: `कोच ${a} ला गैरहजर किंवा उशिरा नोंदवताच तुम्हाला या ॲपमध्ये सूचना मिळेल.` })],
+  [/^₹([\d,]+) a month · due on the (\w+) · late fee ₹([\d,]+) after the (\w+)$/, (m, a, b, c, d) => ({ hi: `₹${a} हर महीने · ${num_(b)} तारीख तक · ${num_(d)} तारीख के बाद ₹${c} लेट फ़ीस`, mr: `₹${a} दरमहा · ${num_(b)} तारखेपर्यंत · ${num_(d)} तारखेनंतर ₹${c} लेट फी` })],
+  [/^Coach (.+?) · (.+)$/, (m, a, b) => ({ hi: `कोच ${a} · ${b}`, mr: `कोच ${a} · ${b}` })],
+  [/^Tap when you reach (.+)\. The time is saved for the manager\.$/, (m, a) => ({ hi: `${a} पहुँचकर दबाएँ। समय मैनेजर के लिए सेव हो जाएगा।`, mr: `${a} ला पोहोचल्यावर दाबा. वेळ मॅनेजरसाठी सेव्ह होईल.` })],
+  [/^(\d+) SESSIONS?$/, (m, a) => ({ hi: `${a} सेशन`, mr: `${a} सेशन` })],
+  [/^(\d+) players? picked$/, (m, a) => ({ hi: `${a} खिलाड़ी चुने`, mr: `${a} खेळाडू निवडले` })],
+  [/^(\d+) played$/, (m, a) => ({ hi: `${a} खेले`, mr: `${a} खेळले` })],
+  [/^Receipt (R-[\d-]+)$/, (m, a) => ({ hi: `रसीद ${a}`, mr: `पावती ${a}` })],
+  [/^Notifications, (\d+) new$/, (m, a) => ({ hi: `सूचनाएँ, ${a} नई`, mr: `सूचना, ${a} नवीन` })],
+  [/^(\w+ \d{4}) · by (.+)$/, (m, a, b) => ({ hi: `${trDates(a)} · ${b}`, mr: `${trDates(a)} · ${b}` })],
+  [/^Added (\d+ \w+)$/, (m, a) => ({ hi: `${trDates(a)} को जोड़ा`, mr: `${trDates(a)} ला जोडले` })],
+  [/^Saved\. (\d+) parents? told about an absence\.$/, (m, a) => ({ hi: `सेव हो गया। ${a} पेरेंट्स को ग़ैरहाज़िरी बताई।`, mr: `सेव्ह झाले. ${a} पालकांना गैरहजेरी कळवली.` })],
+  [/^The transaction ID has 12 digits\. You typed (\d+)\.$/, (m, a) => ({ hi: `ट्रांज़ैक्शन ID में 12 अंक होते हैं। आपने ${a} डाले।`, mr: `ट्रान्झॅक्शन ID मध्ये 12 अंक असतात. तुम्ही ${a} टाकले.` })],
+  [/^The ID has 12 digits\. You typed (\d+)\.$/, (m, a) => ({ hi: `ID में 12 अंक होते हैं। आपने ${a} डाले।`, mr: `ID मध्ये 12 अंक असतात. तुम्ही ${a} टाकले.` })],
+  [/^Being checked · ID (\d+)$/, (m, a) => ({ hi: `जाँच हो रही है · ID ${a}`, mr: `तपासणी सुरू आहे · ID ${a}` })],
+  [/^Being checked · screenshot sent$/, () => ({ hi: 'जाँच हो रही है · स्क्रीनशॉट भेजा', mr: 'तपासणी सुरू आहे · स्क्रीनशॉट पाठवला' })],
+  [/^Screenshot added: $/, () => ({ hi: 'स्क्रीनशॉट जोड़ा: ', mr: 'स्क्रीनशॉट जोडला: ' })],
+  [/^(.+) · (\d+) players?$/, (m, a, b) => ({ hi: `${a} · ${b} खिलाड़ी`, mr: `${a} · ${b} खेळाडू` })],
+  [/^(.+) parents$/, (m, a) => ({ hi: `${a} के पेरेंट्स`, mr: `${a} चे पालक` })],
+  [/^(.+) · updated (.+)$/, (m, a, b) => ({ hi: `${trDates(a)} · ${trDates(b)} को बदला`, mr: `${trDates(a)} · ${trDates(b)} ला बदलले` })],
+  [/^⚽ (\d+) goals?$/, (m, a) => ({ hi: `⚽ ${a} गोल`, mr: `⚽ ${a} गोल` })],
+  [/^⭐ Player of the match ×(\d+)$/, (m, a) => ({ hi: `⭐ मैन ऑफ़ द मैच ×${a}`, mr: `⭐ सामनावीर ×${a}` })],
+  [/^Preview as (\w+)$/, (m, a) => ({ hi: `${I18N.hi[a] || a} के रूप में देखें`, mr: `${I18N.mr[a] || a} म्हणून पाहा` })],
+  [/^(\d+) waiting to send$/, (m, a) => ({ hi: `${a} भेजना बाकी`, mr: `${a} पाठवणे बाकी` })]
+];
+function trS(s) {
+  if (LANG === 'en' || !s) return s; const t = s.trim(); if (!t) return s;
+  const D = I18N[LANG]; if (D[t]) return s.replace(t, D[t]);
+  for (const [re, f] of I18P) { const m = t.match(re); if (m) return s.replace(t, f(...m)[LANG]); }
+  return s.replace(t, trDates(t));
+}
+function trDom(root) {
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement && n.parentElement.closest('textarea,script,style,.utr,code,.no-tr') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  const list = []; let n; while ((n = w.nextNode())) list.push(n);
+  list.forEach(x => { const v = trS(x.nodeValue); if (v !== x.nodeValue) x.nodeValue = v; });
+  root.querySelectorAll('[placeholder],[aria-label],[title]').forEach(e => ['placeholder', 'aria-label', 'title'].forEach(a => { const v = e.getAttribute(a); if (v) { const t = trS(v); if (t !== v) e.setAttribute(a, t); } }));
+}
+document.addEventListener('change', e => { if (e.target.matches && e.target.matches('[data-lang]')) setLang(e.target.value); });
 })();

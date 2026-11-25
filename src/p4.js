@@ -120,6 +120,7 @@ function render() {
   } else if (['login', 'signup', 'forgot', 'reset'].includes(r.view)) html = auth(r.view, r.token);
   else html = VFL.render(CFG, IC);
   $('#app').innerHTML = html + modal(); $('#app').toggleAttribute('data-notrack', r.view === 'app');
+  const tr = i18nOn(); $('#app').classList.toggle('tr', tr); if (tr) trDom($('#app'));
   document.title = r.view === 'landing' ? 'Football Academy Management App India | Veyra Academy' : r.view === 'app' ? `${ROLES[r.role].tabs.find(t => t[0] === r.tab)[1]} · ${B.academy.name}` : 'Veyra Academy';
   if (location.hash !== lastView) { lastView = location.hash; if (r.view === 'login' || r.view === 'signup') mountGoogle(); }
 }

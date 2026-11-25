@@ -38,7 +38,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 
 /* ---------- buttons & inputs ---------- */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:var(--r);border:1px solid transparent;font-weight:600;font-size:14px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:background .15s,border-color .15s,transform .1s;line-height:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px;border-radius:var(--r);border:1px solid transparent;font-weight:600;font-size:14px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:background .15s,border-color .15s,transform .1s;line-height:1}
 .btn:active{transform:translateY(1px)}
 .btn svg{width:18px;height:18px;flex:none}
 .btn-primary{background:var(--gold-grad);background-size:200% 100%;background-position:0 0;color:var(--brand-ink);transition:background-position .6s var(--ease),box-shadow .3s,transform .1s}
@@ -259,6 +259,7 @@ table.t{width:100%;border-collapse:collapse;font-size:14px}
   .t .who{gap:8px}
   .toolbar .search{max-width:none;flex-basis:100%}
   .card-h .toolbar{flex-basis:100%}
+  .toolbar>.select,.toolbar>select{flex:1 1 140px}
   .top-actions .hide-sm{display:none}
   .scrim{place-items:end center;padding:0}
   .modal{width:100%;border-radius:18px 18px 0 0;max-height:92vh;padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -316,3 +317,13 @@ table.t{width:100%;border-collapse:collapse;font-size:14px}
 .gold-text{background:var(--gold-grad);-webkit-background-clip:text;background-clip:text;color:transparent}
 @media (prefers-reduced-motion:reduce){.content.enter *,.ring,.chev i.on{animation:none!important}}
 @media (max-width:380px){.tabbar a{font-size:10px;letter-spacing:-.01em}.tabbar{padding-left:4px;padding-right:4px}}
+/* phones: action buttons fill their row so edges line up with the cards below */
+@media (max-width:600px){
+  .page-head>.hstack{width:100%}
+  .page-head>.hstack,.fill-sm{flex-wrap:wrap}
+  .page-head>.hstack>.btn,.fill-sm>.btn{flex:1 1 auto}
+  .fill-sm{width:100%}
+}
+/* buttons that sit in one row share a height: header bar 40px, page actions 44px */
+.top-actions .btn,.top-actions .btn-sm{height:40px}
+.page-head .btn-sm{height:44px;padding:0 16px;font-size:14px;border-radius:var(--r)}

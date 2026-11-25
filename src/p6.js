@@ -24,7 +24,7 @@ document.addEventListener('click', async e => {
     resetDemo: async () => { if (!armed(a, 'Tap again to reset')) return; await DemoAPI.reset(); U.draft = {}; U.prog = {}; await DemoAPI.loginAs(role || 'admin'); await refresh(); U.menu = false; rerender(); toast('Demo data reset'); },
     switchTo: async () => { try { await API.switchTo(d.aid, d.role); await refresh(); U.menu = false; go(d.role); } catch (er) { fail(er); } },
     install: async () => { U.menu = false; if (installEvt) { installEvt.prompt(); installEvt = null; rerender(); } else openModal({ t: 'install' }); },
-    google: () => API.google().catch(er => showAuthErr(er.message)),
+    google: () => LIVE ? showAuthErr('Google sign-in is still loading. Try again in a moment, or use your email.') : API.google().catch(er => showAuthErr(er.message)),
     openMark: () => { U.attBatch = d.b; U.attDay = 'today'; U.attMode = 'players'; go(role === 'coach' ? 'coach-mark' : role + '-attendance'); },
     pickBatch: () => { U.attBatch = d.b; rerender(); },
     pickBatchGo: () => { U.attBatch = d.b; U.attMode = 'players'; U.attDay = 'today'; },
@@ -55,6 +55,10 @@ document.addEventListener('click', async e => {
       if (M.p) f.id = M.p; if (M.pre && M.pre.admId) f.admId = M.pre.admId;
       const r = await act(M.p ? 'player.update' : 'player.add', f); showCreds(r); },
     leave: () => { if (armed(a, 'Tap again: move to past players')) act('player.leave', { id: d.p }); },
+    importPlayers: () => openModal({ t: 'import' }),
+    importReset: () => { U.modal = { t: 'import' }; rerender(); },
+    importTpl: () => download('veyra-academy-players.csv', '\ufeff' + csv([IMPORT_COLS.map(c => c[0]), ['Aarav Patil', (B.batches[0] || { name: 'U-10' }).name, '7', '14/03/2016', 'Sneha Patil', 'sneha@example.com', '9876543210', '', '']])),
+    importGo: async () => { const M = U.modal; const r = await act('player.import', { rows: M.rows }, { quiet: true }); if (r && r.data) { U.modal = { t: 'import', done: r.data }; rerender(); } },
     exportPlayers: () => download('players.csv', csv([['Name', 'Jersey', 'Batch', 'Date of birth', 'Parent', 'Parent email', 'Parent phone', 'Attendance %', 'Monthly fee', 'Owes', 'Joined'], ...B.players.map(p => [p.name, p.no, batch(p.batch).name, p.dob, p.parentName, p.parentEmail, p.parentPhone, p.att == null ? '' : p.att, p.fee, p.owes || 0, p.joined])])),
     exportFees: () => download('fees.csv', csv([['Receipt', 'Paid on', 'Player', 'For month', 'Amount', 'Paid by', 'UPI ID'], ...(B.payments || []).map(x => [x.receipt, T.date(x.at), (player(x.pid) || { name: 'Past player' }).name, x.m, x.amt, x.via, x.utr])])),
     exportAtt: () => { const rows = [['Date', 'Batch', 'Player', 'Mark', 'Marked by']]; Object.keys(B.attHistory || {}).sort().forEach(dt => Object.entries(B.attHistory[dt]).forEach(([bid, r]) => Object.entries(r.marks).forEach(([pid, v]) => rows.push([dt, batch(bid).name, (player(pid) || { name: 'Past player' }).name, { P: 'Present', L: 'Late', A: 'Absent' }[v], r.by])))); download('attendance.csv', csv(rows)); },
@@ -133,7 +137,7 @@ document.addEventListener('click', async e => {
     pay: () => openModal({ t: 'pay', p: d.p, m: d.m }),
     payNext: () => { U.modal.step2 = true; rerender(); setTimeout(() => $('#utr') && $('#utr').focus(), 30); },
     payBack: () => { U.modal.step2 = false; rerender(); },
-    paySubmit: async () => { const v = val('utr').replace(/\s/g, ''); if (!/^\d{12}$/.test(v)) { const er = $('#utrErr'); er.textContent = 'The ID has 12 digits. You typed ' + v.length + '.'; er.style.color = 'var(--bad)'; return; } act('fee.pay', { pid: M.p, m: M.m, utr: v }); },
+    paySubmit: async () => { const v = val('utr').replace(/\s/g, ''); if (!v && M.shot) return act('fee.pay', { pid: M.p, m: M.m, shot: M.shot.id }); if (!/^\d{12}$/.test(v)) { const er = $('#utrErr'); er.textContent = 'The ID has 12 digits. You typed ' + v.length + '.'; er.style.color = 'var(--bad)'; return; } act('fee.pay', { pid: M.p, m: M.m, utr: v }); },
     copyUpi: () => copy(B.academy.upi, 'UPI ID copied'),
     copyText: () => copy(d.t, 'Copied'),
     pip: () => { readProg(); U.prog[U.progP].scores[+d.k] = +d.n; rerender(); },
@@ -170,11 +174,45 @@ document.addEventListener('change', async e => {
   if (t.dataset.chan) act('reminders.save', { chan: { [t.dataset.chan]: t.checked } }, { quiet: true });
   if (t.id === 's-google') act('academy.save', { google: t.checked }, { quiet: true }).then(() => toast(t.checked ? 'Google sign-in on' : 'Google sign-in off'));
   if (t.dataset.inj) act('injury.status', { id: t.dataset.inj, status: t.value });
+  if (t.dataset.import && t.files && t.files[0]) { const f = t.files[0];
+    if (/\.xlsx?$/i.test(f.name)) { U.modal = { t: 'import', err: 'This is an Excel file. In Excel, use File › Save as › CSV, then pick that file.' }; return rerender(); }
+    const r = readImport(await f.text(), f.name); U.modal = Object.assign({ t: 'import' }, r); rerender(); }
+  if (t.dataset.shot && t.files && t.files[0] && U.modal) {
+    const M = U.modal; try { const f = await shrinkImg(t.files[0]); const r = await API.upload(f, M.p, 'payshot'); M.shot = { id: r.id || 'demo', name: t.files[0].name }; rerender(); } catch (er) { fail(er); }
+  }
   if (t.dataset.up && t.files && t.files[0]) {
     const f = t.files[0]; if (f.size > 4 * 1024 * 1024) return toast('Please pick a file under 4 MB');
     try { const r = await API.upload(f, t.dataset.p, t.dataset.up); await act('doc.set', { pid: t.dataset.p, key: t.dataset.up, file: r.id || '', name: f.name }); } catch (er) { fail(er); }
   }
 });
+/* player import: CSV from Excel or Google Sheets */
+const IMPORT_COLS = [['Player name', 'name', /^(player\s*)?name$|^player$|^child/], ['Batch', 'batch', /^batch|^group|^team/], ['Jersey no', 'no', /jersey|^no\.?$|^number/], ['Date of birth', 'dob', /birth|dob/], ['Parent name', 'parentName', /parent.*name|father|mother|guardian/], ['Parent email', 'parentEmail', /e-?mail/], ['Parent phone', 'parentPhone', /phone|mobile|whatsapp/], ['Monthly fee', 'fee', /fee/], ['Joined on', 'joined', /join/]];
+function parseCSV(text) {
+  text = text.replace(/^\ufeff/, ''); const rows = []; let row = [], f = '', q = false;
+  const sep = (text.split('\n')[0].match(/;/g) || []).length > (text.split('\n')[0].match(/,/g) || []).length ? ';' : ',';
+  for (let i = 0; i < text.length; i++) { const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += ch; }
+    else if (ch === '"') q = true; else if (ch === sep) { row.push(f); f = ''; } else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(f); f = ''; if (row.some(c => c.trim())) rows.push(row); row = []; } else f += ch; }
+  row.push(f); if (row.some(c => c.trim())) rows.push(row); return rows;
+}
+function isoDate(s) { s = String(s || '').trim(); if (!s) return ''; let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/); if (m) { const y = m[3].length === 2 ? (+m[3] > 40 ? '19' : '20') + m[3] : m[3]; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; } return ''; }
+function readImport(text, name) {
+  const rows = parseCSV(text); if (rows.length < 2) return { err: 'This file has no player rows. Use the template and save it as CSV.' };
+  const head = rows[0].map(h => h.trim().toLowerCase()); const map = {}; IMPORT_COLS.forEach(([, k, re]) => { const i = head.findIndex((h, j) => re.test(h) && !Object.values(map).includes(j)); if (i >= 0) map[k] = i; });
+  if (map.name == null) return { err: 'Could not find a "Player name" column. Use the template headings.' };
+  const out = rows.slice(1).map(r => { const o = {}; Object.entries(map).forEach(([k, i]) => { o[k] = String(r[i] || '').trim(); }); o.dob = isoDate(o.dob); o.joined = isoDate(o.joined); o.fee = o.fee.replace(/[^\d]/g, ''); o.no = o.no.replace(/[^\d]/g, ''); return o; }).filter(o => o.name);
+  if (!out.length) return { err: 'No player names found in the file.' };
+  if (out.length > 500) return { err: 'Please import up to 500 players at a time.' };
+  return { rows: out, file: name };
+}
+/* phone screenshots can be big: shrink to a 1600px JPEG before sending */
+function shrinkImg(file) {
+  return new Promise(res => { if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) return res(file); const url = URL.createObjectURL(file); const im = new Image();
+    im.onload = () => { const k = Math.min(1, 1600 / Math.max(im.width, im.height)); const c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      c.toBlob(b => res(b ? new File([b], (file.name || 'screenshot').replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }) : file), 'image/jpeg', 0.82); };
+    im.onerror = () => { URL.revokeObjectURL(url); res(file); }; im.src = url; });
+}
 document.addEventListener('submit', async e => {
   e.preventDefault(); const f = e.target;
   if (f.id === 'authForm') {
@@ -253,5 +291,4 @@ function reveal() {
   /* new version on the server: reload by itself when the person is not in the middle of something */
   if (LIVE && CFG.version) { const check = () => fetch('/healthz', { cache: 'no-store' }).then(r => r.json()).then(j => { if (j.version && j.version !== CFG.version) { const busy = U.modal || (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)); if (busy) U.newVersion = true; else location.reload(); } }).catch(() => {}); setInterval(check, 10 * 60e3); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); }); }
   setInterval(() => { if (B && !U.modal && !drag && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) { const t = B.today; refresh(true).then(() => { if (B && B.today !== t) { U.draft = {}; rerender(); } }); } }, 5 * 60 * 1000);
-})();
 })();

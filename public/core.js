@@ -74,10 +74,12 @@ C.billFor = (ac, p, m, today) => {
   const base = f.amt0 != null ? f.amt0 : feeOf(ac, p);
   if (f.st === 'paid') return { m, st: 'paid', amt: f.amt, at: f.at, via: f.via, receipt: f.receipt };
   if (f.st === 'waived') return { m, st: 'waived', amt: 0 };
-  const due = `${m}-${pad(Math.min(ac.dueDay, T.days(m)))}`, late = `${m}-${pad(Math.min(ac.lateAfter, T.days(m)))}`;
+  let due = `${m}-${pad(Math.min(ac.dueDay, T.days(m)))}`, late = `${m}-${pad(Math.min(ac.lateAfter, T.days(m)))}`;
+  // a player who joins after the due date: their first bill is due the day they join, and the late fee only starts after the same grace period
+  if (p.joined && p.joined.slice(0, 7) === m && p.joined > due) { late = T.add(p.joined, Math.max(0, late < due ? 0 : (Date.parse(late) - Date.parse(due)) / 864e5)); due = p.joined; }
   const over = today > late;
   const amt = base + (over ? +ac.lateFee || 0 : 0);
-  if (f.st === 'verify') return { m, st: 'verify', amt: f.amt || amt, utr: f.utr, due };
+  if (f.st === 'verify') return { m, st: 'verify', amt: f.amt || amt, utr: f.utr, shot: f.shot, due };
   return { m, st: over ? 'overdue' : 'due', amt, due, late: over ? +ac.lateFee || 0 : 0 };
 };
 C.billMonths = (ac, p, today) => {
@@ -301,6 +303,18 @@ def('player.add', AM, (ac, ctx, p, env) => {
   post(ac, ctx, { ico: 'players', title: `${pl.name} joined ${b.name}`, sub: 'Added by ' + ctx.name, aud: { roles: ['admin', 'manager'], sids: [b.coach] }, href: { admin: 'players', coach: 'home' } });
   return { msg: `${pl.name} added`, data: { login, name: pl.parentName, pid: pl.id } };
 });
+def('player.import', AD, (ac, ctx, p, env) => {
+  const rows = Array.isArray(p.rows) ? p.rows.slice(0, 500) : []; if (!rows.length) err('No players found in the file');
+  const byName = n => { const k = String(n || '').trim().toLowerCase(); return ac.batches.find(b => b.name.toLowerCase() === k) || (!k && ac.batches.length === 1 ? ac.batches[0] : null); };
+  let added = 0; const bad = []; const logins = [];
+  rows.forEach((r, i) => {
+    try { const b = byName(r.batch) || err(r.batch ? `No batch called "${str(r.batch, 40)}"` : 'Batch is empty');
+      const { pl, login } = savePlayer(ac, ctx, Object.assign({}, r, { batch: b.id }), env, null); added++; if (login) logins.push(login.email); }
+    catch (e) { bad.push({ row: i + 2, name: str(r.name, 60), why: e.message }); }
+  });
+  if (added) post(ac, ctx, { ico: 'players', title: `${added} players imported`, sub: 'Added by ' + ctx.name, aud: { roles: ['admin', 'manager'] }, href: { admin: 'players' } });
+  return { msg: added ? `${added} player${added === 1 ? '' : 's'} added${bad.length ? `, ${bad.length} skipped` : ''}` : 'No players added', data: { added, bad, parents: logins.length } };
+});
 def('player.update', AD, (ac, ctx, p, env) => { const ex = playerOf(ac, p.id) || err('Player not found'); const { login } = savePlayer(ac, ctx, p, env, ex); return { msg: 'Player saved', data: login && login.temp ? { login, name: ex.parentName } : null }; });
 def('player.leave', AD, (ac, ctx, p, env) => {
   const pl = playerOf(ac, p.id) || err('Player not found'); pl.left = T.date(ctx.now);
@@ -341,13 +355,14 @@ def('att.save', STAFF, (ac, ctx, p) => {
 /* fees */
 def('fee.pay', ['parent'], (ac, ctx, p) => {
   const pl = playerOf(ac, p.pid) || err('Player not found'); if (pl.parentUid !== ctx.uid) err('Not your child', 403);
-  const utr = String(p.utr || '').replace(/\s/g, ''); if (!/^\d{12}$/.test(utr)) err(`The transaction ID has 12 digits. You typed ${utr.length}.`);
-  if (ac.queue.some(q => q.utr === utr) || ac.payments.some(x => x.utr === utr)) err('This transaction ID was already sent');
+  const utr = String(p.utr || '').replace(/\s/g, ''); const shot = !utr && /^([a-f0-9]{24}|demo)$/.test(String(p.shot || '')) ? String(p.shot) : '';
+  if (!shot && !/^\d{12}$/.test(utr)) err(`The transaction ID has 12 digits. You typed ${utr.length}.`);
+  if (utr && (ac.queue.some(q => q.utr === utr) || ac.payments.some(x => x.utr === utr))) err('This transaction ID was already sent');
   const today = T.date(ctx.now); const bill = C.billFor(ac, pl, p.m, today);
   if (!C.billMonths(ac, pl, today).includes(p.m) || !['due', 'overdue'].includes(bill.st)) err('This bill is not open');
-  pl.fees[p.m] = { st: 'verify', amt: bill.amt, utr };
-  ac.queue.unshift({ id: C.id('q'), pid: pl.id, m: p.m, amt: bill.amt, utr, at: ctx.now, by: ctx.name });
-  post(ac, ctx, { ico: 'upi', title: `UPI payment from ${pl.parentName}`, sub: `₹${bill.amt.toLocaleString('en-IN')} for ${pl.name} · ${T.monthOnly(p.m)} · ID ${utr}`, aud: { roles: ['admin'] }, href: { admin: 'fees' } });
+  pl.fees[p.m] = { st: 'verify', amt: bill.amt, utr, shot };
+  ac.queue.unshift({ id: C.id('q'), pid: pl.id, m: p.m, amt: bill.amt, utr, shot, at: ctx.now, by: ctx.name });
+  post(ac, ctx, { ico: 'upi', title: `UPI payment from ${pl.parentName}`, sub: `₹${bill.amt.toLocaleString('en-IN')} for ${pl.name} · ${T.monthOnly(p.m)} · ${utr ? 'ID ' + utr : 'screenshot sent'}`, aud: { roles: ['admin'] }, href: { admin: 'fees' } });
   return { msg: 'Sent. The academy will confirm soon.' };
 });
 function receipt(ac, ctx, pl, m, amt, via, utr, env) {
@@ -370,8 +385,8 @@ def('fee.reject', AD, (ac, ctx, p) => {
   const q = ac.queue.find(x => x.id === p.id) || err('Already handled');
   const pl = ac.players.find(x => x.id === q.pid);
   ac.queue = ac.queue.filter(x => x.id !== q.id);
-  if (pl) { delete pl.fees[q.m]; post(ac, ctx, { ico: 'x', title: `We could not find your payment for ${pl.name}`, sub: `ID ${q.utr}. ${str(p.why, 120) || 'Please check the ID in your UPI app and send it again.'}`, aud: { pids: [pl.id] }, href: { parent: 'fees' } }); }
-  return { msg: `Rejected. ${pl ? pl.parentName : 'The parent'} is asked to check the ID.` };
+  if (pl) { delete pl.fees[q.m]; post(ac, ctx, { ico: 'x', title: `We could not find your payment for ${pl.name}`, sub: `${q.utr ? 'ID ' + q.utr + '. ' : ''}${str(p.why, 120) || (q.utr ? 'Please check the ID in your UPI app and send it again.' : 'Please check the payment in your UPI app and send it again.')}`, aud: { pids: [pl.id] }, href: { parent: 'fees' } }); }
+  return { msg: `Rejected. ${pl ? pl.parentName : 'The parent'} is asked to check the payment.` };
 });
 def('fee.record', AD, (ac, ctx, p, env) => {
   const pl = playerOf(ac, p.pid) || err('Pick a player'); const today = T.date(ctx.now);
@@ -593,7 +608,7 @@ C.boot = (ac, me, now, extra) => {
     if (role === 'admin' || role === 'manager' || role === 'parent') { o.parentEmail = p.parentEmail || ''; o.parentPhone = p.parentPhone || ''; o.hasApp = !!p.parentUid; }
     if (role === 'coach' && myBatches.includes(p.batch)) o.parentPhone = p.parentPhone || '';
     if (role === 'admin' || role === 'parent') { o.bills = C.bills(ac, p, today); o.fee = feeOf(ac, p); o.feeCustom = p.fee != null; }
-    if (role === 'admin') { const cur = o.bills.find(b => b.m === month) || { st: 'none' }; o.cur = cur; o.owes = C.openBills(ac, p, today).filter(b => b.st !== 'verify').reduce((t, b) => t + b.amt, 0); }
+    if (role === 'admin') { const cur = o.bills.find(b => b.m === month) || { st: 'none' }; o.cur = cur; o.owes = C.openBills(ac, p, today).filter(b => b.st !== 'verify' && (!b.due || b.due <= today)).reduce((t, b) => t + b.amt, 0); }
     if (role === 'parent') { o.cal = {}; for (let i = 0; i < 3; i++) { const m = T.addMonth(month, -i); o.cal[m] = C.playerMonth(ac, p, m, today).cal; } }
     return o;
   });

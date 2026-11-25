@@ -444,3 +444,42 @@ button.buy small { margin-bottom: 14px; }
 /* counter display settings + bill row picked for the customer screen */
 .disp-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 10px 16px; }
 .cb-row.sel { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent); }
+
+/* take an order (admin): table picker, dish notes, top-bar button — 2026-11-25 */
+.top-take { flex: none; }
+.pos-ov .sheet { display: flex; flex-direction: column; }
+.pos-root { display: flex; flex-direction: column; min-height: 0; }
+.pos-h { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.pos-h h3 { overflow-wrap: anywhere; }
+.sheet-head small.muted { display: block; font-size: 13px; margin-top: 2px; }
+.pos-take { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--brand-soft); color: var(--ink); font: inherit; cursor: pointer; margin-bottom: 14px; }
+.pos-take span { flex: 1; min-width: 0; } .pos-take small { display: block; color: var(--muted); font-size: 13px; }
+.pos-take:hover { border-color: var(--brand); }
+.pos-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+.pos-legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+.pos-legend .free, .pos-t.s-free { --c: #CBD5E1; } .pos-legend .new, .pos-t.s-new { --c: var(--brand); }
+.pos-legend .cooking, .pos-t.s-cooking { --c: var(--amber, #D97706); } .pos-legend .ready, .pos-t.s-ready { --c: var(--green, #16A34A); }
+.pos-tables { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.pos-t { display: grid; gap: 2px; justify-items: start; text-align: left; padding: 12px; min-height: 78px; border: 1px solid var(--line); border-left: 5px solid var(--c); border-radius: 12px; background: #fff; color: var(--ink); font: inherit; cursor: pointer; min-width: 0; }
+.pos-t:hover { border-color: var(--c); }
+.pos-t b { font-size: 15px; overflow-wrap: anywhere; } .pos-t small { color: var(--muted); font-size: 12px; } .pos-t span { font-weight: 700; font-size: 13px; }
+.pos-already, .pos-cust { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin: 0 0 10px; font-size: 14px; }
+.pos-already summary, .pos-cust summary { cursor: pointer; display: flex; align-items: center; gap: 8px; list-style: none; }
+.pos-already summary::-webkit-details-marker, .pos-cust summary::-webkit-details-marker { display: none; }
+.pos-already > div { display: grid; gap: 2px; margin-top: 8px; color: var(--ink-2); font-size: 13px; }
+.pos-cust .pos-top { grid-template-columns: 1fr 1fr; margin-top: 10px; }
+.pos-search { position: relative; display: block; } .pos-search .ic { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.pos-search .input { padding-left: 38px; width: 100%; }
+.pos-it { flex-direction: column; align-items: stretch; }
+.pos-r { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.pos-nb { align-self: flex-start; border: 0; background: none; padding: 2px 0 0; font: inherit; font-size: 12px; color: var(--brand); cursor: pointer; display: inline-flex; gap: 4px; align-items: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pos-dn { margin-top: 6px; font-size: 13px; padding: 7px 10px; }
+.cb-hact { display: flex; align-items: center; gap: 8px; flex: none; }
+@media (max-width: 640px) {
+  .pos-cust .pos-top { grid-template-columns: 1fr; }
+  .pos-tables { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+  .pos-foot .btn-lg { padding-left: 14px; padding-right: 14px; }
+}
+@media (max-width: 720px) { .top-take span { display: none; } .top-take { padding: 8px; } }
+.pos-cust .pos-top.one { grid-template-columns: 1fr; }
+@media (max-width: 640px) { .top-take { display: none; } }

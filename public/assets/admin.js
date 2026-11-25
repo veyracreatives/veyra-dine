@@ -430,6 +430,7 @@
       <div class="main">${trialBar()}
         <div class="topbar">
           <h1>${TABS.find(t => t[0] === S.tab)[1]}</h1>
+          ${S.tab === 'orders' ? '' : `<button class="btn btn-primary btn-sm top-take" id="takeTop" title="Take an order for a table or the counter">${icon('plus', 18)}<span>Take order</span></button>`}
           <span class="net-pill" id="netPill"></span>
           <label class="live-pill switch" title="When off, customers can still see the menu but can't order">
             <input type="checkbox" id="accepting" ${r.acceptingOrders ? 'checked' : ''}><span class="track"></span><span id="accLabel">${r.acceptingOrders ? 'Taking orders' : 'Orders paused'}</span>
@@ -443,6 +444,7 @@
     app.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
     app.querySelectorAll('[data-license]').forEach(b => b.onclick = licenseModal);
     document.getElementById('logout').onclick = async () => { await api('/api/admin/logout', { method: 'POST' }); renderLogin(); };
+    const tt = document.getElementById('takeTop'); if (tt) tt.onclick = () => newOrder();
     document.getElementById('accepting').onchange = async e => {
       const on = e.target.checked;
       try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { acceptingOrders: on } }); document.getElementById('accLabel').textContent = on ? 'Taking orders' : 'Orders paused'; toast(on ? 'Customers can order again' : 'Ordering paused. Customers can still see the menu.'); }
@@ -568,56 +570,91 @@
     } catch (err) { toast(esc(err.message), 'error'); }
   }
 
-  // ---------- counter order (also works offline) ----------
-  async function newOrder() {
-    if (!S.menu || !S.tables) { try { const [mn, tb] = await Promise.all([S.menu || api('/api/admin/menu'), S.tables || api('/api/admin/tables')]); S.menu = mn; S.tables = tb; saveCache(); } catch (err) { if (!S.menu || !S.tables) return toast('Open the Menu and Tables tabs once while online, then counter orders work offline too.', 'error'); } }
-    const items = S.menu.items.filter(i => !i.hidden), cats = S.menu.categories || [], tables = S.tables.filter(t => t.active !== false);
-    const cart = {}; let q = '', cat = '';
+  // ---------- take an order (owner or counter): pick a table, add dishes, send to the kitchen. Also works offline ----------
+  async function newOrder(pre) {
+    if (!S.menu || !S.tables) { try { const [mn, tb] = await Promise.all([S.menu || api('/api/admin/menu'), S.tables || api('/api/admin/tables')]); S.menu = mn; S.tables = tb; saveCache(); } catch (err) { if (!S.menu || !S.tables) return toast('Open the Menu and Tables tabs once while online, then taking orders works offline too.', 'error'); } }
+    const cats = [...(S.menu.categories || [])].sort((a, b) => (a.sort || 0) - (b.sort || 0)).filter(k => S.menu.items.some(i => i.categoryId === k.id && !i.hidden));
+    const items = S.menu.items.filter(i => !i.hidden).sort((a, b) => (cats.findIndex(k => k.id === a.categoryId) - cats.findIndex(k => k.id === b.categoryId)) || (a.sort || 0) - (b.sort || 0));
+    const tables = S.tables.filter(t => t.active !== false);
+    const cart = {}, notes = {}, noteOpen = new Set(); let q = '', cat = '', tId = pre === undefined ? undefined : (pre || ''), sentOrder = null;
     const L = S.me.restaurant.loyalty;
-    const o = modal(`<div class="sheet-head"><h3>New order</h3><button class="icon-btn" data-close>${icon('x', 20)}</button></div>
-      <div class="sheet-body pos">
-        <div class="pos-top"><label class="field"><span>Table</span><select class="input" id="ptab"><option value="">Counter / takeaway</option>${tables.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
-          <label class="field"><span>Customer name (optional)</span><input class="input" id="pname" maxlength="60"></label>
-          ${L ? `<label class="field"><span>Mobile for points (optional)</span><input class="input" id="pphone" inputmode="tel" maxlength="14"></label>` : ''}</div>
-        <div class="pos-find"><input class="input" id="pq" placeholder="Search dishes"><div class="pos-cats"><button class="chip on" data-pc="">All</button>${cats.map(k => `<button class="chip" data-pc="${k.id}">${esc(k.name)}</button>`).join('')}</div></div>
-        <div class="pos-list" id="plist"></div>
-        <label class="field"><span>Note for the kitchen (optional)</span><input class="input" id="pnote" maxlength="300" placeholder="E.g. less spicy"></label>
-      </div>
-      <div class="sheet-foot pos-foot"><div id="psum" class="muted">No dishes yet</div><button class="btn btn-primary btn-lg" id="psend" disabled>${icon('printer', 18)} Send to kitchen</button></div>`, { wide: true });
+    const tState = t => { const os = S.orders.filter(x => x.tableId === t.id), has = s => os.some(x => x.status === s); return { os, total: os.reduce((a, x) => a + x.total, 0), st: has('ready') ? ['ready', 'Food ready'] : has('new') ? ['new', 'New order'] : os.length ? ['cooking', 'Cooking'] : ['free', 'Free'] }; };
+    const o = modal('<div class="pos-root"></div>', { wide: true });
     o.classList.add('pos-ov');
-    const draw = () => {
-      const list = items.filter(i => (!cat || i.categoryId === cat) && (!q || i.name.toLowerCase().includes(q)));
-      o.querySelector('#plist').innerHTML = list.map(i => `<div class="pos-it ${cart[i.id] ? 'on' : ''} ${i.available === false ? 'off' : ''}"><span class="nm">${dietMark(i.diet)} ${esc(i.name)}<small>${cur(i.price)}${i.available === false ? ' · sold out' : ''}</small></span>
-        ${cart[i.id] ? `<span class="pos-q"><button class="btn btn-sm" data-d="${i.id}">−</button><b>${cart[i.id]}</b><button class="btn btn-sm" data-a="${i.id}">+</button></span>` : `<button class="btn btn-sm" data-a="${i.id}">${icon('plus', 16)} Add</button>`}</div>`).join('') || '<div class="empty">No dishes found</div>';
-      const n = Object.values(cart).reduce((a, b) => a + b, 0), tot = Object.entries(cart).reduce((a, [id, qty]) => a + qty * (items.find(i => i.id === id) || {}).price, 0);
-      o.querySelector('#psum').innerHTML = n ? `<b>${n} item${n === 1 ? '' : 's'}</b> · ${cur(tot)}` : 'No dishes yet';
-      o.querySelector('#psend').disabled = !n;
-      const tSel = o.querySelector('#ptab'), tN = tSel && tSel.value ? tSel.options[tSel.selectedIndex].text : '';
-      toDisplay(n ? { mode: 'cart', title: tN || 'Your order', lines: Object.entries(cart).map(([id, qty]) => { const it = items.find(i => i.id === id) || {}; return { name: it.name, qty, price: it.price }; }) } : { mode: 'idle' });
-    };
-    let sentOrder = null;
+    const root = o.querySelector('.pos-root');
+    const count = () => Object.values(cart).reduce((a, b) => a + b, 0), total = () => Object.entries(cart).reduce((a, [id, n]) => a + n * ((items.find(i => i.id === id) || {}).price || 0), 0);
+    const tName = () => { const t = tables.find(x => x.id === tId); return t ? t.name : 'Takeaway / counter'; };
+    const show = () => toDisplay(count() ? { mode: 'cart', title: tId ? tName() : 'Your order', lines: Object.entries(cart).map(([id, n]) => { const it = items.find(i => i.id === id) || {}; return { name: it.name, qty: n, price: it.price }; }) } : { mode: 'idle' });
     onGone(o, () => toDisplay(sentOrder && !sentOrder.offline ? { mode: 'order', orderId: sentOrder.id } : { mode: 'idle' }, true));
-    o.querySelector('#ptab').onchange = () => draw();
-    o.querySelector('#plist').onclick = e => { const b = e.target.closest('[data-a],[data-d]'); if (!b) return; const id = b.dataset.a || b.dataset.d; cart[id] = Math.max(0, (cart[id] || 0) + (b.dataset.a ? 1 : -1)); if (!cart[id]) delete cart[id]; draw(); };
-    o.querySelector('#pq').oninput = e => { q = e.target.value.trim().toLowerCase(); draw(); };
-    o.querySelectorAll('[data-pc]').forEach(b => b.onclick = () => { cat = b.dataset.pc; o.querySelectorAll('[data-pc]').forEach(x => x.classList.toggle('on', x === b)); draw(); });
-    o.querySelector('#psend').onclick = async e => {
-      const btn = e.currentTarget; btn.disabled = true;
-      const tId = o.querySelector('#ptab').value, t = tables.find(x => x.id === tId);
-      const body = { tableId: tId || null, label: t ? '' : 'Counter', items: Object.entries(cart).map(([id, qty]) => ({ id, qty, price: (items.find(i => i.id === id) || {}).price })), name: o.querySelector('#pname').value.trim(), note: o.querySelector('#pnote').value.trim(), phone: o.querySelector('#pphone') ? o.querySelector('#pphone').value : '', status: 'preparing' };
-      let order;
-      if (!S.offline) { try { order = await api('/api/admin/orders', { method: 'POST', body }); } catch (err) { if (!err.offline) { btn.disabled = false; return toast(esc(err.message), 'error'); } } }
-      if (!order) { // offline: keep it here, print the KOT, sync later
-        const tmpId = 'off-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), lines = body.items.map(x => { const it = items.find(i => i.id === x.id); return { itemId: it.id, name: it.name, price: it.price, qty: x.qty, diet: it.diet }; });
-        const total = lines.reduce((a, l) => a + l.price * l.qty, 0);
-        order = { id: tmpId, number: 'OFF-' + (outbox().filter(x => x.kind === 'order').length + 1), tableId: tId || null, tableName: t ? t.name : 'Counter', items: lines, note: body.note, customerName: body.name, total, subtotal: total, discount: 0, coupon: '', status: 'preparing', createdAt: new Date().toISOString(), offline: true, source: 'counter' };
-        queue({ kind: 'order', tmpId, body: { ...body, createdAt: order.createdAt } });
-      }
-      sentOrder = order; o.close(); upsertOrder(order);
-      if (window.vdDesktop && window.vdDesktop.print && BILLCFG().autoKot) printKot(order);
-      toast(`${icon('check', 18)} Order for ${esc(order.tableName)} sent${order.offline && String(order.id).startsWith('off-') ? ' (saved offline)' : ''}. ${window.vdDesktop && BILLCFG().autoKot ? 'KOT printing.' : 'Tap KOT on the order to print the kitchen ticket.'}`, 'ok');
-    };
-    draw(); setTimeout(() => o.querySelector('#pq').focus(), 60);
+
+    // step 1: which table
+    function pickTable() {
+      const ts = tables.map(t => ({ t, ...tState(t) })), busy = ts.filter(x => x.os.length).length;
+      root.innerHTML = `<div class="sheet-head"><div><h3>Take an order</h3><small class="muted">Pick the table. ${busy} of ${ts.length} busy.</small></div><button class="icon-btn" data-close aria-label="Close">${icon('x', 20)}</button></div>
+        <div class="sheet-body">
+          <button class="pos-take" data-pt="">${icon('bag', 22)}<span><b>Takeaway or counter</b><small>Parcel, phone order or walk-in at the counter</small></span>${icon('chevron', 18)}</button>
+          <div class="pos-legend"><span class="free">Free</span><span class="new">New order</span><span class="cooking">Cooking</span><span class="ready">Food ready</span></div>
+          <div class="pos-tables">${ts.map(x => `<button class="pos-t s-${x.st[0]}" data-pt="${x.t.id}"><b>${esc(x.t.name)}</b><small>${x.st[1]}</small>${x.total ? `<span>${cur(x.total)}</span>` : ''}</button>`).join('') || `<div class="empty" style="grid-column:1/-1">No tables yet. Add them in Tables &amp; QR, or take a counter order.</div>`}</div>
+        </div>`;
+      root.querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { tId = b.dataset.pt; pickDishes(); });
+    }
+
+    // step 2: dishes
+    function pickDishes() {
+      const t = tables.find(x => x.id === tId), x = t ? tState(t) : null;
+      const already = x && x.os.length ? x.os.flatMap(o2 => o2.items) : [];
+      root.innerHTML = `<div class="sheet-head"><div class="pos-h"><h3>${esc(tName())}</h3><button class="btn btn-sm btn-ghost" id="pchg">${icon('edit', 14)} Change</button></div><button class="icon-btn" data-close aria-label="Close">${icon('x', 20)}</button></div>
+        <div class="sheet-body pos">
+          ${already.length ? `<details class="pos-already"><summary>${icon('receipt', 16)} <span>Already ordered here: <b>${already.reduce((a, l) => a + l.qty, 0)} item${already.reduce((a, l) => a + l.qty, 0) === 1 ? '' : 's'} · ${cur(x.total)}</b></span></summary><div>${already.map(l => `<div>${l.qty}× ${esc(l.name)}</div>`).join('')}</div></details>` : ''}
+          <details class="pos-cust"><summary>${icon('user', 16)} <span>Customer name${L ? ' and mobile for points' : ''} <small class="muted">(optional)</small></span></summary>
+            <div class="pos-top ${L ? '' : 'one'}"><label class="field"><span>Customer name</span><input class="input" id="pname" maxlength="60"></label>
+            ${L ? `<label class="field"><span>Mobile for points</span><input class="input" id="pphone" inputmode="tel" maxlength="14"></label>` : ''}</div></details>
+          <div class="pos-find"><label class="pos-search">${icon('search', 18)}<input class="input" id="pq" placeholder="Search dishes" autocomplete="off"></label><div class="pos-cats"><button class="chip on" data-pc="">All</button>${cats.map(k => `<button class="chip" data-pc="${k.id}">${esc(k.name)}</button>`).join('')}</div></div>
+          <div class="pos-list" id="plist"></div>
+          <label class="field"><span>Note for the kitchen (optional)</span><input class="input" id="pnote" maxlength="300" placeholder="E.g. less spicy, serve together"></label>
+        </div>
+        <div class="sheet-foot pos-foot"><div id="psum" class="muted">No dishes yet</div><button class="btn btn-primary btn-lg" id="psend" disabled>${icon('chef', 18)} Send to kitchen</button></div>`;
+      const list = root.querySelector('#plist');
+      const row = i => { const n = cart[i.id], sold = i.available === false; return `<div class="pos-it ${n ? 'on' : ''} ${sold ? 'off' : ''}" data-i="${i.id}"><div class="pos-r"><span class="nm">${dietMark(i.diet)} ${esc(i.name)}<small>${cur(i.price)}${sold ? ' · sold out' : ''}</small></span>
+        ${sold ? '' : n ? `<span class="pos-q"><button class="btn btn-sm" data-d="${i.id}" aria-label="One less">−</button><b>${n}</b><button class="btn btn-sm" data-a="${i.id}" aria-label="One more">+</button></span>` : `<button class="btn btn-sm" data-a="${i.id}">${icon('plus', 16)} Add</button>`}</div>
+        ${n ? (noteOpen.has(i.id) ? `<input class="input pos-dn" data-n="${i.id}" maxlength="140" placeholder="Note for this dish, e.g. no onion" value="${esc(notes[i.id] || '')}">` : `<button class="pos-nb" data-on="${i.id}">${icon('edit', 13)} ${notes[i.id] ? esc(notes[i.id]) : 'Add note'}</button>`) : ''}</div>`; };
+      const foot = () => {
+        const n = count();
+        root.querySelector('#psum').innerHTML = n ? `<b>${n} item${n === 1 ? '' : 's'}</b> · ${cur(total())}` : 'No dishes yet';
+        root.querySelector('#psend').disabled = !n; show();
+      };
+      const draw = () => { const l = items.filter(i => (!cat || i.categoryId === cat) && (!q || i.name.toLowerCase().includes(q))); list.innerHTML = l.map(row).join('') || '<div class="empty" style="grid-column:1/-1">No dishes found</div>'; foot(); };
+      const redraw = id => { const el = list.querySelector(`[data-i="${id}"]`); if (el) el.outerHTML = row(items.find(i => i.id === id)); foot(); };
+      list.onclick = e => {
+        const nb = e.target.closest('[data-on]'); if (nb) { noteOpen.add(nb.dataset.on); redraw(nb.dataset.on); const f = list.querySelector(`[data-n="${nb.dataset.on}"]`); if (f) f.focus(); return; }
+        const b = e.target.closest('[data-a],[data-d]'); if (!b) return; const id = b.dataset.a || b.dataset.d;
+        cart[id] = Math.max(0, (cart[id] || 0) + (b.dataset.a ? 1 : -1)); if (!cart[id]) { delete cart[id]; delete notes[id]; noteOpen.delete(id); } redraw(id);
+      };
+      list.oninput = e => { const f = e.target.closest('[data-n]'); if (f) notes[f.dataset.n] = f.value; };
+      list.addEventListener('focusout', e => { const f = e.target.closest('[data-n]'); if (f && !f.value.trim()) { noteOpen.delete(f.dataset.n); setTimeout(() => redraw(f.dataset.n), 0); } });
+      root.querySelector('#pchg').onclick = pickTable;
+      root.querySelector('#pq').oninput = e => { q = e.target.value.trim().toLowerCase(); draw(); };
+      root.querySelectorAll('[data-pc]').forEach(b => b.onclick = () => { cat = b.dataset.pc; root.querySelectorAll('[data-pc]').forEach(y => y.classList.toggle('on', y === b)); draw(); });
+      root.querySelector('#psend').onclick = async e => {
+        const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Sending…';
+        const t2 = tables.find(y => y.id === tId);
+        const body = { tableId: tId || null, label: t2 ? '' : 'Counter', items: Object.entries(cart).map(([id, n]) => ({ id, qty: n, price: (items.find(i => i.id === id) || {}).price, note: (notes[id] || '').trim() })), name: (root.querySelector('#pname').value || '').trim(), note: root.querySelector('#pnote').value.trim(), phone: root.querySelector('#pphone') ? root.querySelector('#pphone').value : '', status: 'preparing', clientId: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) };
+        let order;
+        if (!S.offline) { try { order = await api('/api/admin/orders', { method: 'POST', body }); } catch (err) { if (!err.offline) { btn.disabled = false; foot(); btn.innerHTML = `${icon('chef', 18)} Send to kitchen`; return toast(esc(err.message), 'error'); } } }
+        if (!order) { // offline: keep it here, print the KOT, sync later
+          const tmpId = 'off-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), lines = body.items.map(y => { const it = items.find(i => i.id === y.id); return { itemId: it.id, name: it.name, price: it.price, qty: y.qty, diet: it.diet, note: y.note }; });
+          const tot = lines.reduce((a, l) => a + l.price * l.qty, 0);
+          order = { id: tmpId, number: 'OFF-' + (outbox().filter(y => y.kind === 'order').length + 1), tableId: tId || null, tableName: t2 ? t2.name : 'Counter', items: lines, note: body.note, customerName: body.name, total: tot, subtotal: tot, discount: 0, coupon: '', status: 'preparing', createdAt: new Date().toISOString(), offline: true, source: 'counter' };
+          queue({ kind: 'order', tmpId, body: { ...body, createdAt: order.createdAt } });
+        }
+        sentOrder = order; o.close(); upsertOrder(order);
+        if (window.vdDesktop && window.vdDesktop.print && BILLCFG().autoKot) printKot(order);
+        toast(`${icon('check', 18)} Order for ${esc(order.tableName)} sent to the kitchen${order.offline && String(order.id).startsWith('off-') ? ' (saved offline)' : ''}. ${window.vdDesktop && BILLCFG().autoKot ? 'KOT printing.' : 'Tap KOT on the order to print the kitchen ticket.'}`, 'ok');
+      };
+      draw();
+      setTimeout(() => { if (matchMedia('(min-width: 720px)').matches) root.querySelector('#pq').focus(); }, 60);
+    }
+    if (tId === undefined) pickTable(); else pickDishes();
   }
 
   // ---------- loyalty customers ----------
@@ -728,7 +765,7 @@
     const isLocal = /localhost|127\.0\.0\.1/.test(S.me.baseUrl);
     c.innerHTML = `
       ${phoneBanner()}${hubBanner()}
-      <div class="o-tools"><button class="btn btn-primary" id="newOrder">${icon('plus', 18)} New order</button>${KDS() ? `<button class="btn" id="openKds">${icon('chef', 18)} Kitchen display</button>` : ''}${DISP() ? `<button class="btn" id="openDisp">${icon('monitor', 18)} Customer display</button>` : ''}<span class="muted">Take an order at the counter or for a phone call. ${S.me.restaurant.service && S.me.restaurant.service.autoAccept ? 'QR orders go straight to the kitchen.' : ''}</span></div>
+      <div class="o-tools"><button class="btn btn-primary" id="newOrder">${icon('plus', 18)} Take order</button>${KDS() ? `<button class="btn" id="openKds">${icon('chef', 18)} Kitchen display</button>` : ''}${DISP() ? `<button class="btn" id="openDisp">${icon('monitor', 18)} Customer display</button>` : ''}<span class="muted">Take an order for a table, the counter or a phone call. ${S.me.restaurant.service && S.me.restaurant.service.autoAccept ? 'QR orders go straight to the kitchen.' : ''}</span></div>
       ${!S.audioOk && !window.vdDesktop ? `<div class="banner">${icon('bell', 22)}<span>Turn on alerts so you hear a sound and get a pop-up for every new order.</span><button class="btn btn-primary" id="enableAlerts">Turn on alerts</button></div>` : ''}
       <div class="stats">
         <button class="stat link" data-gosales>  <small>Orders today</small><b>${st.ordersToday}</b><span class="sub">Other days ›</span></button>
@@ -753,6 +790,7 @@
     c.querySelectorAll('[data-gosales]').forEach(b => b.onclick = () => { setRange(...rangeFor('today'), 'today'); go('history'); });
     c.querySelectorAll('[data-col]').forEach(b => b.onclick = () => { S.mobileCol = b.dataset.col; renderOrders(c); });
     c.querySelectorAll('[data-obill]').forEach(b => b.onclick = () => counterBill(b.dataset.obill));
+    c.querySelectorAll('[data-oadd]').forEach(b => b.onclick = () => newOrder(b.dataset.oadd));
     c.querySelectorAll('[data-req]').forEach(b => b.onclick = async () => { await api('/api/admin/requests/' + b.dataset.req, { method: 'PATCH', body: {} }); S.requests = S.requests.filter(q => q.id !== b.dataset.req); renderOrders(c); refreshBadges(); });
     c.querySelectorAll('[data-status]').forEach(b => b.onclick = () => setStatus(b.dataset.id, b.dataset.status));
     c.querySelectorAll('[data-kot]').forEach(b => b.onclick = () => { const o = S.orders.find(x => x.id === b.dataset.kot); if (o) printKot(o); });
@@ -770,12 +808,12 @@
     const mins = (Date.now() - Date.parse(o.createdAt)) / 60000;
     const next = { new: ['preparing', 'Accept & start cooking'], preparing: ['ready', 'Mark as ready'], ready: ['served', 'Mark as served'] }[o.status];
     return `<article class="order ${S.newIds.has(o.id) ? 'is-new' : ''}">
-      <div class="o-head"><div><div class="o-table">${esc(o.tableName)}</div><div class="o-meta">Order #${o.number}${o.customerName ? ' · ' + esc(o.customerName) : ''}</div>${o.offline && String(o.id).startsWith('off-') ? `<span class="badge badge-amber o-tag">${icon('wifi', 12)} Saved offline</span>` : o.source === 'counter' ? `<span class="badge badge-grey o-tag">Counter order</span>` : ''}</div>
+      <div class="o-head"><div><div class="o-table">${esc(o.tableName)}</div><div class="o-meta">Order #${o.number}${o.customerName ? ' · ' + esc(o.customerName) : ''}</div>${o.offline && String(o.id).startsWith('off-') ? `<span class="badge badge-amber o-tag">${icon('wifi', 12)} Saved offline</span>` : o.source === 'counter' ? `<span class="badge badge-grey o-tag">${o.tableId ? 'Taken by staff' : 'Counter order'}</span>` : o.source === 'waiter' ? `<span class="badge badge-grey o-tag">Waiter${o.waiter ? ' ' + esc(o.waiter) : ''}</span>` : ''}</div>
         ${dueChip(o, mins)}</div>
       <div class="o-items">${o.items.map(l => `<div class="o-line"><span class="q">${l.qty}×</span>${dietMark(l.diet)}<span class="nm">${esc(l.name)}${l.note ? `<small>${esc(l.note)}</small>` : ''}${l.by && new Set(o.items.map(x => x.by)).size > 1 ? `<small class="by">for ${esc(l.by)}</small>` : ''}</span></div>`).join('')}</div>
       ${o.note ? `<div class="o-note">${icon('edit', 16)} ${esc(o.note)}</div>` : ''}
       <div class="o-foot"><span class="total">${cur(o.total)}${o.coupon ? `<small class="cpn">${esc(o.coupon)} −${cur(o.discount)}</small>` : ''}</span>
-<button class="btn btn-sm btn-ghost" data-kot="${o.id}" title="Print kitchen ticket (KOT)">${icon('printer', 16)} KOT</button>${o.tableId ? `<button class="btn btn-sm btn-ghost" data-obill="${o.tableId}" title="See, split and print the bill for this table">${icon('receipt', 16)} Bill</button>` : ''}
+<button class="btn btn-sm btn-ghost" data-kot="${o.id}" title="Print kitchen ticket (KOT)">${icon('printer', 16)} KOT</button>${o.tableId ? `<button class="btn btn-sm btn-ghost" data-oadd="${o.tableId}" title="Add more dishes for this table">${icon('plus', 16)} Add</button><button class="btn btn-sm btn-ghost" data-obill="${o.tableId}" title="See, split and print the bill for this table">${icon('receipt', 16)} Bill</button>` : ''}
                 ${o.status === 'new' ? `<button class="btn btn-sm btn-ghost btn-danger" data-id="${o.id}" data-status="cancelled">Cancel</button>` : ''}
         <button class="btn btn-primary" data-id="${o.id}" data-status="${next[0]}">${next[1]}</button></div>
     </article>`;
@@ -1067,6 +1105,7 @@
           <a class="btn btn-sm" href="${esc(t.url)}" target="_blank">${icon('eye', 16)} Test</a>
           <button class="btn btn-sm" data-copy="${esc(t.url)}">${icon('copy', 16)} Copy link</button>
           <button class="btn btn-sm" data-tedit="${t.id}">${icon('settings', 16)} Options</button>
+          <button class="btn btn-sm btn-primary span2" data-ttake="${t.id}" ${t.active ? '' : 'disabled'}>${icon('plus', 16)} Take order</button>
           <button class="btn btn-sm btn-dark span2" data-tbill="${t.id}">${icon('receipt', 16)} Bill and split</button>
         </div></div>`).join('') || `<div class="empty" style="grid-column:1/-1">${icon('qr', 44)}<div>No tables yet. Add your tables to get their QR codes.</div></div>`}</div>`;
     document.getElementById('addOne').onclick = () => addTables(false);
@@ -1074,6 +1113,7 @@
     c.querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copy); toast('Link copied'); } catch { prompt('Copy this link', b.dataset.copy); } });
     c.querySelectorAll('[data-tedit]').forEach(b => b.onclick = () => tableOptions(S.tables.find(t => t.id === b.dataset.tedit)));
     c.querySelectorAll('[data-tbill]').forEach(b => b.onclick = () => counterBill(b.dataset.tbill));
+    c.querySelectorAll('[data-ttake]').forEach(b => b.onclick = () => newOrder(b.dataset.ttake));
   }
   function addTables(many) {
     const nums = S.tables.map(t => parseInt((t.name.match(/\d+/) || [0])[0], 10)).filter(Boolean);
@@ -1454,7 +1494,7 @@
       if (mode !== 'person' || !rows.some(r => r.gid === sel && r.due)) sel = null;
       const selRow = sel && rows.find(r => r.gid === sel);
       if (!off && B.lines.length) { lastLeft = left; toDisplay({ mode: 'bill', tableId, ...(mode === 'equal' && left ? { split: n, amount: Math.min(left, Math.ceil(B.total / n)) } : selRow ? { amount: selRow.due, who: selRow.name } : {}) }); }
-      o.querySelector('.sheet').innerHTML = `<div class="sheet-head"><h3>${esc(B.table.name)} · Bill</h3><button class="icon-btn" data-close>${icon('x', 20)}</button></div>
+      o.querySelector('.sheet').innerHTML = `<div class="sheet-head"><h3>${esc(B.table.name)} · Bill</h3><div class="cb-hact">${off ? '' : `<button class="btn btn-sm" id="cbAdd" title="Add more dishes for this table">${icon('plus', 16)} Add dishes</button>`}<button class="icon-btn" data-close aria-label="Close">${icon('x', 20)}</button></div></div>
       <div class="sheet-body cbill">
         ${off ? `<div class="hint" style="margin:0 0 12px;background:#FEF3C7;color:#78350F">${icon('wifi', 18)}<div><b>Offline.</b> This bill is made from the orders on this screen. Payments and clearing the table are saved and sync when the internet is back.</div></div>` : ''}
         ${Lc && !off && B.lines.length ? `<div class="loy">
@@ -1495,6 +1535,7 @@
         try { const x = await api(`/api/admin/tables/${tableId}/payment`, { method: 'POST', body: { gid: b.dataset.gid, name: b.dataset.name, amount: b.dataset.amt, method: b.dataset.pay } }); B = x; toast(`${icon('check', 18)} ${esc(b.dataset.name)} paid ${cur(b.dataset.amt)} by ${M[b.dataset.pay]}`, 'ok'); draw(); }
         catch (err) { b.disabled = false; toast(esc(err.message), 'error'); }
       });
+      const cba = o.querySelector('#cbAdd'); if (cba) cba.onclick = () => { o.close(); newOrder(tableId); };
       const pb = o.querySelector('#pbill'); if (pb) pb.onclick = () => printBill(B);
       const st = o.querySelector('#settle'); if (st) st.onclick = async () => {
         if (left && !(await confirmBox('Clear table with money still due?', `${cur(left)} is not marked as paid yet.`, 'Clear table'))) return;

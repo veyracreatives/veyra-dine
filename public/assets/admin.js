@@ -615,8 +615,8 @@
         </div>
         <div class="sheet-foot pos-foot"><div id="psum" class="muted">No dishes yet</div><button class="btn btn-primary btn-lg" id="psend" disabled>${icon('chef', 18)} Send to kitchen</button></div>`;
       const list = root.querySelector('#plist');
-      const row = i => { const n = cart[i.id], sold = i.available === false; return `<div class="pos-it ${n ? 'on' : ''} ${sold ? 'off' : ''}" data-i="${i.id}"><div class="pos-r"><span class="nm">${dietMark(i.diet)} ${esc(i.name)}<small>${cur(i.price)}${sold ? ' · sold out' : ''}</small></span>
-        ${sold ? '' : n ? `<span class="pos-q"><button class="btn btn-sm" data-d="${i.id}" aria-label="One less">−</button><b>${n}</b><button class="btn btn-sm" data-a="${i.id}" aria-label="One more">+</button></span>` : `<button class="btn btn-sm" data-a="${i.id}">${icon('plus', 16)} Add</button>`}</div>
+      const row = i => { const n = cart[i.id], sold = i.available === false; return `<div class="pos-it ${n ? 'on' : ''} ${sold ? 'off' : ''}" data-i="${i.id}"><div class="pos-r"><span class="pos-dm">${dietMark(i.diet)}</span><span class="nm">${esc(i.name)}<small>${cur(i.price)}${sold ? ' · sold out' : ''}</small></span>
+        ${sold ? '' : n ? `<span class="pos-q"><button class="btn btn-sm" data-d="${i.id}" aria-label="One less">${icon('minus', 16)}</button><b>${n}</b><button class="btn btn-sm" data-a="${i.id}" aria-label="One more">${icon('plus', 16)}</button></span>` : `<button class="btn btn-sm" data-a="${i.id}">${icon('plus', 16)} Add</button>`}</div>
         ${n ? (noteOpen.has(i.id) ? `<input class="input pos-dn" data-n="${i.id}" maxlength="140" placeholder="Note for this dish, e.g. no onion" value="${esc(notes[i.id] || '')}">` : `<button class="pos-nb" data-on="${i.id}">${icon('edit', 13)} ${notes[i.id] ? esc(notes[i.id]) : 'Add note'}</button>`) : ''}</div>`; };
       const foot = () => {
         const n = count();

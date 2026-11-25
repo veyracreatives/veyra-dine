@@ -483,3 +483,17 @@ button.buy small { margin-bottom: 14px; }
 @media (max-width: 720px) { .top-take span { display: none; } .top-take { padding: 8px; } }
 .pos-cust .pos-top.one { grid-template-columns: 1fr; }
 @media (max-width: 640px) { .top-take { display: none; } }
+/* dish row alignment: diet mark | name, price, note | qty (2026-11-25 fix) */
+.pos-it { display: grid; grid-template-columns: 1fr; gap: 0; }
+.pos-r { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: start; column-gap: 8px; }
+.pos-dm { padding-top: 2px; line-height: 0; }
+.pos-it .nm { line-height: 1.3; overflow-wrap: anywhere; }
+.pos-it .nm small { margin-top: 2px; }
+.pos-r > .btn, .pos-q { align-self: center; }
+.pos-q { gap: 6px; }
+.pos-q .btn { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; }
+.pos-q b { min-width: 18px; text-align: center; }
+.pos-nb, .pos-dn { margin-left: 26px; }
+.pos-dn { width: calc(100% - 26px); box-sizing: border-box; margin-top: 8px; }
+.pos-nb { margin-top: 4px; }
+.pos-dn { height: 36px; min-height: 36px; padding: 6px 10px; }

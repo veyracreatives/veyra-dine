@@ -228,27 +228,36 @@
       <div class="sheet-foot w-send"><textarea class="input" id="note" rows="1" placeholder="Note for the kitchen (less spicy, no onion…)"></textarea><button class="btn btn-primary btn-lg btn-block" id="send" disabled>Add dishes</button></div>`, 'w-ov w-full');
     const list = o.querySelector('#list'), send = o.querySelector('#send');
     const items = () => menu.items.filter(i => !i.hidden && (cat === 'all' || i.categoryId === cat) && (!q || i.name.toLowerCase().includes(q))).sort((a, b) => (cats.findIndex(c => c.id === a.categoryId) - cats.findIndex(c => c.id === b.categoryId)) || a.sort - b.sort);
-    const total = () => Object.entries(qty).reduce((s, [id, n]) => s + n * (menu.items.find(i => i.id === id) || { price: 0 }).price, 0);
+    const kInfo = k => { const { id, ids } = VDOpt.fromKey(k), it = menu.items.find(i => i.id === id) || { id, name: '?', price: 0 }; return { it, ids, label: VDOpt.pick(it, ids).label || '', unit: VDOpt.unit(it, ids) }; };
+    const total = () => Object.entries(qty).reduce((s, [k, n]) => s + n * kInfo(k).unit, 0);
     const count = () => Object.values(qty).reduce((a, b) => a + b, 0);
     const foot = () => { const n = count(); send.disabled = !n; send.innerHTML = n ? `${icon('chef', 20)} Send ${n} item${n > 1 ? 's' : ''} to kitchen · ${cur(total())}` : 'Add dishes'; };
-    const row = i => `<div class="w-dish ${i.available === false ? 'off' : ''}" data-i="${i.id}"><span class="d d-${esc(i.diet || 'veg')}"></span><div class="w-dn"><b>${esc(i.name)}</b><small>${i.available === false ? 'Sold out' : cur(i.price)}</small></div>
-      ${i.available === false ? '' : qty[i.id] ? `<div class="w-qty"><button data-m="${i.id}" aria-label="Less">${icon('minus', 18)}</button><b>${qty[i.id]}</b><button data-p="${i.id}" aria-label="More">${icon('plus', 18)}</button></div>` : `<button class="btn w-add" data-p="${i.id}">${icon('plus', 16)} Add</button>`}</div>`;
+    const qUi = (k, n) => `<div class="w-qty"><button data-m="${esc(k)}" aria-label="Less">${icon('minus', 18)}</button><b>${n}</b><button data-p="${esc(k)}" aria-label="More">${icon('plus', 18)}</button></div>`;
+    const row = i => {
+      const opt = VDOpt.has(i), vs = Object.keys(qty).filter(k => VDOpt.fromKey(k).id === i.id), n = vs.reduce((a, k) => a + qty[k], 0);
+      return `<div class="w-dish ${i.available === false ? 'off' : ''} ${opt && vs.length ? 'w-has' : ''}" data-i="${i.id}"><span class="d d-${esc(i.diet || 'veg')}"></span><div class="w-dn"><b>${esc(i.name)}</b><small>${i.available === false ? 'Sold out' : cur(i.price) + (opt ? ' · has choices' : '')}</small></div>
+      ${i.available === false ? '' : opt ? `<button class="btn w-add" data-ch="${i.id}">${icon('plus', 16)} ${n ? 'More' : 'Add'}</button>` : n ? qUi(i.id, n) : `<button class="btn w-add" data-p="${i.id}">${icon('plus', 16)} Add</button>`}
+      ${opt && vs.length ? `<div class="w-vs">${vs.map(k => { const x = kInfo(k); return `<div class="w-v"><span>${x.label ? esc(x.label) : 'No choices'}<small>${cur(x.unit)} each</small></span>${qUi(k, qty[k])}</div>`; }).join('')}</div>` : ''}</div>`;
+    };
     const draw = () => {
       const its = items();
       list.innerHTML = its.map(row).join('') || '<div class="empty">No dish matches.</div>';
       foot();
     };
     list.addEventListener('click', e => {
+      const redraw = k => { const id = VDOpt.fromKey(k).id, el = list.querySelector(`[data-i="${id}"]`); if (el) el.outerHTML = row(menu.items.find(i => i.id === id)); foot(); };
+      const ch = e.target.closest('[data-ch]');
+      if (ch) { const it = menu.items.find(i => i.id === ch.dataset.ch); VDOpt.choose(it, { cur }).then(r => { if (!r) return; const k = VDOpt.key(it.id, r.ids); qty[k] = Math.min(99, (qty[k] || 0) + r.qty); redraw(k); }); return; }
       const p = e.target.closest('[data-p]'), m = e.target.closest('[data-m]');
-      const id = p ? p.dataset.p : m ? m.dataset.m : null; if (!id) return;
-      qty[id] = Math.max(0, (qty[id] || 0) + (p ? 1 : -1)); if (!qty[id]) delete qty[id];
-      const el = list.querySelector(`[data-i="${id}"]`); if (el) el.outerHTML = row(menu.items.find(i => i.id === id)); foot();
+      const k = p ? p.dataset.p : m ? m.dataset.m : null; if (!k) return;
+      qty[k] = Math.max(0, Math.min(99, (qty[k] || 0) + (p ? 1 : -1))); if (!qty[k]) delete qty[k];
+      redraw(k);
     });
     o.querySelector('#q').oninput = e => { q = e.target.value.trim().toLowerCase(); draw(); };
     o.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { cat = b.dataset.c; o.querySelectorAll('[data-c]').forEach(x => x.classList.toggle('on', x === b)); draw(); list.scrollTop = 0; });
     o.querySelector('#note').oninput = e => { note = e.target.value; };
     send.onclick = async () => {
-      const body = { tableId: t ? t.id : null, label: t ? '' : 'Takeaway', tableName: t ? t.name : 'Takeaway', items: Object.entries(qty).map(([id, n]) => ({ id, qty: n })), note, status: 'preparing', clientId: 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) };
+      const body = { tableId: t ? t.id : null, label: t ? '' : 'Takeaway', tableName: t ? t.name : 'Takeaway', items: Object.entries(qty).map(([k, n]) => { const x = kInfo(k); return { id: x.it.id, qty: n, opt: x.ids }; }), note, status: 'preparing', clientId: 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) };
       send.disabled = true; send.textContent = 'Sending…';
       try { const r = await api('/api/admin/orders', { method: 'POST', body }); upsert(r); o.remove(); toast(`${icon('check', 18)} Order #${r.number} sent to the kitchen`, 'ok'); render(); }
       catch (e) {

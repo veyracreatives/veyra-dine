@@ -112,3 +112,5 @@ button { font: inherit; cursor: pointer; color: inherit; }
   .k-stat span { flex: 1; justify-content: center; }
   .t-go { min-height: 54px; }
 }
+/* Swiggy / Zomato tickets: coloured top edge so the kitchen packs them for the rider */
+.t.ch-swiggy { box-shadow: inset 0 6px 0 #FC8019; } .t.ch-zomato { box-shadow: inset 0 6px 0 #E23744; }

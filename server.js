@@ -128,6 +128,38 @@ function readBody(req, limit = 8 * 1024 * 1024) {
 }
 const str = (v, max = 200) => String(v == null ? '' : v).trim().slice(0, max);
 const money = v => Math.max(0, Math.round(Number(v) * 100) / 100 || 0);
+// ---- dish options (spice level, Jain, portion, add-ons). Same rules as public/assets/opts.js ----
+const r2 = v => Math.round((Number(v) || 0) * 100) / 100;
+const optId = (v, n = 8) => (typeof v === 'string' && /^[A-Za-z0-9]{4,16}$/.test(v) ? v : id(n));
+function cleanOptions(v) {
+  return (Array.isArray(v) ? v : []).slice(0, 8).map(g => {
+    const multi = !!(g && g.multi);
+    return { id: optId(g && g.id), name: str(g && g.name, 40), multi, req: !multi && !!(g && g.req), max: multi ? Math.max(0, Math.min(20, parseInt(g && g.max, 10) || 0)) : 1,
+      choices: (Array.isArray(g && g.choices) ? g.choices : []).slice(0, 15).map(c => ({ id: optId(c && c.id), name: str(c && c.name, 40), price: Math.max(-100000, Math.min(100000, r2(c && c.price))) })).filter(c => c.name) };
+  }).filter(g => g.name && g.choices.length);
+}
+function optPick(item, sel) {
+  const want = Array.isArray(sel) ? sel.map(String) : [];
+  const ids = [], names = []; let extra = 0;
+  for (const g of Array.isArray(item.options) ? item.options : []) {
+    let got = g.choices.filter(c => want.includes(c.id));
+    if (!g.multi) got = got.slice(0, 1); else if (g.max) got = got.slice(0, g.max);
+    if (g.req && !got.length) return { error: `Please choose ${g.name.toLowerCase()} for ${item.name}.` };
+    for (const c of got) { ids.push(c.id); names.push(c.name); extra += c.price || 0; }
+  }
+  return { ids, label: names.join(', '), extra: r2(extra) };
+}
+// name and price of one order line with its options, e.g. "Paneer Tikka (Hot, Half)"
+function optLine(item, sel) {
+  const p = optPick(item, sel); if (p.error) return p;
+  return { name: item.name + (p.label ? ` (${p.label})` : ''), price: money(item.price + p.extra), ...(p.ids.length ? { opt: p.ids, opts: p.label } : {}) };
+}
+const optKey = ids => (Array.isArray(ids) ? ids.join('.') : '');
+// ---- Swiggy / Zomato orders typed in by the staff (no link to the platforms themselves) ----
+const PLATFORMS = { swiggy: 'Swiggy', zomato: 'Zomato' };
+const PLATFORM_DEFAULT = { swiggy: { on: true, commission: 0 }, zomato: { on: true, commission: 0 } };
+const platformsOf = r => { const o = {}; for (const k of Object.keys(PLATFORMS)) o[k] = Object.assign({}, PLATFORM_DEFAULT[k], (r.platforms || {})[k] || {}); return o; };
+const channelOf = o => o.channel && PLATFORMS[o.channel] ? o.channel : o.tableId ? 'dine' : 'takeaway';
 const slugify = s => str(s, 60).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'restaurant';
 
 const SOCIAL_KEYS = ['instagram', 'facebook', 'whatsapp', 'google', 'website', 'youtube', 'zomato', 'swiggy'];
@@ -444,7 +476,7 @@ function updatesUntilOf(pl) {
   const d = new Date((pl.iat || new Date().toISOString().slice(0, 10)) + 'T00:00:00Z'); d.setUTCFullYear(d.getUTCFullYear() + 1); return d.toISOString().slice(0, 10);
 }
 const BILL_DEFAULT = { width: '80', gstin: '', fssai: '', footer: 'Thank you! Please visit again.', autoKot: false, showUpi: true };
-function adminRestaurant(r) { return { ...publicRestaurant(r), hasWaiterPin: !!r.waiterPin, upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null) } : r.paidVia === 'razorpay' && r.plan !== 'trial' ? { code: null, key: '', online: true, to: r.name, at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.plan === 'lifetime' ? null : r.paidUntil ? r.paidUntil.slice(0, 10) : null) } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}), service: Object.assign({ autoAccept: false, payFirst: false }, r.service || {}), loyaltyCfg: Object.assign({}, LOYALTY_DEFAULT, r.loyalty || {}), wifiCfg: Object.assign({ on: false, ssid: '', pass: '' }, r.wifi || {}), gamesCfg: Object.assign({}, GAMES_DEFAULT, r.games || {}), displayCfg: displayCfg(r), kitchenCfg: kitchenCfg(r) }; }
+function adminRestaurant(r) { return { ...publicRestaurant(r), platforms: platformsOf(r), hasWaiterPin: !!r.waiterPin, upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null) } : r.paidVia === 'razorpay' && r.plan !== 'trial' ? { code: null, key: '', online: true, to: r.name, at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.plan === 'lifetime' ? null : r.paidUntil ? r.paidUntil.slice(0, 10) : null) } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}), service: Object.assign({ autoAccept: false, payFirst: false }, r.service || {}), loyaltyCfg: Object.assign({}, LOYALTY_DEFAULT, r.loyalty || {}), wifiCfg: Object.assign({ on: false, ssid: '', pass: '' }, r.wifi || {}), gamesCfg: Object.assign({}, GAMES_DEFAULT, r.games || {}), displayCfg: displayCfg(r), kitchenCfg: kitchenCfg(r) }; }
 function newRestaurant({ name, slug, password, email, ownerName, phone, plan = 'trial' }) {
   let s = slugify(slug || name), n = 2;
   while (db.restaurants.some(r => r.slug === s)) s = slugify(slug || name) + '-' + n++;
@@ -490,7 +522,7 @@ function cartView(table) {
   const last = {}; for (const l of c.lines) last[l.gid] = Math.max(last[l.gid] || 0, l.at || 0);
   c.lines = c.lines.filter(l => { const it = db.items.find(i => i.id === l.itemId && i.restaurantId === table.restaurantId && !i.hidden); return it && it.available !== false && l.qty > 0 && Date.now() - (last[l.gid] || Date.now()) < CART_IDLE; });
   const people = []; for (const l of c.lines) if (!people.some(x => x.gid === l.gid)) people.push({ gid: l.gid, name: l.name });
-  return { lines: c.lines.map(l => ({ gid: l.gid, name: l.name, itemId: l.itemId, qty: l.qty })), people };
+  return { lines: c.lines.map(l => ({ gid: l.gid, name: l.name, itemId: l.itemId, qty: l.qty, ...(l.opt && l.opt.length ? { opt: l.opt } : {}) })), people };
 }
 function billView(r, table) {
   const since = Date.now() - BILL_WINDOW;
@@ -615,7 +647,7 @@ function kitchenOf(slug, key) {
 }
 function kitchenOrders(r) {
   const since = Date.now() - 12 * 3600e3, t = Date.now();
-  const row = o => ({ id: o.id, number: o.number, table: o.tableName || '', status: o.status, source: o.source || 'qr', waiter: o.waiter || '', name: o.customerName || '', note: o.note || '', createdAt: o.createdAt, preparingAt: o.preparingAt || null, readyAt: o.readyAt || null, readyBy: o.readyBy || null,
+  const row = o => ({ id: o.id, number: o.number, table: o.tableName || '', status: o.status, source: o.source || 'qr', channel: o.channel || '', waiter: o.waiter || '', name: o.customerName || '', note: o.note || '', createdAt: o.createdAt, preparingAt: o.preparingAt || null, readyAt: o.readyAt || null, readyBy: o.readyBy || null,
     items: (o.items || []).map(l => ({ name: l.name, qty: l.qty, diet: l.diet || '', note: l.note || '' })) });
   const list = db.orders.filter(o => o.restaurantId === r.id && Date.parse(o.createdAt) > since);
   return {
@@ -658,7 +690,7 @@ function openStream(req, res, map, key) {
 }
 
 const adminOrder = o => ({ ...publicOrder(o), tableId: o.tableId || null, source: o.source || 'qr', waiter: o.waiter || '', offline: !!o.offline, points: o.points || 0, phone: o.loyaltyPhone || '' }); // the counter needs the table to open its bill
-const publicOrder = o => ({ id: o.id, number: o.number, tableName: o.tableName, items: o.items, note: o.note, customerName: o.customerName, total: o.total, subtotal: o.subtotal || o.total, discount: o.discount || 0, coupon: o.coupon || '', status: o.status, createdAt: o.createdAt, updatedAt: o.updatedAt, readyBy: o.readyBy || null, readyAt: o.readyAt || null });
+const publicOrder = o => ({ id: o.id, number: o.number, tableName: o.tableName, items: o.items, note: o.note, customerName: o.customerName, total: o.total, subtotal: o.subtotal || o.total, discount: o.discount || 0, coupon: o.coupon || '', status: o.status, createdAt: o.createdAt, updatedAt: o.updatedAt, readyBy: o.readyBy || null, readyAt: o.readyAt || null, ...(o.channel ? { channel: o.channel, platformRef: o.platformRef || '' } : {}) });
 
 // ---------- wait-time promise: learn how long each dish really takes in this kitchen ----------
 const DEFAULT_PREP = 15; // minutes, until the kitchen has history
@@ -888,7 +920,7 @@ async function handle(req, res) {
     icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }],
   }), { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'no-cache' });
   if (m === 'GET' && p === '/admin-sw.js') return send(res, 200, `// Veyra Dine In admin: shows order pop-ups and an offline page. It never stores orders or menus.
-const C = 'vd-admin-v2', SHELL = ['/admin', '/assets/base.css', '/assets/admin.css', '/assets/shell.css', '/assets/admin.js', '/assets/icons.js', '/assets/google.js', '/icon-192.png', '/favicon-32.png'];
+const C = 'vd-admin-v3', SHELL = ['/admin', '/assets/base.css', '/assets/admin.css', '/assets/shell.css', '/assets/admin.js', '/assets/icons.js', '/assets/opts.js', '/assets/google.js', '/icon-192.png', '/favicon-32.png'];
 self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(C).then(c => Promise.all(SHELL.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => {}))))); });
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x.startsWith('vd-admin') && x !== C).map(x => caches.delete(x)))).then(() => self.clients.claim())));
 // Network first, so updates show straight away. Without internet the admin still opens from the saved copy.
@@ -1045,7 +1077,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       offers: db.coupons.filter(c => c.restaurantId === r.id && c.active && c.showOnMenu && (!c.expires || c.expires >= new Date().toISOString().slice(0, 10)) && !(c.maxUses && (c.uses || 0) >= c.maxUses)).map(c => publicCoupon(c, r)),
       prep: (() => { const pm = prepMinutes(r.id), out = {}; for (const [k, v] of Object.entries(pm)) if (v.n >= 3) out[k] = v.mins; return out; })(),
       categories: db.categories.filter(c => c.restaurantId === r.id).sort((a, b) => a.sort - b.sort).map(c => ({ id: c.id, name: c.name })),
-      items: db.items.filter(i => i.restaurantId === r.id && !i.hidden).sort((a, b) => a.sort - b.sort).map(i => ({ id: i.id, categoryId: i.categoryId, name: i.name, description: i.description, price: i.price, photo: i.photo, diet: i.diet, available: i.available !== false, bestseller: !!i.bestseller, spicy: !!i.spicy })),
+      items: db.items.filter(i => i.restaurantId === r.id && !i.hidden).sort((a, b) => a.sort - b.sort).map(i => ({ id: i.id, categoryId: i.categoryId, name: i.name, description: i.description, price: i.price, photo: i.photo, diet: i.diet, available: i.available !== false, bestseller: !!i.bestseller, spicy: !!i.spicy, chef: !!i.chef, isNew: !!i.isNew, options: Array.isArray(i.options) ? i.options : [] })),
     });
   }
   if (m === 'POST' && (mt = /^\/api\/menu\/([a-z0-9-]+)\/coupon$/.exec(p))) {
@@ -1083,10 +1115,12 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       if (!item) return fail(res, 404, 'Dish not found');
       if (item.available === false) return fail(res, 409, `${item.name} just sold out.`);
       const qty = Math.min(50, Math.max(0, parseInt(body.qty, 10) || 0));
-      let line = cart.lines.find(l => l.gid === body.gid && l.itemId === item.id);
+      const op = optPick(item, body.opt); if (op.error && qty) return fail(res, 400, op.error);
+      const ok = op.error ? optKey((Array.isArray(body.opt) ? body.opt : []).map(String)) : optKey(op.ids);
+      let line = cart.lines.find(l => l.gid === body.gid && l.itemId === item.id && optKey(l.opt) === ok);
       const others = [...new Set(cart.lines.filter(l => l.gid !== body.gid).map(l => l.gid))].length;
       const myName = name || (cart.lines.find(l => l.gid === body.gid) || {}).name || `Guest ${others + 1}`;
-      if (qty && !line) cart.lines.push(line = { gid: body.gid, name: myName, itemId: item.id, qty, at: Date.now() });
+      if (qty && !line) cart.lines.push(line = { gid: body.gid, name: myName, itemId: item.id, qty, at: Date.now(), ...(op.ids && op.ids.length ? { opt: op.ids } : {}) });
       else if (line) line.qty = qty;
       cart.lines.forEach(l => { if (l.gid === body.gid) l.at = Date.now(); });
       cart.lines.forEach(l => { if (l.gid === body.gid) l.name = myName; });
@@ -1233,7 +1267,8 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       if (!cv.lines.length) return fail(res, 400, 'Your table order is empty. Someone may have just sent it.');
       for (const l of cv.lines) {
         const item = db.items.find(i => i.id === l.itemId);
-        lines.push({ itemId: item.id, name: item.name, price: item.price, qty: l.qty, diet: item.diet, note: '', gid: l.gid, by: l.name });
+        const ol = optLine(item, l.opt); if (ol.error) return fail(res, 409, ol.error + ' Open your order and add it again.');
+        lines.push({ itemId: item.id, ...ol, qty: l.qty, diet: item.diet, note: '', gid: l.gid, by: l.name });
       }
     }
     for (const line of shared ? [] : Array.isArray(body.items) ? body.items.slice(0, 60) : []) {
@@ -1241,7 +1276,8 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       const qty = Math.min(50, Math.max(0, parseInt(line.qty, 10) || 0));
       if (!item || !qty) continue;
       if (item.available === false) return fail(res, 409, `${item.name} just sold out. Please remove it and try again.`);
-      lines.push({ itemId: item.id, name: item.name, price: item.price, qty, diet: item.diet, note: str(line.note, 140), ...(gidOk(body.gid) ? { gid: body.gid, by: str(body.name, 40) || 'Guest' } : {}) });
+      const ol = optLine(item, line.opt); if (ol.error) return fail(res, 409, ol.error);
+      lines.push({ itemId: item.id, ...ol, qty, diet: item.diet, note: str(line.note, 140), ...(gidOk(body.gid) ? { gid: body.gid, by: str(body.name, 40) || 'Guest' } : {}) });
     }
     if (!lines.length) return fail(res, 400, 'Your order is empty.');
     const subtotal = money(lines.reduce((s, l) => s + l.price * l.qty, 0));
@@ -1654,7 +1690,16 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
         const t = tables[o.tableName] || (tables[o.tableName] = { name: o.tableName, orders: 0, sales: 0 }); t.orders++; t.sales = money(t.sales + o.total);
         hours[new Date(Date.parse(o.createdAt) - tz * 60000).getUTCHours()]++;
       }
+      // sales by where the order came from; Swiggy / Zomato show the commission kept and what the restaurant earns
+      const CH = { dine: 'Dine-in', takeaway: 'Takeaway', ...PLATFORMS }, chans = {};
+      for (const o of done) {
+        const k = channelOf(o), c = chans[k] || (chans[k] = { key: k, name: CH[k], orders: 0, sales: 0, commission: 0, net: 0 });
+        const cm = k in PLATFORMS ? money(o.total * (o.commissionPct || 0) / 100) : 0;
+        c.orders++; c.sales = money(c.sales + o.total); c.commission = money(c.commission + cm); c.net = money(c.sales - c.commission);
+      }
+      const channels = Object.keys(CH).filter(k => chans[k]).map(k => chans[k]);
       return send(res, 200, {
+        channels, commission: money(channels.reduce((a, c) => a + c.commission, 0)),
         from, to, discounts: money(done.reduce((s, o) => s + (o.discount || 0), 0)), orders: done.length, sales, average: done.length ? Math.round(sales / done.length) : 0,
         cancelled: all.length - done.length, items: done.reduce((s, o) => s + o.items.reduce((a, l) => a + l.qty, 0), 0),
         days, hours,
@@ -1831,6 +1876,10 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       if (b.available != null) it.available = !!b.available;
       if (b.bestseller != null) it.bestseller = !!b.bestseller;
       if (b.spicy != null) it.spicy = !!b.spicy;
+      if (b.chef != null) it.chef = !!b.chef;
+      if (b.isNew != null) it.isNew = !!b.isNew;
+      if (b.options !== undefined) it.options = cleanOptions(b.options);
+      if (b.prices && typeof b.prices === 'object') { it.prices = {}; for (const k of Object.keys(PLATFORMS)) { const v = money(b.prices[k]); if (v > 0) it.prices[k] = v; } }
       if (b.photo !== undefined) it.photo = b.photo && String(b.photo).startsWith('data:') ? saveImage(b.photo) : str(b.photo, 300);
     };
     if (m === 'POST' && p === '/api/admin/items') {
@@ -1912,21 +1961,26 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     if (m === 'POST' && p === '/api/admin/orders') { // order taken at the counter (also used to sync orders made while offline)
       const cid = str(body.clientId, 40);
       if (cid) { const dup = db.orders.find(o => o.restaurantId === r.id && o.clientId === cid); if (dup) return send(res, 200, adminOrder(dup)); }
-      const table = db.tables.find(t => t.id === body.tableId && t.restaurantId === r.id);
+      const ch = PLATFORMS[body.channel] ? body.channel : '', pref = ch ? str(body.platformRef, 30).replace(/^#/, '') : '';
+      const table = ch ? null : db.tables.find(t => t.id === body.tableId && t.restaurantId === r.id);
       const lines = [];
       for (const line of Array.isArray(body.items) ? body.items.slice(0, 80) : []) {
         const item = db.items.find(i => i.id === line.id && i.restaurantId === r.id);
         const qty = Math.min(99, Math.max(0, parseInt(line.qty, 10) || 0));
         if (!item || !qty) continue;
-        lines.push({ itemId: item.id, name: item.name, price: line.price != null && body.offline ? money(Number(line.price) || item.price) : item.price, qty, diet: item.diet, note: str(line.note, 140) });
+        const ol = optLine(item, line.opt); if (ol.error && !body.offline) return fail(res, 400, ol.error);
+        const base = ol.error ? { name: item.name, price: item.price } : ol;
+        const pp = ch && item.prices && item.prices[ch]; if (pp) base.price = money(pp + (ol.error ? 0 : optPick(item, line.opt).extra)); // the dish's own Swiggy / Zomato price
+        lines.push({ itemId: item.id, ...base, price: line.price != null && body.offline ? money(Number(line.price) || base.price) : base.price, qty, diet: item.diet, note: str(line.note, 140) });
       }
       if (!lines.length) return fail(res, 400, 'Add at least one dish');
       const total = money(lines.reduce((a, l) => a + l.price * l.qty, 0));
       let at = Date.parse(body.createdAt); if (!body.offline || !(at > Date.now() - 7 * DAY && at <= Date.now() + 60000)) at = Date.now();
       const st = ['new', 'preparing', 'ready', 'served', 'cancelled'].includes(body.status) ? body.status : 'preparing';
-      const lp = loyaltyOn(r) ? normPhone(body.phone) : '';
+      const lp = loyaltyOn(r) && !ch ? normPhone(body.phone) : '';
       r.orderSeq = (r.orderSeq || 100) + 1;
-      const order = { id: id(16), restaurantId: r.id, number: r.orderSeq, tableId: table ? table.id : null, tableName: table ? table.name : (str(body.label, 40) || 'Counter'),
+      const order = { id: id(16), restaurantId: r.id, number: r.orderSeq, tableId: table ? table.id : null, tableName: ch ? PLATFORMS[ch] + (pref ? ' #' + pref : '') : table ? table.name : (str(body.label, 40) || 'Counter'),
+        ...(ch ? { channel: ch, platformRef: pref, commissionPct: platformsOf(r)[ch].commission || 0 } : {}),
         items: lines, note: str(body.note, 300), customerName: str(body.name, 60), total, subtotal: total, discount: 0, coupon: '', status: st, source: waiter ? 'waiter' : 'counter', ...(waiter ? { waiter: waiter.name } : {}),
         createdAt: new Date(at).toISOString(), updatedAt: now(), readyBy: estimateReady(r, lines), ...(st !== 'new' ? { preparingAt: now() } : {}),
         ...(cid ? { clientId: cid } : {}), ...(body.offline ? { offline: true } : {}), ...(lp ? { loyaltyPhone: lp } : {}) };
@@ -1960,7 +2014,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
         const total = money(lines.reduce((a, l) => a + l.price * l.qty, 0));
         r.orderSeq = (r.orderSeq || 100) + 1;
         o = { id: id(16), restaurantId: r.id, number: r.orderSeq, tableId: table ? table.id : null, tableName: table ? table.name : str(h.tableName, 40) || 'Counter', items: lines, note: str(h.note, 300), customerName: str(h.customerName, 60),
-          total, subtotal: total, discount: 0, coupon: '', status: st, source: 'wifi', ...(h.waiter ? { waiter: str(h.waiter, 30) } : {}), createdAt: new Date(at).toISOString(), updatedAt: now(), clientId: 'hub-' + h.id, hubNumber: h.number, offline: true };
+          total, subtotal: total, discount: 0, coupon: '', status: st, source: 'wifi', ...(h.waiter ? { waiter: str(h.waiter, 30) } : {}), ...(PLATFORMS[h.channel] ? { channel: h.channel, platformRef: str(h.platformRef, 30), commissionPct: platformsOf(r)[h.channel].commission || 0 } : {}), createdAt: new Date(at).toISOString(), updatedAt: now(), clientId: 'hub-' + h.id, hubNumber: h.number, offline: true };
         db.orders.push(o); if (st === 'served') earnFor(r, o);
         emit(r.id, 'order', adminOrder(o)); done.push(h.id);
       }
@@ -2025,6 +2079,11 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
           if (body.wifi.ssid != null) W.ssid = str(body.wifi.ssid, 32); if (body.wifi.pass != null) W.pass = String(body.wifi.pass).slice(0, 63);
           if (body.wifi.on != null) W.on = !!body.wifi.on; if (W.on && !W.ssid) throw new Error('Enter the WiFi name');
           r.wifi = W;
+        }
+        if (body.platforms && typeof body.platforms === 'object') {
+          const P = platformsOf(r);
+          for (const k of Object.keys(PLATFORMS)) { const x = body.platforms[k]; if (!x || typeof x !== 'object') continue; if (x.on != null) P[k].on = !!x.on; if (x.commission != null) P[k].commission = Math.min(60, Math.max(0, Math.round(Number(x.commission) * 10) / 10 || 0)); }
+          r.platforms = P;
         }
         if (body.service && typeof body.service === 'object') { r.service = Object.assign({ autoAccept: false, payFirst: false }, r.service || {}); for (const k of ['autoAccept', 'payFirst']) if (body.service[k] != null) r.service[k] = !!body.service[k]; }
         if (body.loyalty && typeof body.loyalty === 'object') {

@@ -18,7 +18,9 @@
   const myName = () => localStorage.getItem('vd_name') || '';
   let G = null; // logged-in guest account
   const needLogin = () => D.restaurant.guestLogin && !G;
-  const cart = new Proxy({}, { get: (_, id) => { const l = T.lines.find(x => x.gid === GID && x.itemId === id); return l ? l.qty : 0; } });
+  const cart = new Proxy({}, { get: (_, id) => T.lines.filter(x => x.gid === GID && x.itemId === id).reduce((a, l) => a + l.qty, 0) }); // my count of a dish, all choices together
+  const okey = o => (Array.isArray(o) ? o.join('.') : '');
+  const mineOf = id => T.lines.filter(x => x.gid === GID && x.itemId === id && x.qty > 0);
 
   function load(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } }
   function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
@@ -44,19 +46,19 @@
   // ---------- cart ----------
   function cartLines() { return T.lines.map(l => ({ ...l, it: item(l.itemId) })).filter(l => l.it && l.qty > 0); }
   function cartCount() { return cartLines().reduce((s, l) => s + l.qty, 0); }
-  function cartTotal() { return cartLines().reduce((s, l) => s + l.qty * l.it.price, 0); }
+  function cartTotal() { return cartLines().reduce((s, l) => s + l.qty * VDOpt.unit(l.it, l.opt), 0); }
   function refreshCart() {
     document.querySelectorAll('[data-ctl]').forEach(el => { const it = item(el.dataset.ctl); if (it) el.innerHTML = control(it); });
     renderCartBar(); if (onTable) onTable();
   }
   let pending = 0;
-  async function setQty(id, qty) {
-    qty = Math.max(0, Math.min(50, qty));
-    const mine = T.lines.find(l => l.gid === GID && l.itemId === id);
-    if (mine) mine.qty = qty; else if (qty) T.lines.push({ gid: GID, name: myName() || 'You', itemId: id, qty });
+  async function setQty(id, qty, opt) {
+    qty = Math.max(0, Math.min(50, qty)); opt = Array.isArray(opt) && opt.length ? opt : undefined;
+    const mine = T.lines.find(l => l.gid === GID && l.itemId === id && okey(l.opt) === okey(opt));
+    if (mine) mine.qty = qty; else if (qty) T.lines.push({ gid: GID, name: myName() || 'You', itemId: id, qty, ...(opt ? { opt } : {}) });
     T.lines = T.lines.filter(l => l.qty > 0);
     refreshCart(); pending++;
-    try { const t = await api(`/api/menu/${slug}/table/cart`, { method: 'POST', body: { t: tableToken, gid: GID, name: myName(), itemId: id, qty } }); if (--pending === 0) { T = t; refreshCart(); } }
+    try { const t = await api(`/api/menu/${slug}/table/cart`, { method: 'POST', body: { t: tableToken, gid: GID, name: myName(), itemId: id, qty, opt } }); if (--pending === 0) { T = t; refreshCart(); } }
     catch (err) { pending--; toast(esc(err.message), 'error'); loadTable(); }
   }
   async function loadTable() { try { const x = await api(`/api/menu/${slug}/table?t=${encodeURIComponent(tableToken)}`); T = x.cart; B = x.bill; refreshCart(); } catch {} }
@@ -82,7 +84,7 @@
     if (!it.available) return '<span class="sold">Sold out</span>';
     if (!canOrder()) return '';
     const q = cart[it.id] || 0;
-    if (!q) return `<button class="add" data-add="${it.id}" aria-label="Add ${esc(it.name)}">ADD ${icon('plus', 16)}</button>`;
+    if (!q) return `<button class="add" data-add="${it.id}" aria-label="Add ${esc(it.name)}">ADD ${icon('plus', 16)}</button>${VDOpt.has(it) ? '<small class="custom">Customisable</small>' : ''}`;
     return `<div class="stepper"><button data-dec="${it.id}" aria-label="Remove one">${icon('minus', 18)}</button><span>${q}</span><button data-inc="${it.id}" aria-label="Add one">${icon('plus', 18)}</button></div>`;
   }
   function renderCartBar() {
@@ -162,7 +164,7 @@
   function dish(it) {
     return `<article class="dish ${it.available ? '' : 'unavailable'}">
       <div class="dish-info" data-open="${it.id}">
-        <div class="dish-tags">${dietMark(it.diet)}${it.bestseller ? '<span class="badge badge-amber">★ Bestseller</span>' : ''}${it.spicy ? `<span class="spicy" title="Spicy">${icon('flame', 16)}</span>` : ''}</div>
+        <div class="dish-tags">${dietMark(it.diet)}${it.bestseller ? '<span class="badge badge-amber">★ Bestseller</span>' : ''}${it.chef ? '<span class="badge badge-brand">Chef\'s special</span>' : ''}${it.isNew ? '<span class="badge badge-green">New</span>' : ''}${it.spicy ? `<span class="spicy" title="Spicy">${icon('flame', 16)}</span>` : ''}</div>
         <h3>${esc(it.name)}</h3>
         <div class="price">${cur(it.price)}${D.prep && D.prep[it.id] ? `<span class="prep">${icon('clock', 13)} ${D.prep[it.id]} min</span>` : ''}</div>
         ${it.description ? `<p class="desc">${esc(it.description)}</p>` : ''}
@@ -202,27 +204,39 @@
 
   function openItem(id) {
     const it = item(id); if (!it) return;
-    let qty = Math.max(1, cart[id] || 1);
+    const hasOpt = VDOpt.has(it);
+    let qty = hasOpt ? 1 : Math.max(1, cart[id] || 1);
     const o = sheet(`
       <div style="position:relative">
         <button class="close-float" data-close aria-label="Close">${icon('x', 20)}</button>
         ${it.photo ? `<img class="detail-photo" src="${esc(it.photo)}" alt="${esc(it.name)}">` : ''}
       </div>
       <div class="sheet-body" style="${it.photo ? '' : 'padding-top:60px'}">
-        <div class="dish-tags">${dietMark(it.diet)}${it.bestseller ? '<span class="badge badge-amber">★ Bestseller</span>' : ''}${it.spicy ? `<span class="badge badge-red">${icon('flame', 13)} Spicy</span>` : ''}</div>
+        <div class="dish-tags">${dietMark(it.diet)}${it.bestseller ? '<span class="badge badge-amber">★ Bestseller</span>' : ''}${it.chef ? '<span class="badge badge-brand">Chef\'s special</span>' : ''}${it.isNew ? '<span class="badge badge-green">New</span>' : ''}${it.spicy ? `<span class="badge badge-red">${icon('flame', 13)} Spicy</span>` : ''}</div>
         <h2>${esc(it.name)}</h2>
         <div class="price" style="font-size:18px">${cur(it.price)}</div>
         ${it.description ? `<p class="muted" style="margin:10px 0 0">${esc(it.description)}</p>` : ''}
+        ${hasOpt && it.available && canOrder() ? `<div class="vo-body" id="vo">${VDOpt.html(it, null, cur)}</div>` : hasOpt ? `<p class="muted" style="margin:12px 0 0;font-size:13px">Choices: ${VDOpt.groups(it).map(g => esc(g.name)).join(', ')}</p>` : ''}
       </div>
       ${it.available && canOrder() ? `<div class="sheet-foot" style="display:flex;gap:12px;align-items:center">
         <div class="qty-big"><button data-q="-1" aria-label="Less">${icon('minus', 20)}</button><span id="dq">${qty}</span><button data-q="1" aria-label="More">${icon('plus', 20)}</button></div>
         <button class="btn btn-primary btn-lg" style="flex:1" id="dadd">Add · ${cur(it.price * qty)}</button>
       </div>` : `<div class="sheet-foot"><div class="${it.available ? 'muted' : 'sold'}" style="justify-content:center;width:100%">${it.available ? 'Scan the QR on your table to order' : 'Sold out for now'}</div></div>`}`, 'detail');
+    const vo = o.querySelector('#vo'), ids = () => vo ? VDOpt.read(vo, it) : undefined;
+    const price = () => { const a = o.querySelector('#dadd'); if (a) a.textContent = `Add · ${cur(VDOpt.unit(it, ids()) * qty)}`; };
+    if (vo) VDOpt.bindLimits(vo, it, () => { vo.querySelectorAll('.vo-miss').forEach(x => x.classList.remove('vo-miss')); price(); });
+    price();
     o.querySelectorAll('[data-q]').forEach(b => b.onclick = () => {
       qty = Math.max(1, Math.min(50, qty + Number(b.dataset.q)));
-      o.querySelector('#dq').textContent = qty; o.querySelector('#dadd').textContent = `Add · ${cur(it.price * qty)}`;
+      o.querySelector('#dq').textContent = qty; price();
     });
-    const add = o.querySelector('#dadd'); if (add) add.onclick = () => { setQty(id, qty); o.close(); toast(`${icon('check', 18)} Added ${esc(it.name)}`, 'ok'); };
+    const add = o.querySelector('#dadd'); if (add) add.onclick = () => {
+      if (!hasOpt) { setQty(id, qty); o.close(); return toast(`${icon('check', 18)} Added ${esc(it.name)}`, 'ok'); }
+      const sel = ids(), p = VDOpt.pick(it, sel);
+      if (p.error) { const g = VDOpt.groups(it).find(x => x.req && !sel.some(i => x.choices.some(c => c.id === i))); const box = g && vo.querySelector(`.vo-g[data-g="${g.id}"]`); if (box) { box.classList.add('vo-miss'); box.scrollIntoView({ block: 'center', behavior: 'smooth' }); } return toast(esc(p.error), 'error'); }
+      const had = (mineOf(id).find(l => okey(l.opt) === okey(p.ids)) || {}).qty || 0;
+      setQty(id, had + qty, p.ids); o.close(); toast(`${icon('check', 18)} Added ${esc(it.name)}${p.label ? ` (${esc(p.label)})` : ''}`, 'ok');
+    };
   }
 
   // ---------- coupons ----------
@@ -307,10 +321,10 @@
       if (!lines.length) { o.close(); return; }
       const groups = []; for (const l of lines) { let g = groups.find(x => x.gid === l.gid); if (!g) groups.push(g = { gid: l.gid, name: l.name, lines: [] }); g.lines.push(l); }
       groups.sort((a, b) => (b.gid === GID) - (a.gid === GID));
-      o.querySelector('#lines').innerHTML = groups.map(g => `<div class="who"><span class="av">${esc((g.gid === GID ? (myName() || 'You') : g.name).slice(0, 1).toUpperCase())}</span>${g.gid === GID ? `You${myName() ? ` (${esc(myName())})` : ''}` : esc(g.name)}<span class="muted">${cur(g.lines.reduce((s, l) => s + l.qty * l.it.price, 0))}</span></div>` +
-        g.lines.map(({ it, qty, gid }) => `<div class="line">${dietMark(it.diet)}<div class="line-info"><b>${esc(it.name)}</b><small>${cur(it.price)} each</small></div>
-          ${gid === GID ? `<div class="stepper"><button data-dec="${it.id}" aria-label="Remove one">${icon('minus', 16)}</button><span>${qty}</span><button data-inc="${it.id}" aria-label="Add one">${icon('plus', 16)}</button></div>` : `<span class="qty-ro">${qty}×</span>`}
-          <div class="line-total">${cur(it.price * qty)}</div></div>`).join('')).join('') +
+      o.querySelector('#lines').innerHTML = groups.map(g => `<div class="who"><span class="av">${esc((g.gid === GID ? (myName() || 'You') : g.name).slice(0, 1).toUpperCase())}</span>${g.gid === GID ? `You${myName() ? ` (${esc(myName())})` : ''}` : esc(g.name)}<span class="muted">${cur(g.lines.reduce((s, l) => s + l.qty * VDOpt.unit(l.it, l.opt), 0))}</span></div>` +
+        g.lines.map(({ it, qty, gid, opt }) => { const u = VDOpt.unit(it, opt), lb = VDOpt.pick(it, opt).label; return `<div class="line">${dietMark(it.diet)}<div class="line-info"><b>${esc(it.name)}</b>${lb ? `<small class="opt">${esc(lb)}</small>` : ''}<small>${cur(u)} each</small></div>
+          ${gid === GID ? `<div class="stepper"><button data-dec="${it.id}" data-opt="${esc(okey(opt))}" aria-label="Remove one">${icon('minus', 16)}</button><span>${qty}</span><button data-inc="${it.id}" data-opt="${esc(okey(opt))}" aria-label="Add one">${icon('plus', 16)}</button></div>` : `<span class="qty-ro">${qty}×</span>`}
+          <div class="line-total">${cur(u * qty)}</div></div>`; }).join('')).join('') +
         `<button class="btn btn-ghost btn-sm" data-close style="margin-top:10px;color:var(--brand)">${icon('plus', 16)} Add more dishes</button>`;
       const sub = cartTotal();
       if (coupon && sub !== lastSub && lastSub !== null) checkCoupon(coupon.code, true).then(draw);
@@ -337,7 +351,8 @@
     o.addEventListener('click', e => { if (e.target === o || e.target.closest('[data-close]')) onTable = null; });
     o.querySelector('#lines').addEventListener('click', e => {
       const b = e.target.closest('[data-inc],[data-dec]'); if (!b) return;
-      const id = b.dataset.inc || b.dataset.dec; setQty(id, cart[id] + (b.dataset.inc ? 1 : -1));
+      const id = b.dataset.inc || b.dataset.dec, ok = b.dataset.opt || '', l = mineOf(id).find(x => okey(x.opt) === ok);
+      setQty(id, (l ? l.qty : 0) + (b.dataset.inc ? 1 : -1), ok ? ok.split('.') : undefined);
     });
     o.querySelector('#note').oninput = e => sessionStorage.setItem('vd_note', e.target.value);
     o.querySelector('#cname').onchange = async e => {
@@ -744,7 +759,10 @@
     if (of && !of.closest('.overlay')) { if (!canOrder()) return toast('Scan the QR on your table to order and use this offer.'); if (!cartCount()) return toast(`Add dishes first, then use code ${esc(of.dataset.offer)} in your order.`); checkCoupon(of.dataset.offer).then(ok => ok && openCart()); return; }
     const a = e.target.closest('[data-add],[data-inc],[data-dec],[data-open],[data-cat]');
     if (!a || a.closest('.overlay')) return;
-    if (a.dataset.add) { setQty(a.dataset.add, 1); if (navigator.vibrate) navigator.vibrate(15); }
+    const id = a.dataset.add || a.dataset.inc || a.dataset.dec, it = id && item(id);
+    if (it && VDOpt.has(it) && !a.dataset.dec) openItem(id); // dishes with choices open the dish to pick them
+    else if (it && VDOpt.has(it)) { const m = mineOf(id); if (m.length === 1) setQty(id, m[0].qty - 1, m[0].opt); else openCart(); }
+    else if (a.dataset.add) { setQty(a.dataset.add, 1); if (navigator.vibrate) navigator.vibrate(15); }
     else if (a.dataset.inc) setQty(a.dataset.inc, cart[a.dataset.inc] + 1);
     else if (a.dataset.dec) setQty(a.dataset.dec, cart[a.dataset.dec] - 1);
     else if (a.dataset.open) openItem(a.dataset.open);

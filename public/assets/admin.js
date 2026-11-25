@@ -582,9 +582,14 @@
     const o = modal('<div class="pos-root"></div>', { wide: true });
     o.classList.add('pos-ov');
     const root = o.querySelector('.pos-root');
-    const count = () => Object.values(cart).reduce((a, b) => a + b, 0), total = () => Object.entries(cart).reduce((a, [id, n]) => a + n * ((items.find(i => i.id === id) || {}).price || 0), 0);
-    const tName = () => { const t = tables.find(x => x.id === tId); return t ? t.name : 'Takeaway / counter'; };
-    const show = () => toDisplay(count() ? { mode: 'cart', title: tId ? tName() : 'Your order', lines: Object.entries(cart).map(([id, n]) => { const it = items.find(i => i.id === id) || {}; return { name: it.name, qty: n, price: it.price }; }) } : { mode: 'idle' });
+    // cart keys are the dish id, plus the chosen options for dishes that have them (VDOpt.key)
+    // Swiggy / Zomato orders: tId is 'ch:swiggy' or 'ch:zomato', and dishes use their platform price when one is set
+    const PN = { swiggy: 'Swiggy', zomato: 'Zomato' }, CHN = () => (tId && String(tId).startsWith('ch:') ? tId.slice(3) : '');
+    const baseOf = it => { const c = CHN(); return c && it.prices && it.prices[c] ? it.prices[c] : it.price; };
+    const kInfo = k => { const { id, ids } = VDOpt.fromKey(k), it0 = items.find(i => i.id === id) || { id, name: '?', price: 0 }, it = { ...it0, price: baseOf(it0) }, p = VDOpt.pick(it, ids); return { it, ids, label: p.label || '', unit: VDOpt.unit(it, ids) }; };
+    const count = () => Object.values(cart).reduce((a, b) => a + b, 0), total = () => Object.entries(cart).reduce((a, [k, n]) => a + n * kInfo(k).unit, 0);
+    const tName = () => { if (CHN()) return PN[CHN()] + ' order'; const t = tables.find(x => x.id === tId); return t ? t.name : 'Takeaway / counter'; };
+    const show = () => CHN() ? toDisplay({ mode: 'idle' }) : toDisplay(count() ? { mode: 'cart', title: tId ? tName() : 'Your order', lines: Object.entries(cart).map(([k, n]) => { const x = kInfo(k); return { name: x.it.name + (x.label ? ` (${x.label})` : ''), qty: n, price: x.unit }; }) } : { mode: 'idle' });
     onGone(o, () => toDisplay(sentOrder && !sentOrder.offline ? { mode: 'order', orderId: sentOrder.id } : { mode: 'idle' }, true));
 
     // step 1: which table
@@ -593,6 +598,7 @@
       root.innerHTML = `<div class="sheet-head"><div><h3>Take an order</h3><small class="muted">Pick the table. ${busy} of ${ts.length} busy.</small></div><button class="icon-btn" data-close aria-label="Close">${icon('x', 20)}</button></div>
         <div class="sheet-body">
           <button class="pos-take" data-pt="">${icon('bag', 22)}<span><b>Takeaway or counter</b><small>Parcel, phone order or walk-in at the counter</small></span>${icon('chevron', 18)}</button>
+          ${(() => { const P = S.me.restaurant.platforms || {}, on = ['swiggy', 'zomato'].filter(k => !P[k] || P[k].on !== false); return on.length ? `<div class="pos-plats">${on.map(k => `<button class="pos-plat plat-${k}" data-pt="ch:${k}"><b>${PN[k]}</b><small>Type in a ${PN[k]} order</small></button>`).join('')}</div>` : ''; })()}
           <div class="pos-legend"><span class="free">Free</span><span class="new">New order</span><span class="cooking">Cooking</span><span class="ready">Food ready</span></div>
           <div class="pos-tables">${ts.map(x => `<button class="pos-t s-${x.st[0]}" data-pt="${x.t.id}"><b>${esc(x.t.name)}</b><small>${x.st[1]}</small>${x.total ? `<span>${cur(x.total)}</span>` : ''}</button>`).join('') || `<div class="empty" style="grid-column:1/-1">No tables yet. Add them in Tables &amp; QR, or take a counter order.</div>`}</div>
         </div>`;
@@ -601,34 +607,43 @@
 
     // step 2: dishes
     function pickDishes() {
-      const t = tables.find(x => x.id === tId), x = t ? tState(t) : null;
+      const t = tables.find(x => x.id === tId), x = t ? tState(t) : null, ch = CHN();
       const already = x && x.os.length ? x.os.flatMap(o2 => o2.items) : [];
-      root.innerHTML = `<div class="sheet-head"><div class="pos-h"><h3>${esc(tName())}</h3><button class="btn btn-sm btn-ghost" id="pchg">${icon('edit', 14)} Change</button></div><button class="icon-btn" data-close aria-label="Close">${icon('x', 20)}</button></div>
+      root.innerHTML = `<div class="sheet-head"><div class="pos-h">${ch ? `<span class="plat-tag plat-${ch}">${PN[ch]}</span>` : ''}<h3>${esc(ch ? 'order' : tName())}</h3><button class="btn btn-sm btn-ghost" id="pchg">${icon('edit', 14)} Change</button></div><button class="icon-btn" data-close aria-label="Close">${icon('x', 20)}</button></div>
         <div class="sheet-body pos">
           ${already.length ? `<details class="pos-already"><summary>${icon('receipt', 16)} <span>Already ordered here: <b>${already.reduce((a, l) => a + l.qty, 0)} item${already.reduce((a, l) => a + l.qty, 0) === 1 ? '' : 's'} · ${cur(x.total)}</b></span></summary><div>${already.map(l => `<div>${l.qty}× ${esc(l.name)}</div>`).join('')}</div></details>` : ''}
-          <details class="pos-cust"><summary>${icon('user', 16)} <span>Customer name${L ? ' and mobile for points' : ''} <small class="muted">(optional)</small></span></summary>
-            <div class="pos-top ${L ? '' : 'one'}"><label class="field"><span>Customer name</span><input class="input" id="pname" maxlength="60"></label>
-            ${L ? `<label class="field"><span>Mobile for points</span><input class="input" id="pphone" inputmode="tel" maxlength="14"></label>` : ''}</div></details>
+          ${ch ? `<div class="pos-ref"><label class="field"><span>${PN[ch]} order number</span><input class="input" id="pref" maxlength="30" placeholder="From the ${PN[ch]} partner app, e.g. 4521" autocomplete="off"></label><small class="muted">${(() => { const pc = ((S.me.restaurant.platforms || {})[ch] || {}).commission; return pc ? `${PN[ch]} keeps ${pc}% commission.` : `Set the ${PN[ch]} commission in Settings to see what you earn.`; })()} Dishes use their ${PN[ch]} price where you set one.</small></div>` : ''}
+          <details class="pos-cust"><summary>${icon('user', 16)} <span>Customer name${L && !ch ? ' and mobile for points' : ''} <small class="muted">(optional)</small></span></summary>
+            <div class="pos-top ${L && !ch ? '' : 'one'}"><label class="field"><span>Customer name</span><input class="input" id="pname" maxlength="60"></label>
+            ${L && !ch ? `<label class="field"><span>Mobile for points</span><input class="input" id="pphone" inputmode="tel" maxlength="14"></label>` : ''}</div></details>
           <div class="pos-find"><label class="pos-search">${icon('search', 18)}<input class="input" id="pq" placeholder="Search dishes" autocomplete="off"></label><div class="pos-cats"><button class="chip on" data-pc="">All</button>${cats.map(k => `<button class="chip" data-pc="${k.id}">${esc(k.name)}</button>`).join('')}</div></div>
           <div class="pos-list" id="plist"></div>
           <label class="field"><span>Note for the kitchen (optional)</span><input class="input" id="pnote" maxlength="300" placeholder="E.g. less spicy, serve together"></label>
         </div>
         <div class="sheet-foot pos-foot"><div id="psum" class="muted">No dishes yet</div><button class="btn btn-primary btn-lg" id="psend" disabled>${icon('chef', 18)} Send to kitchen</button></div>`;
       const list = root.querySelector('#plist');
-      const row = i => { const n = cart[i.id], sold = i.available === false; return `<div class="pos-it ${n ? 'on' : ''} ${sold ? 'off' : ''}" data-i="${i.id}"><div class="pos-r"><span class="pos-dm">${dietMark(i.diet)}</span><span class="nm">${esc(i.name)}<small>${cur(i.price)}${sold ? ' · sold out' : ''}</small></span>
-        ${sold ? '' : n ? `<span class="pos-q"><button class="btn btn-sm" data-d="${i.id}" aria-label="One less">${icon('minus', 16)}</button><b>${n}</b><button class="btn btn-sm" data-a="${i.id}" aria-label="One more">${icon('plus', 16)}</button></span>` : `<button class="btn btn-sm" data-a="${i.id}">${icon('plus', 16)} Add</button>`}</div>
-        ${n ? (noteOpen.has(i.id) ? `<input class="input pos-dn" data-n="${i.id}" maxlength="140" placeholder="Note for this dish, e.g. no onion" value="${esc(notes[i.id] || '')}">` : `<button class="pos-nb" data-on="${i.id}">${icon('edit', 13)} ${notes[i.id] ? esc(notes[i.id]) : 'Add note'}</button>`) : ''}</div>`; };
+      const noteUi = k => noteOpen.has(k) ? `<input class="input pos-dn" data-n="${esc(k)}" maxlength="140" placeholder="Note for this dish, e.g. no onion" value="${esc(notes[k] || '')}">` : `<button class="pos-nb" data-on="${esc(k)}">${icon('edit', 13)} ${notes[k] ? esc(notes[k]) : 'Add note'}</button>`;
+      const qtyUi = (k, n) => `<span class="pos-q"><button class="btn btn-sm" data-d="${esc(k)}" aria-label="One less">${icon('minus', 16)}</button><b>${n}</b><button class="btn btn-sm" data-a="${esc(k)}" aria-label="One more">${icon('plus', 16)}</button></span>`;
+      const row = i => {
+        const sold = i.available === false, opt = VDOpt.has(i);
+        const vs = Object.keys(cart).filter(k => VDOpt.fromKey(k).id === i.id), n = vs.reduce((a, k) => a + cart[k], 0);
+        return `<div class="pos-it ${n ? 'on' : ''} ${sold ? 'off' : ''}" data-i="${i.id}"><div class="pos-r"><span class="pos-dm">${dietMark(i.diet)}</span><span class="nm">${esc(i.name)}<small>${cur(baseOf(i))}${opt ? ' · has choices' : ''}${sold ? ' · sold out' : ''}</small></span>
+        ${sold ? '' : opt ? `<button class="btn btn-sm" data-ch="${i.id}">${icon('plus', 16)} ${n ? 'More' : 'Add'}</button>` : n ? qtyUi(i.id, n) : `<button class="btn btn-sm" data-a="${i.id}">${icon('plus', 16)} Add</button>`}</div>
+        ${opt ? vs.map(k => { const x = kInfo(k); return `<div class="pos-v"><div class="pos-vr"><span class="pos-vl">${x.label ? esc(x.label) : 'No choices'}<small>${cur(x.unit)} each</small></span>${qtyUi(k, cart[k])}</div>${noteUi(k)}</div>`; }).join('') : n ? noteUi(i.id) : ''}</div>`;
+      };
       const foot = () => {
         const n = count();
         root.querySelector('#psum').innerHTML = n ? `<b>${n} item${n === 1 ? '' : 's'}</b> · ${cur(total())}` : 'No dishes yet';
         root.querySelector('#psend').disabled = !n; show();
       };
       const draw = () => { const l = items.filter(i => (!cat || i.categoryId === cat) && (!q || i.name.toLowerCase().includes(q))); list.innerHTML = l.map(row).join('') || '<div class="empty" style="grid-column:1/-1">No dishes found</div>'; foot(); };
-      const redraw = id => { const el = list.querySelector(`[data-i="${id}"]`); if (el) el.outerHTML = row(items.find(i => i.id === id)); foot(); };
+      const redraw = k => { const id = VDOpt.fromKey(k).id, el = list.querySelector(`[data-i="${id}"]`); if (el) el.outerHTML = row(items.find(i => i.id === id)); foot(); };
       list.onclick = e => {
         const nb = e.target.closest('[data-on]'); if (nb) { noteOpen.add(nb.dataset.on); redraw(nb.dataset.on); const f = list.querySelector(`[data-n="${nb.dataset.on}"]`); if (f) f.focus(); return; }
-        const b = e.target.closest('[data-a],[data-d]'); if (!b) return; const id = b.dataset.a || b.dataset.d;
-        cart[id] = Math.max(0, (cart[id] || 0) + (b.dataset.a ? 1 : -1)); if (!cart[id]) { delete cart[id]; delete notes[id]; noteOpen.delete(id); } redraw(id);
+        const ch = e.target.closest('[data-ch]');
+        if (ch) { const it0 = items.find(i => i.id === ch.dataset.ch), it = { ...it0, price: baseOf(it0) }; VDOpt.choose(it, { cur }).then(r => { if (!r) return; const k = VDOpt.key(it.id, r.ids); cart[k] = Math.min(99, (cart[k] || 0) + r.qty); redraw(k); }); return; }
+        const b = e.target.closest('[data-a],[data-d]'); if (!b) return; const k = b.dataset.a || b.dataset.d;
+        cart[k] = Math.max(0, Math.min(99, (cart[k] || 0) + (b.dataset.a ? 1 : -1))); if (!cart[k]) { delete cart[k]; delete notes[k]; noteOpen.delete(k); } redraw(k);
       };
       list.oninput = e => { const f = e.target.closest('[data-n]'); if (f) notes[f.dataset.n] = f.value; };
       list.addEventListener('focusout', e => { const f = e.target.closest('[data-n]'); if (f && !f.value.trim()) { noteOpen.delete(f.dataset.n); setTimeout(() => redraw(f.dataset.n), 0); } });
@@ -637,14 +652,14 @@
       root.querySelectorAll('[data-pc]').forEach(b => b.onclick = () => { cat = b.dataset.pc; root.querySelectorAll('[data-pc]').forEach(y => y.classList.toggle('on', y === b)); draw(); });
       root.querySelector('#psend').onclick = async e => {
         const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Sending…';
-        const t2 = tables.find(y => y.id === tId);
-        const body = { tableId: tId || null, label: t2 ? '' : 'Counter', items: Object.entries(cart).map(([id, n]) => ({ id, qty: n, price: (items.find(i => i.id === id) || {}).price, note: (notes[id] || '').trim() })), name: (root.querySelector('#pname').value || '').trim(), note: root.querySelector('#pnote').value.trim(), phone: root.querySelector('#pphone') ? root.querySelector('#pphone').value : '', status: 'preparing', clientId: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) };
+        const t2 = tables.find(y => y.id === tId), chn = CHN(), pref = chn ? root.querySelector('#pref').value.trim().replace(/^#/, '') : '';
+        const body = { ...(chn ? { channel: chn, platformRef: pref } : {}), tableId: t2 ? t2.id : null, label: t2 ? '' : 'Counter', items: Object.entries(cart).map(([k, n]) => { const x = kInfo(k); return { id: x.it.id, qty: n, opt: x.ids, price: x.unit, note: (notes[k] || '').trim() }; }), name: (root.querySelector('#pname').value || '').trim(), note: root.querySelector('#pnote').value.trim(), phone: root.querySelector('#pphone') ? root.querySelector('#pphone').value : '', status: 'preparing', clientId: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) };
         let order;
         if (!S.offline) { try { order = await api('/api/admin/orders', { method: 'POST', body }); } catch (err) { if (!err.offline) { btn.disabled = false; foot(); btn.innerHTML = `${icon('chef', 18)} Send to kitchen`; return toast(esc(err.message), 'error'); } } }
         if (!order) { // offline: keep it here, print the KOT, sync later
-          const tmpId = 'off-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), lines = body.items.map(y => { const it = items.find(i => i.id === y.id); return { itemId: it.id, name: it.name, price: it.price, qty: y.qty, diet: it.diet, note: y.note }; });
+          const tmpId = 'off-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), lines = body.items.map(y => { const it = items.find(i => i.id === y.id), lb = VDOpt.pick(it, y.opt).label; return { itemId: it.id, name: it.name + (lb ? ` (${lb})` : ''), price: y.price, qty: y.qty, diet: it.diet, note: y.note, ...(y.opt && y.opt.length ? { opt: y.opt, opts: lb } : {}) }; });
           const tot = lines.reduce((a, l) => a + l.price * l.qty, 0);
-          order = { id: tmpId, number: 'OFF-' + (outbox().filter(y => y.kind === 'order').length + 1), tableId: tId || null, tableName: t2 ? t2.name : 'Counter', items: lines, note: body.note, customerName: body.name, total: tot, subtotal: tot, discount: 0, coupon: '', status: 'preparing', createdAt: new Date().toISOString(), offline: true, source: 'counter' };
+          order = { id: tmpId, number: 'OFF-' + (outbox().filter(y => y.kind === 'order').length + 1), tableId: t2 ? t2.id : null, tableName: chn ? PN[chn] + (pref ? ' #' + pref : '') : t2 ? t2.name : 'Counter', ...(chn ? { channel: chn, platformRef: pref } : {}), items: lines, note: body.note, customerName: body.name, total: tot, subtotal: tot, discount: 0, coupon: '', status: 'preparing', createdAt: new Date().toISOString(), offline: true, source: 'counter' };
           queue({ kind: 'order', tmpId, body: { ...body, createdAt: order.createdAt } });
         }
         sentOrder = order; o.close(); upsertOrder(order);
@@ -806,9 +821,9 @@
   }
   function orderCard(o) {
     const mins = (Date.now() - Date.parse(o.createdAt)) / 60000;
-    const next = { new: ['preparing', 'Accept & start cooking'], preparing: ['ready', 'Mark as ready'], ready: ['served', 'Mark as served'] }[o.status];
+    const next = { new: ['preparing', 'Accept & start cooking'], preparing: ['ready', o.channel ? 'Packed, ready for rider' : 'Mark as ready'], ready: ['served', o.channel ? 'Picked up by rider' : 'Mark as served'] }[o.status];
     return `<article class="order ${S.newIds.has(o.id) ? 'is-new' : ''}">
-      <div class="o-head"><div><div class="o-table">${esc(o.tableName)}</div><div class="o-meta">Order #${o.number}${o.customerName ? ' · ' + esc(o.customerName) : ''}</div>${o.offline && String(o.id).startsWith('off-') ? `<span class="badge badge-amber o-tag">${icon('wifi', 12)} Saved offline</span>` : o.source === 'counter' ? `<span class="badge badge-grey o-tag">${o.tableId ? 'Taken by staff' : 'Counter order'}</span>` : o.source === 'waiter' ? `<span class="badge badge-grey o-tag">Waiter${o.waiter ? ' ' + esc(o.waiter) : ''}</span>` : ''}</div>
+      <div class="o-head"><div>${o.channel ? `<span class="plat-tag plat-${esc(o.channel)}">${o.channel === 'swiggy' ? 'Swiggy' : 'Zomato'}</span>` : ''}<div class="o-table">${esc(o.channel ? (o.platformRef ? '#' + o.platformRef : 'Delivery') : o.tableName)}</div><div class="o-meta">Order #${o.number}${o.customerName ? ' · ' + esc(o.customerName) : ''}</div>${o.offline && String(o.id).startsWith('off-') ? `<span class="badge badge-amber o-tag">${icon('wifi', 12)} Saved offline</span>` : o.channel ? '' : o.source === 'counter' ? `<span class="badge badge-grey o-tag">${o.tableId ? 'Taken by staff' : 'Counter order'}</span>` : o.source === 'waiter' ? `<span class="badge badge-grey o-tag">Waiter${o.waiter ? ' ' + esc(o.waiter) : ''}</span>` : ''}</div>
         ${dueChip(o, mins)}</div>
       <div class="o-items">${o.items.map(l => `<div class="o-line"><span class="q">${l.qty}×</span>${dietMark(l.diet)}<span class="nm">${esc(l.name)}${l.note ? `<small>${esc(l.note)}</small>` : ''}${l.by && new Set(o.items.map(x => x.by)).size > 1 ? `<small class="by">for ${esc(l.by)}</small>` : ''}</span></div>`).join('')}</div>
       ${o.note ? `<div class="o-note">${icon('edit', 16)} ${esc(o.note)}</div>` : ''}
@@ -824,7 +839,7 @@
     try {
       const o = await api('/api/admin/orders/' + oid, { method: 'PATCH', body: { status } });
       S.newIds.delete(oid); upsertOrder(o);
-      if (status === 'served') toast(`${icon('check', 18)} ${esc(o.tableName)} served`, 'ok');
+      if (status === 'served') toast(`${icon('check', 18)} ${esc(o.tableName)} ${o.channel ? 'picked up by the rider' : 'served'}`, 'ok');
     } catch (err) { if (err.offline) return offlineStatus(oid, status); toast(esc(err.message), 'error'); }
   }
   function upsertOrder(o) {
@@ -923,6 +938,9 @@
         <div class="stat"><small>Average order</small><b>${cur(R.average)}</b></div>
         <div class="stat"><small>${one ? 'Busiest hour' : 'Best day'}</small><b>${R.orders ? (one ? `${hourLabel(busyHour)}` : `${short(best.date)}`) : '–'}</b>${R.orders ? `<span class="sub">${one ? `${R.hours[busyHour]} orders` : cur(best.sales)}</span>` : ''}</div>
       </div>
+      ${R.channels && R.channels.length ? `<div class="panel"><div class="panel-head"><div><h2>Where orders came from</h2>${R.commission ? `<span class="muted" style="font-size:14px">Swiggy and Zomato kept ${cur(Math.round(R.commission))} in commission. You earned ${cur(Math.round(R.sales - R.commission))}.</span>` : ''}</div></div>
+        <div style="overflow-x:auto"><table class="tbl ch-tbl"><thead><tr><th>Type</th><th class="r hide-sm">Orders</th><th class="r">Sales</th><th class="r">Commission</th><th class="r">You earn</th></tr></thead><tbody>${R.channels.map(x => `<tr><td>${x.key === 'swiggy' || x.key === 'zomato' ? `<span class="plat-tag plat-${x.key}">${esc(x.name)}</span>` : esc(x.name)}<small class="muted ch-n">${x.orders} order${x.orders === 1 ? '' : 's'}</small></td><td class="r hide-sm">${x.orders}</td><td class="r">${cur(x.sales)}</td><td class="r">${x.commission ? '−' + cur(Math.round(x.commission)) : (x.key === 'swiggy' || x.key === 'zomato') ? '<span class="muted">set % in Settings</span>' : '–'}</td><td class="r"><b>${cur(Math.round(x.net))}</b></td></tr>`).join('')}</tbody>
+        ${R.channels.length > 1 ? `<tfoot><tr><td><b>All</b></td><td class="r hide-sm"><b>${R.orders}</b></td><td class="r"><b>${cur(R.sales)}</b></td><td class="r">${R.commission ? '−' + cur(Math.round(R.commission)) : '–'}</td><td class="r"><b>${cur(Math.round(R.sales - R.commission))}</b></td></tr></tfoot>` : ''}</table></div></div>` : ''}
       ${R.orders ? `
       ${!one ? `<div class="panel"><div class="panel-head"><h2>Sales by day</h2><span class="muted">Click a day to open it</span></div>
         <div class="bars ${R.days.length > 16 ? 'dense' : ''}">${R.days.map(d => `<button class="bar" data-day="${d.date}" title="${short(d.date)}: ${cur(d.sales)}, ${d.orders} orders"><span class="v">${d.sales ? cur(d.sales) : ''}</span><span class="f" style="height:${Math.max(d.sales ? 3 : 0, Math.round(d.sales / maxDay * 100))}%"></span><span class="d">${short(d.date)}</span></button>`).join('')}</div></div>` : ''}
@@ -932,7 +950,7 @@
       </div>` : ''}
       <div class="panel"><div class="panel-head"><h2>Orders</h2>${R.list.length ? `<button class="btn btn-sm" id="csv">${icon('download', 16)} Download (Excel)</button>` : ''}</div>
       ${R.list.length ? `<table class="tbl"><thead><tr><th>Order</th><th>Table</th><th class="hide-sm">Items</th><th>Status</th><th class="r">Total</th><th class="r"><span class="hide-sm">Bill</span></th></tr></thead><tbody>
-        ${R.list.map(o => `<tr><td><b>#${o.number}</b><br><span class="muted">${one ? '' : short(dkey(Date.parse(o.createdAt))) + ', '}${new Date(o.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span></td><td>${esc(o.tableName)}${o.customerName ? `<br><span class="muted">${esc(o.customerName)}</span>` : ''}</td>
+        ${R.list.map(o => `<tr><td><b>#${o.number}</b><br><span class="muted">${one ? '' : short(dkey(Date.parse(o.createdAt))) + ', '}${new Date(o.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span></td><td>${o.channel ? `<span class="plat-tag plat-${esc(o.channel)}">${o.channel === 'swiggy' ? 'Swiggy' : 'Zomato'}</span> ${o.platformRef ? '#' + esc(o.platformRef) : ''}` : esc(o.tableName)}${o.customerName ? `<br><span class="muted">${esc(o.customerName)}</span>` : ''}</td>
           <td class="hide-sm">${o.items.map(l => `${l.qty}× ${esc(l.name)}`).join('<br>')}</td><td><span class="badge ${B[o.status]}">${o.status[0].toUpperCase() + o.status.slice(1)}</span></td><td class="r"><b>${cur(o.total)}</b></td><td class="r">${o.status !== 'cancelled' ? `<button class="btn btn-sm btn-ghost" data-rbill="${o.id}" title="Print this bill again">${icon('printer', 16)}<span class="hide-sm"> Print</span></button>` : ''}</td></tr>`).join('')}
         </tbody><tfoot><tr><td colspan="3" class="hide-sm"></td><td><b>${R.orders} orders</b></td><td class="r"><b>${cur(R.sales)}</b></td><td></td></tr></tfoot></table>`
         : `<div class="empty">${icon('receipt', 40)}<div>No orders ${one ? 'on this day' : 'in these dates'}.</div></div>`}</div>`;
@@ -943,7 +961,7 @@
     const csv = document.getElementById('csv');
     if (csv) csv.onclick = () => {
       const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-      const rows = [['Order', 'Date', 'Time', 'Table', 'Customer', 'Items', 'Status', 'Total'].map(q).join(',')].concat(R.list.map(o => [o.number, dkey(Date.parse(o.createdAt)), new Date(o.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), o.tableName, o.customerName, o.items.map(l => `${l.qty} x ${l.name}`).join('; '), o.status, o.total].map(q).join(',')));
+      const rows = [['Order', 'Date', 'Time', 'Type', 'Table', 'Platform order no.', 'Customer', 'Items', 'Status', 'Total'].map(q).join(',')].concat(R.list.map(o => [o.number, dkey(Date.parse(o.createdAt)), new Date(o.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), o.channel === 'swiggy' ? 'Swiggy' : o.channel === 'zomato' ? 'Zomato' : o.tableName === 'Counter' || o.tableName === 'Takeaway' ? 'Takeaway / counter' : 'Dine-in', o.tableName, o.platformRef || '', o.customerName, o.items.map(l => `${l.qty} x ${l.name}`).join('; '), o.status, o.total].map(q).join(',')));
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv' }));
       a.download = `orders-${S.rFrom}${one ? '' : '-to-' + S.rTo}.csv`; a.click();
     };
@@ -1002,7 +1020,7 @@
       <div class="panel"><div class="panel-head"><h2>${cat ? esc(cat.name) : 'Dishes'} <span class="muted" style="font-weight:600">· ${list.length} dishes</span></h2>${cat ? `<button class="btn btn-primary" id="addItem">${icon('plus', 18)} Add dish</button>` : ''}</div>
         <div>${list.map(it => `<div class="item-row ${it.available ? '' : 'off'}">
           ${it.photo ? `<img class="thumb" src="${esc(it.photo)}" alt="">` : `<div class="thumb">${icon('image', 22)}</div>`}
-          <div class="info"><b>${dietMark(it.diet)} ${esc(it.name)} ${it.bestseller ? '<span class="badge badge-amber">Bestseller</span>' : ''}</b><small>${esc(it.description) || '&nbsp;'}</small></div>
+          <div class="info"><b>${dietMark(it.diet)} ${esc(it.name)} ${it.bestseller ? '<span class="badge badge-amber">Bestseller</span>' : ''}${it.chef ? ' <span class="badge badge-brand">Chef\'s special</span>' : ''}${it.isNew ? ' <span class="badge badge-green">New</span>' : ''}</b><small>${(it.options || []).length ? `<span class="opt-sum">${icon('list', 13)} ${it.options.map(g => esc(g.name)).join(' · ')}</span> ` : ''}${esc(it.description) || '&nbsp;'}</small></div>
           <div class="pr">${cur(it.price)}</div>
           <label class="switch" title="Available today"><input type="checkbox" data-avail="${it.id}" ${it.available ? 'checked' : ''}><span class="track"></span><span class="hide-sm" style="width:72px">${it.available ? 'In stock' : 'Sold out'}</span></label>
           <button class="icon-btn" data-edit="${it.id}" aria-label="Edit">${icon('edit', 18)}</button>
@@ -1060,7 +1078,18 @@
         <div class="toggles">
           <label class="switch"><input type="checkbox" name="available" ${it.available ? 'checked' : ''}><span class="track"></span>In stock (customers can order it)</label>
           <label class="switch"><input type="checkbox" name="bestseller" ${it.bestseller ? 'checked' : ''}><span class="track"></span>Show “Bestseller” tag</label>
+          <label class="switch"><input type="checkbox" name="chef" ${it.chef ? 'checked' : ''}><span class="track"></span>Show “Chef's special” tag</label>
+          <label class="switch"><input type="checkbox" name="isNew" ${it.isNew ? 'checked' : ''}><span class="track"></span>Show “New” tag</label>
           <label class="switch"><input type="checkbox" name="spicy" ${it.spicy ? 'checked' : ''}><span class="track"></span>Spicy</label>
+        </div>
+        <details class="plat-prices" ${it.prices && (it.prices.swiggy || it.prices.zomato) ? 'open' : ''}><summary>${icon('bag', 16)} Swiggy and Zomato prices <small class="muted">(optional)</small></summary>
+          <div class="row2"><label class="field"><span>Swiggy price</span><input class="input" name="pSwiggy" type="number" min="0" step="0.01" value="${(it.prices && it.prices.swiggy) || ''}" placeholder="Same as menu"></label><label class="field"><span>Zomato price</span><input class="input" name="pZomato" type="number" min="0" step="0.01" value="${(it.prices && it.prices.zomato) || ''}" placeholder="Same as menu"></label></div>
+          <small class="muted">Used when you type in a Swiggy or Zomato order. Leave empty to use the menu price.</small></details>
+        <div class="opt-ed">
+          <div class="opt-h"><b>Choices for this dish</b><small>Spice level, Jain, half or full, add-ons. Guests, waiters and you pick them when ordering, and they print on the KOT and the bill. The price next to a choice is added to the dish price. Use a minus amount, like -100, for a cheaper half portion.</small></div>
+          <div id="ogs"></div>
+          <div class="opt-add"><span class="muted">Add:</span><button type="button" class="chip" data-preset="spice">${icon('flame', 14)} Spice level</button><button type="button" class="chip" data-preset="jain">Jain / no onion-garlic</button><button type="button" class="chip" data-preset="portion">Half / Full</button><button type="button" class="chip" data-preset="addons">Add-ons</button><button type="button" class="chip" data-preset="own">${icon('plus', 14)} Your own</button></div>
+          <label class="switch" id="ocopyW" hidden><input type="checkbox" id="ocopy"><span class="track"></span><span id="ocopyT"></span></label>
         </div>
       </div>
       <div class="sheet-foot" style="display:flex;gap:10px">${iid ? `<button type="button" class="btn btn-danger" id="del">${icon('trash', 18)} Delete</button>` : ''}<button class="btn btn-primary btn-lg" style="flex:1">${iid ? 'Save changes' : 'Add dish'}</button></div></form>`, { wide: true });
@@ -1070,13 +1099,70 @@
       try { photo = await readImage(f, 1200); photoChanged = true; pd.innerHTML = `<img src="${photo}" alt=""><span class="btn btn-sm change">${icon('edit', 15)} Change</span>`; }
       catch (err) { toast(esc(err.message), 'error'); }
     };
+    // ---- choices (options) editor ----
+    const og = JSON.parse(JSON.stringify(it.options || []));
+    const ogs = o.querySelector('#ogs');
+    const TYPES = [['one', 'Pick one, must choose'], ['oneopt', 'Pick one, optional'], ['many', 'Pick any (add-ons)']];
+    const gType = g => g.multi ? 'many' : g.req ? 'one' : 'oneopt';
+    const priceNow = () => Number(o.querySelector('[name=price]').value) || 0;
+    const PRESETS = {
+      spice: () => ({ name: 'Spice level', req: true, choices: [['Mild', 0], ['Medium', 0], ['Hot', 0], ['Extra hot', 0]] }),
+      jain: () => ({ name: 'Preparation', req: false, choices: [['Regular', 0], ['Jain', 0], ['No onion, no garlic', 0]] }),
+      portion: () => ({ name: 'Portion', req: true, choices: [['Full', 0], ['Half', -Math.round(priceNow() * 0.4)]] }),
+      addons: () => ({ name: 'Add-ons', multi: true, choices: [['Extra cheese', 40], ['Extra butter', 20], ['Extra paneer', 60]] }),
+      own: () => ({ name: '', req: false, choices: [['', 0]] }),
+    };
+    const drawOg = () => {
+      ogs.innerHTML = og.map((g, gi) => `<div class="og" data-gi="${gi}">
+        <div class="og-top"><input class="input og-name" data-f="name" value="${esc(g.name)}" maxlength="40" placeholder="Group name, e.g. Spice level">
+          <select class="select og-type" data-f="type">${TYPES.map(([v, l]) => `<option value="${v}" ${gType(g) === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+          ${g.multi ? `<label class="og-max">Up to <input class="input" data-f="max" type="number" min="0" max="20" value="${g.max || ''}" placeholder="any"></label>` : ''}
+          <button type="button" class="icon-btn og-del" data-delg="${gi}" aria-label="Remove this group" title="Remove this group">${icon('trash', 17)}</button></div>
+        <div class="og-cs">${g.choices.map((c, ci) => `<div class="og-c" data-ci="${ci}"><input class="input" data-c="name" value="${esc(c.name)}" maxlength="40" placeholder="Choice, e.g. Hot"><label class="og-p"><span>${esc(S.me.restaurant.currency)}</span><input class="input" data-c="price" type="number" step="1" value="${c.price || ''}" placeholder="+0" title="Extra price. Use a minus amount, like -100, to make it cheaper"></label><button type="button" class="icon-btn" data-delc="${ci}" aria-label="Remove choice">${icon('x', 16)}</button></div>`).join('')}</div>
+        <button type="button" class="btn btn-sm btn-ghost" data-addc="${gi}">${icon('plus', 15)} Add choice</button>
+        ${!g.multi && g.req && g.choices.length ? `<small class="muted og-hint">“${esc(g.choices[0].name || 'The first choice')}” is ticked to start with. Put the usual one first.</small>` : ''}</div>`).join('');
+      const others = S.menu.items.filter(x => x.categoryId === o.querySelector('[name=categoryId]').value && x.id !== iid).length;
+      o.querySelector('#ocopyW').hidden = !og.length || !others;
+      o.querySelector('#ocopyT').textContent = `Also give these choices to the other ${others} dish${others === 1 ? '' : 'es'} in this category`;
+    };
+    ogs.addEventListener('input', e => {
+      const gEl = e.target.closest('[data-gi]'); if (!gEl) return; const g = og[gEl.dataset.gi];
+      const cEl = e.target.closest('[data-ci]');
+      if (cEl) { const c = g.choices[cEl.dataset.ci]; if (e.target.dataset.c === 'name') c.name = e.target.value; else { c.price = Number(e.target.value) || 0; } return; }
+      if (e.target.dataset.f === 'name') g.name = e.target.value;
+      if (e.target.dataset.f === 'max') g.max = parseInt(e.target.value, 10) || 0;
+    });
+    ogs.addEventListener('change', e => { if (e.target.dataset.f !== 'type') return; const g = og[e.target.closest('[data-gi]').dataset.gi], v = e.target.value; g.multi = v === 'many'; g.req = v === 'one'; drawOg(); });
+    ogs.addEventListener('click', e => {
+      const b = e.target.closest('[data-delg],[data-addc],[data-delc]'); if (!b) return;
+      const gi = b.closest('[data-gi]').dataset.gi, g = og[gi];
+      if (b.dataset.delg != null) og.splice(gi, 1);
+      else if (b.dataset.addc != null) { g.choices.push({ name: '', price: 0 }); drawOg(); const ins = ogs.querySelectorAll(`[data-gi="${gi}"] [data-c=name]`); ins[ins.length - 1].focus(); return; }
+      else if (b.dataset.delc != null) { g.choices.splice(b.dataset.delc, 1); if (!g.choices.length) og.splice(gi, 1); }
+      drawOg();
+    });
+    o.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => {
+      const x = PRESETS[b.dataset.preset](); og.push({ ...x, choices: x.choices.map(([name, price]) => ({ name, price })) }); drawOg();
+      if (b.dataset.preset === 'own') ogs.querySelector('.og:last-child .og-name').focus();
+    });
+    o.querySelector('[name=categoryId]').addEventListener('change', drawOg);
+    drawOg();
+    const cleanOg = () => og.map(g => ({ id: g.id, name: (g.name || '').trim(), multi: !!g.multi, req: !g.multi && !!g.req, max: g.multi ? g.max || 0 : 1, choices: g.choices.map(c => ({ id: c.id, name: (c.name || '').trim(), price: Number(c.price) || 0 })).filter(c => c.name) })).filter(g => g.choices.length);
     o.querySelector('form').onsubmit = async e => {
       e.preventDefault(); const f = new FormData(e.target); const btn = e.submitter; if (btn) btn.disabled = true;
-      const body = { name: f.get('name'), price: f.get('price'), categoryId: f.get('categoryId'), description: f.get('description'), diet: f.get('diet'), available: !!f.get('available'), bestseller: !!f.get('bestseller'), spicy: !!f.get('spicy') };
+      const opts = cleanOg(), noName = opts.find(g => !g.name);
+      if (noName) { if (btn) btn.disabled = false; return toast(`Give the group with “${esc(noName.choices[0].name)}” a name, like “Spice level”.`, 'error'); }
+      const body = { name: f.get('name'), price: f.get('price'), categoryId: f.get('categoryId'), description: f.get('description'), diet: f.get('diet'), available: !!f.get('available'), bestseller: !!f.get('bestseller'), chef: !!f.get('chef'), isNew: !!f.get('isNew'), spicy: !!f.get('spicy'), options: opts, prices: { swiggy: f.get('pSwiggy'), zomato: f.get('pZomato') } };
       if (photoChanged) body.photo = photo;
       try {
         const saved = await api(iid ? '/api/admin/items/' + iid : '/api/admin/items', { method: iid ? 'PUT' : 'POST', body });
         if (iid) Object.assign(it, saved); else S.menu.items.push(saved);
+        const cp = o.querySelector('#ocopy');
+        if (cp && cp.checked && !o.querySelector('#ocopyW').hidden) {
+          const rest = S.menu.items.filter(x => x.categoryId === saved.categoryId && x.id !== saved.id);
+          for (const x of rest) { try { Object.assign(x, await api('/api/admin/items/' + x.id, { method: 'PUT', body: { options: saved.options.map(g => ({ ...g, id: undefined, choices: g.choices.map(c => ({ ...c, id: undefined })) })) } })); } catch (err) { toast(esc(err.message), 'error'); break; } }
+          toast(`${icon('check', 18)} Choices added to ${rest.length} more dish${rest.length === 1 ? '' : 'es'}`, 'ok');
+        }
         S.selCat = saved.categoryId; o.close(); renderMenu(document.getElementById('content')); toast(`${icon('check', 18)} ${esc(saved.name)} saved`, 'ok');
       } catch (err) { toast(esc(err.message), 'error'); if (btn) btn.disabled = false; }
     };
@@ -1236,6 +1322,11 @@
         ${r.upiId ? '' : '<p class="muted" style="margin:0;font-size:13px">Add your UPI ID under “Split bill and UPI payments” to turn on pay at the table.</p>'}
         <p class="muted" style="margin:0;font-size:13px">${window.vdDesktop ? 'To print the kitchen ticket (KOT) by itself for every order, turn on “Print a KOT automatically” under Bill printer below.' : 'Kitchen tickets print by themselves in the Windows app (Settings › Bill printer).'} Guests' “I've paid” shows here with the amount. Check it in your UPI app.</p>
       </div></form>
+      <form class="panel" id="platF"><div class="panel-head"><div><h2>Swiggy and Zomato orders</h2><span class="muted" style="font-size:14px">When an order comes in on the Swiggy or Zomato partner app, tap Take order › Swiggy or Zomato, type their order number and the dishes. It goes to the kitchen display and the KOT like any other order, and Sales by date shows it separately with the commission.</span></div></div><div class="panel-body form">
+        ${['swiggy', 'zomato'].map(k => { const P = (r.platforms || {})[k] || { on: true, commission: 0 }, n = k === 'swiggy' ? 'Swiggy' : 'Zomato'; return `<div class="plat-row"><span class="plat-tag plat-${k}">${n}</span><label class="switch"><input type="checkbox" name="${k}On" ${P.on ? 'checked' : ''}><span class="track"></span>Show in Take order</label><label class="field plat-pc"><span>Commission</span><span class="pc-in"><input class="input" name="${k}Pc" type="number" min="0" max="60" step="0.1" value="${P.commission || ''}" placeholder="e.g. 22"><b>%</b></span></label></div>`; }).join('')}
+        <p class="muted" style="margin:0;font-size:13px">The commission is what the platform keeps from each order (check your partner agreement). It is used only to show what you earn. Each dish can also have its own Swiggy or Zomato price: Menu › edit the dish › Swiggy and Zomato prices.</p>
+        <button class="btn btn-primary" style="justify-self:start">Save Swiggy and Zomato</button>
+      </div></form>
       <form class="panel" id="wifiF"><div class="panel-head"><div><h2>WiFi for guests</h2><span class="muted" style="font-size:14px">Guests see a WiFi button on the menu with the name and password, a copy button and a QR to join.</span></div></div><div class="panel-body form">
         <label class="switch"><input type="checkbox" name="on" ${r.wifiCfg && r.wifiCfg.on ? 'checked' : ''}><span class="track"></span>Show WiFi on the menu</label>
         <div class="loy-rules" style="grid-template-columns:1fr 1fr">
@@ -1328,6 +1419,8 @@
     dispF.onsubmit = async e => { e.preventDefault(); const f = new FormData(dispF); try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { display: { on: !!f.get('on'), welcome: f.get('welcome'), board: !!f.get('board'), sound: !!f.get('sound'), menuQr: !!f.get('menuQr'), wifi: !!f.get('wifi'), offers: !!f.get('offers') } } }); saveCache(); toast(`${icon('check', 18)} Counter display saved`, 'ok'); renderSettings(c); } catch (err) { toast(esc(err.message), 'error'); } };
     document.getElementById('wpinF').onsubmit = async e => { e.preventDefault(); try { S.me.restaurant = await api('/api/admin/waiter-pin', { method: 'POST', body: { pin: e.target.pin.value } }); saveCache(); toast(`${icon('check', 18)} Waiter PIN saved`, 'ok'); renderSettings(document.getElementById('content')); } catch (err) { toast(esc(err.message), 'error'); } };
     svcF.onchange = async () => { const f = new FormData(svcF); try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { service: { autoAccept: !!f.get('autoAccept'), payFirst: !!f.get('payFirst') } } }); saveCache(); toast('Saved', 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
+    const platF = document.getElementById('platF');
+    platF.onsubmit = async e => { e.preventDefault(); const f = new FormData(platF); try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { platforms: { swiggy: { on: !!f.get('swiggyOn'), commission: f.get('swiggyPc') }, zomato: { on: !!f.get('zomatoOn'), commission: f.get('zomatoPc') } } } }); saveCache(); toast(`${icon('check', 18)} Swiggy and Zomato saved`, 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
     const wifiF = document.getElementById('wifiF');
     wifiF.onsubmit = async e => { e.preventDefault(); const f = new FormData(wifiF); try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { wifi: { on: !!f.get('on'), ssid: f.get('ssid'), pass: f.get('pass') } } }); saveCache(); toast('WiFi saved', 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
     const loyF = document.getElementById('loyF');

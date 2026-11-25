@@ -109,3 +109,8 @@ body { background: var(--bg); }
 .w-send { display: grid; gap: 10px; }
 .w-send textarea { min-height: 46px; resize: none; }
 @media (min-width: 960px) { .w-top { padding-left: calc((100% - 900px) / 2 + 14px); padding-right: calc((100% - 900px) / 2 + 14px); } }
+/* dishes with choices */
+.w-dish { flex-wrap: wrap; }
+.w-vs { flex-basis: 100%; display: grid; gap: 8px; padding-left: 26px; }
+.w-v { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--brand-soft); border-radius: 12px; padding: 6px 6px 6px 12px; }
+.w-v span { min-width: 0; font-weight: 700; font-size: 14px; overflow-wrap: anywhere; } .w-v small { display: block; color: var(--ink-3); font-weight: 600; font-size: 12px; }

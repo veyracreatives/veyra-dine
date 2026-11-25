@@ -118,3 +118,4 @@ html, body { overflow-x: hidden; }
 .upd-bar .upd-prog i { display: block; height: 100%; background: var(--brand, #E4572E); transition: width .3s; }
 @keyframes updIn { from { opacity: 0; } }
 @media (max-width: 860px) { .upd-bar { padding: 10px 16px; } }
+.auth-lang { display: flex; justify-content: flex-end; margin-bottom: 14px; }

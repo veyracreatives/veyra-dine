@@ -122,6 +122,10 @@
   .feat .bi { width: 46px; height: 46px; border-radius: 14px; background: var(--ink); color: #fff; display: grid; place-items: center; }
   .feat h3, .feat .ft { font-size: 17.5px; margin: 16px 0 6px; font-weight: 700; }
   .feat p { margin: 0; color: var(--ink-2); font-size: 15px; }
+  a.feat { display: block; color: inherit; text-decoration: none; }
+  .hero .cta { position: relative; z-index: 3; } .hero .cta .btn-line { background: var(--cream, #FBF6EE); }
+  .features.key6, .features.help3 { grid-template-columns: repeat(3, 1fr); }
+  .fhead { padding-top: 60px; padding-bottom: 10px; } .fhead h1 { font-family: Fraunces, Georgia, serif; font-size: clamp(36px, 6vw, 60px); line-height: 1.05; margin: 10px 0 14px; } .fhead .cta { margin-top: 26px; flex-wrap: wrap; }
 
   /* pricing */
   .pricing { background: var(--ink); color: #F5EFE6; }
@@ -193,7 +197,7 @@
     .toast { right: 0; bottom: -6px; width: 270px; padding: 11px 13px; }
     .toast b { font-size: 14px; } .toast small { font-size: 12px; }
     .steps, .plans { grid-template-columns: 1fr; }
-    .features { grid-template-columns: 1fr 1fr; }
+    .features, .features.key6, .features.help3 { grid-template-columns: 1fr 1fr; }
     .nav-links { display: none; }
     .final { grid-template-columns: 1fr; padding: 36px 26px; }
     section { padding: 64px 0; }
@@ -208,7 +212,7 @@
     .visual { height: 360px; }
     .laptop { width: 420px; right: -170px; top: 0; }
     .phone { width: 165px; border-width: 7px; border-radius: 28px; }
-    .features { grid-template-columns: 1fr; }
+    .features, .features.key6, .features.help3 { grid-template-columns: 1fr; }
     .phones .ph { width: 46%; }
     .phones .ph:nth-child(3) { display: none; }
     .plan { padding: 24px; }
@@ -496,8 +500,8 @@
 <div class="progress" aria-hidden="true"></div>
 <div id="vd-banner" hidden></div>
 <header class="nav"><div class="wrap">
-  <a class="logo" href="#"><span class="mark" data-logo><svg class="ic" width="22" height="22"><use href="#i-qr"/></svg></span><span>Veyra Dine In<small data-k="te3eb71fe">by Veyra Creative &amp; Digital Lab</small></span></a>
-  <nav class="nav-links"><a href="#how" data-k="t1dd6a17c">How it works</a><a href="#waiter" data-k="t3c3d7921">Waiter app</a><a href="#games" data-k="t398ed329">Games</a><a href="#features" data-k="tfc338f87">Features</a><a href="#guides" data-k="t929a28d2">Guides</a><a href="#pricing" data-k="ta0d9bbad">Pricing</a><a href="#faq" data-k="t03688ba6">FAQ</a></nav>
+  <a class="logo" href="/"><span class="mark" data-logo><svg class="ic" width="22" height="22"><use href="#i-qr"/></svg></span><span>Veyra Dine In<small data-k="te3eb71fe">by Veyra Creative &amp; Digital Lab</small></span></a>
+  <nav class="nav-links"><a href="/#how" data-k="t1dd6a17c">How it works</a><a href="/features" data-k="tfc338f87">Features</a><a href="/features#guides" data-k="t929a28d2">Guides</a><a href="/#pricing" data-k="ta0d9bbad">Pricing</a><a href="/#faq" data-k="t03688ba6">FAQ</a><a href="/#help" data-k="tc47ae153">Help</a><a href="/demo" data-k="t38cfaf72">Try the demo</a></nav>
   <div class="nav-cta"><a class="login-link waiter-link" href="https://dinein.veyracreatives.com/waiter" data-k="t9fb9c6a7">Waiter login</a><a class="login-link" href="https://dinein.veyracreatives.com/admin" data-k="tf7c400ed">Log in</a>
   <a class="btn btn-dark btn-sm pc-only" href="https://dinein.veyracreatives.com/download/Veyra-Dine-In-Setup.exe" download><span>Get it free</span></a>
   <a class="btn btn-dark btn-sm ph-only" href="https://dinein.veyracreatives.com/signup"><span>Try free<span class="xs-hide" data-k="t07a40f33"> for 10 days</span></span></a>
@@ -506,15 +510,16 @@
 </div><nav class="mnav" id="mnav" hidden></nav></header>
 
 <main>
+<!--HOME-->
 <section class="hero"><div class="wrap">
   <div>
-    <span class="eyebrow"><i></i> <span>Self-ordering + waiter app<span class="xs-hide" data-k="tb7032b0f"> · works without internet</span></span></span>
+    <span class="eyebrow"><i></i> <span data-k="t6364e247">Waiter app + QR ordering</span><span class="xs-hide" data-k="tb7032b0f"> · works without internet</span></span>
     <h1 data-k="hero"><span class="w" style="--i:0" data-k="t3c23a670">Guests</span> <span class="w" style="--i:1" data-k="tc4dc297b">scan.</span> <span class="w" style="--i:2" data-k="t905cb326">You</span> <span class="w" style="--i:3" data-k="t783923e5">get</span> <span class="w" style="--i:4" data-k="tbbccdf2e">the</span> <span class="w" style="--i:5" data-k="tcce55e43">order</span> <em><span class="w" style="--i:6" data-k="t27e90dfa">at</span> <span class="w" style="--i:7" data-k="tbbccdf2e">the</span> <span class="w" style="--i:8" data-k="t2e9bdd7a">counter.</span></em></h1>
-    <p class="lead" data-k="t566dbc22">Put a QR code on every table. Guests order and pay from their own phone, and the KOT reaches your kitchen by itself, even when the internet is down.</p>
+    <p class="lead" data-k="t7d41f1d2">Your waiters take orders on their phones, guests can scan the table QR and order themselves, and the KOT reaches your kitchen by itself, even when the internet is down.</p>
     <div class="cta" id="download">
       <a class="btn btn-main ph-only" href="https://dinein.veyracreatives.com/signup" data-k="t4ca03e0d"><svg class="ic" width="20" height="20"><use href="#i-phone"/></svg> Start free on your phone</a>
       <a class="btn btn-main pc-only" href="https://dinein.veyracreatives.com/download/Veyra-Dine-In-Setup.exe" download data-k="te03d007c"><svg class="ic" width="20" height="20"><use href="#i-win"/></svg> Download for Windows</a>
-      <a class="btn btn-line" href="#how" data-k="tf7b38f07">See how it works</a>
+      <a class="btn btn-line" href="/demo" data-k="t38cfaf72"><svg class="ic" width="20" height="20"><use href="#i-qr"/></svg> Try the demo</a>
     </div>
     <p class="weblink pc-only-b">No Windows computer? <a href="https://dinein.veyracreatives.com/signup" data-k="te88a3edd">Start free in your browser</a></p>
     <p class="weblink ph-only-b">Works on any phone, no Windows computer needed. Have a PC at the counter? <a href="https://dinein.veyracreatives.com/download/Veyra-Dine-In-Setup.exe" data-k="tc200e07b">Get the Windows app</a> too.</p>
@@ -544,7 +549,14 @@
   <span data-k="t475ce9b0"><svg class="ic" width="20" height="20"><use href="#i-off"/></svg> Keeps working offline</span>
   <span data-k="t860e8095"><svg class="ic" width="20" height="20"><use href="#i-check"/></svg> Split the bill by UPI</span>
 </div></div>
+<!--/HOME-->
 
+<!--FEAT-->
+<section class="fhead"><div class="wrap">
+  <div class="center"><div class="kicker" data-k="tf136c558">All features</div><h1 data-k="tf1ea188c">Everything Veyra Dine In does</h1><p class="sub" data-k="t8456f8fc">The waiter app, QR ordering, kitchen and counter screens, split bills, games and more. Every plan includes all of it.</p>
+  <div class="cta" style="justify-content:center"><a class="btn btn-main" href="/demo" data-k="t38cfaf72"><svg class="ic" width="20" height="20"><use href="#i-qr"/></svg> Try the demo</a><a class="btn btn-line" href="https://dinein.veyracreatives.com/signup" data-k="t237b9993">Start free for 10 days</a></div></div>
+</div></section>
+<!--/FEAT-->
 <section id="how"><div class="wrap">
   <div class="center rv"><div class="kicker" data-k="t1dd6a17c">How it works</div><h2 data-k="td089a614">Set up in one afternoon</h2><p class="sub" data-k="t2143bfb2">No new hardware. Use the computer at your counter and the phones your guests already have.</p></div>
   <div class="steps">
@@ -554,6 +566,21 @@
   </div>
 </div></section>
 
+<!--HOME-->
+<section id="key" style="background:var(--white);border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><div class="wrap">
+  <div class="center rv"><div class="kicker" data-k="t8ac7aa17">What you get</div><h2 data-k="t041b9002">Six things owners use every day</h2></div>
+  <div class="features key6">
+    <a class="rv feat" style="--d:0" href="/features#waiter"><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-phone"/></svg></span><p class="ft" data-k="t3c3d7921">Waiter app</p><p data-k="te6b6e6e7">Waiters take orders on their own phones with a PIN. They see every table, hear calls and know when food is ready.</p></a>
+    <a class="rv feat" style="--d:1" href="/features#new"><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-qr"/></svg></span><p class="ft" data-k="t3a32ddff">QR ordering and UPI bills</p><p data-k="tfcb9110f">Guests scan, order and split the bill from their phone, and pay their share by UPI to your account.</p></a>
+    <a class="rv feat" style="--d:2" href="/features#kitchen"><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-chef"/></svg></span><p class="ft" data-k="t4eaaab53">Kitchen screen and KOT</p><p data-k="t7f7dc9ea">Orders reach the kitchen as KOTs on a thermal printer or as big tickets on a screen, with timers.</p></a>
+    <a class="rv feat" style="--d:0" href="/features#new"><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-off"/></svg></span><p class="ft" data-k="tc1b6e372">Works without internet</p><p data-k="t084d83cd">Keep taking orders, printing KOTs and bills when the internet drops. Everything syncs later.</p></a>
+    <a class="rv feat" style="--d:1" href="/features#features"><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-book"/></svg></span><p class="ft" data-k="t741602d0">English, Hindi and Marathi</p><p data-k="t5f8aa6ec">Guests, waiters and the owner can switch the app to Hindi or Marathi with one tap.</p></a>
+    <a class="rv feat" style="--d:2" href="/features#features"><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-chart"/></svg></span><p class="ft" data-k="t14d76bc1">Swiggy, Zomato and sales</p><p data-k="t33962f2e">Type in Swiggy and Zomato orders, and see sales by day, dish and channel after commission.</p></a>
+  </div>
+  <p class="center" style="margin-top:30px"><a class="btn btn-line" href="/features" data-k="t88ae7e18">See all features</a></p>
+</div></section>
+<!--/HOME-->
+<!--MORE-->
 <section style="padding-top:20px"><div class="wrap">
   <div class="split">
     <div>
@@ -582,9 +609,9 @@
 </div></section>
 
 <section class="nw" id="new"><div class="wrap">
-  <div class="center rv"><span class="newtag" data-k="te2dfb4b8">New in Veyra Dine In</span><h2>No waiter needed. <span class="u" data-k="td904f696">Never stops, even without internet.</span></h2><p class="sub" data-k="ta426ebe0">Guests order and pay at the table, the kitchen gets the KOT straight away, and your counter keeps billing when the internet goes down.</p></div>
+  <div class="center rv"><span class="newtag" data-k="te2dfb4b8">New in Veyra Dine In</span><h2><span data-k="t0b11b69f">Fewer trips for your waiters.</span> <span class="u" data-k="td904f696">Never stops, even without internet.</span></h2><p class="sub" data-k="ta426ebe0">Guests order and pay at the table, the kitchen gets the KOT straight away, and your counter keeps billing when the internet goes down.</p></div>
   <div class="nwgrid">
-    <div class="nwc big rv" style="--d:0"><span class="tagx" data-k="tdcbb47de">No waiter</span><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-qr"/></svg></span><h3 data-k="tb34260ff">Scan, order and pay at the table</h3><p data-k="t9537fade">Turn on auto-accept and every order goes straight to the kitchen with its KOT. Turn on pay-first and guests pay by UPI before the food is made. Nobody has to walk to the table to take an order.</p>
+    <div class="nwc big rv" style="--d:0"><span class="tagx" data-k="tb77d74d4">Self-order</span><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-qr"/></svg></span><h3 data-k="tb34260ff">Scan, order and pay at the table</h3><p data-k="tdd39a212">Turn on auto-accept and table orders go straight to the kitchen with their KOT. Turn on pay-first and guests pay by UPI before the food is made. Your waiters spend their time serving, not writing orders.</p>
       <div class="flow"><span style="--k:0" data-k="t28cba55d"><svg class="ic" width="16" height="16"><use href="#i-qr"/></svg>Scan</span><span style="--k:1" data-k="t1d75774c"><svg class="ic" width="16" height="16"><use href="#i-book"/></svg>Order</span><span style="--k:2" data-k="tcd850fd8"><svg class="ic" width="16" height="16"><use href="#i-check"/></svg>Pay by UPI</span><span style="--k:3" data-k="ta5fd1d10"><svg class="ic" width="16" height="16"><use href="#i-print"/></svg>KOT in kitchen</span></div></div>
     <div class="nwc big rv" style="--d:1"><span class="tagx" data-k="te01fa717">Offline</span><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-off"/></svg></span><h3 data-k="tc1b6e372">Works without internet</h3><p data-k="tb3e1ea3c">Internet gone? Keep taking counter orders, printing KOTs and bills, and marking payments. Everything is saved on the device and syncs by itself when you are back online.</p>
       <div class="nmock"><div class="bar off" data-k="tdaecdcd9"><svg class="ic" width="16" height="16"><use href="#i-off"/></svg> Offline · 3 orders saved on this device</div><div class="row"><span data-k="t536992f8">OFF-2 · Table 4 · 2× Masala Dosa</span><small data-k="tcec284b9">KOT printed</small></div><div class="bar on" data-k="ta767d7af"><svg class="ic" width="16" height="16"><use href="#i-check"/></svg> Back online · all synced</div></div></div>
@@ -740,6 +767,8 @@
 </div></section>
 
 <!--VD:TESTIMONIALS-->
+<!--/MORE-->
+<!--HOME-->
 <section class="pricing" id="pricing"><div class="wrap">
   <div class="center rv"><div class="kicker" data-k="ta0d9bbad">Pricing</div><h2 data-k="tca97f918">Try it free. Pay only when you love it.</h2><p class="sub" data-k="t02251d6e">Every plan includes all features and online hosting for your menu.</p></div>
   <div class="plans">
@@ -784,7 +813,18 @@
   </div>
 <!--VD:FAQ-->
 </div></section>
+<!--/HOME-->
 
+<section id="help" style="padding-top:10px"><div class="wrap">
+  <div class="center rv"><div class="kicker" data-k="tf32d5a3b">Support</div><h2 data-k="td51636da">Help when you need it</h2><p class="sub" data-k="td99b8227">Write to us any time. We reply within 2 hours, 10 AM to 7 PM, Monday to Saturday.</p></div>
+  <div class="features help3">
+    <a class="rv feat" href="mailto:marketing@veyracreatives.com?subject=Help%20with%20Veyra%20Dine%20In"><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-hand"/></svg></span><p class="ft" data-k="te5efb051">Email support</p><p data-k="t54678d22">marketing@veyracreatives.com for setup, menus, printers and billing. No call centre, no waiting on hold.</p></a>
+    <a class="rv feat" href="mailto:marketing@veyracreatives.com?subject=Free%20setup%20visit%20for%20my%20restaurant&amp;body=Restaurant%20name%3A%0AArea%3A%0ABest%20day%20and%20time%3A"><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-user"/></svg></span><p class="ft" data-k="t3f847090">Free setup visit</p><p data-k="t312785a3">Restaurants in Navi Mumbai and Thane get a free visit: we add your menu, set up the printer and train your staff.</p></a>
+    <a class="rv feat" href="/features#guides"><span class="bi"><svg class="ic" width="22" height="22"><use href="#i-book"/></svg></span><p class="ft" data-k="t8a452551">Help inside the app</p><p data-k="t138fc08b">Tap Help in the admin or the waiter app to read short how-to guides or email us from where you are.</p></a>
+  </div>
+</div></section>
+
+<!--MORE-->
 <section id="ideas" style="padding-top:10px"><div class="wrap">
   <div class="center rv"><div class="kicker" data-k="tb2aec363">Tell us</div><h2 data-k="te2a51ebd">Want something more?</h2><p class="sub" data-k="tc601f669">Tell us what we should add next, or ask for a version built just for your restaurant or chain.</p></div>
   <div class="ideas rv">
@@ -800,6 +840,7 @@
     </form>
   </div>
 </div></section>
+<!--/MORE-->
 
 <section style="padding-top:20px"><div class="wrap">
   <div class="final rv"><div><h2 data-k="tfe58dfe2">Start taking orders from the table</h2><p class="pc-only-b">Download the Windows app and use every feature free for 10 days. Or <a href="https://dinein.veyracreatives.com/signup" style="color:inherit;font-weight:700;text-decoration:underline" data-k="t721247ab">sign up in your browser</a>.</p><p class="ph-only-b" data-k="t3abcd263">Sign up on your phone and use every feature free for 10 days. No Windows computer needed.</p></div>
@@ -808,7 +849,7 @@
 </main>
 
 <footer><div class="wrap">
-  <div><b data-k="ta33d42b8">Veyra Dine In</b><br>QR code menu and table ordering system for restaurants, cafés, dhabas, bars and cloud kitchens in Navi Mumbai, Thane, Mumbai and across India. Made by Veyra Creative &amp; Digital Lab, Navi Mumbai.<br><a href="#ideas" data-k="tb77aa8e1">Suggest a feature</a> · <a href="#ideas" data-k="t22643982">Custom build</a><br><a href="/privacy" data-k="tcf01481f">Privacy</a> · <a href="/terms" data-k="ta55a275a">Terms</a> · <a href="/refund" data-k="tbe32adaa">Refunds</a> · <a href="/contact" data-k="tb37456c4">Contact</a><br><a href="/admin" data-k="tcb7f1b73">Owner log in</a> · <a href="https://dinein.veyracreatives.com/waiter" data-k="tfa8c9b50">Waiter sign in</a> · <a href="/download/Veyra-Dine-In-Setup.exe" data-k="t5244b34b">Download the Windows app</a></div>
+  <div><b data-k="ta33d42b8">Veyra Dine In</b><br>QR code menu and table ordering system for restaurants, cafés, dhabas, bars and cloud kitchens in Navi Mumbai, Thane, Mumbai and across India. Made by Veyra Creative &amp; Digital Lab, Navi Mumbai.<br><a href="/features#ideas" data-k="tb77aa8e1">Suggest a feature</a> · <a href="/features#ideas" data-k="t22643982">Custom build</a><br><a href="/privacy" data-k="tcf01481f">Privacy</a> · <a href="/terms" data-k="ta55a275a">Terms</a> · <a href="/refund" data-k="tbe32adaa">Refunds</a> · <a href="/contact" data-k="tb37456c4">Contact</a><br><a href="/admin" data-k="tcb7f1b73">Owner log in</a> · <a href="https://dinein.veyracreatives.com/waiter" data-k="tfa8c9b50">Waiter sign in</a> · <a href="/download/Veyra-Dine-In-Setup.exe" data-k="t5244b34b">Download the Windows app</a></div>
   <div>Email <a href="mailto:marketing@veyracreatives.com" style="font-weight:600" data-k="t908e482c">marketing@veyracreatives.com</a><br>Instagram <a href="https://instagram.com/veyralab.in" target="_blank" rel="noopener" data-k="t36424cfc">@veyralab.in</a></div>
 </div></footer>
 <a class="wa" href="mailto:marketing@veyracreatives.com?subject=Free%20demo%20of%20Veyra%20Dine%20In&amp;body=Hi%2C%20I%20want%20a%20free%20demo%20of%20Veyra%20Dine%20In%20for%20my%20restaurant." aria-label="Email us"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></a>

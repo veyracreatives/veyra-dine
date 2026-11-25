@@ -58,7 +58,7 @@
   // ---- login ----
   function renderLogin(msg) {
     app.innerHTML = `<div class="w-login">
-      <div class="w-brand">${icon('utensils', 26)}<div><b>Waiter</b><small>Veyra Dine In</small></div></div>
+      <div class="w-brand">${icon('utensils', 26)}<div><b>Waiter</b><small>Veyra Dine In</small></div>${window.VDI18n ? VDI18n.picker('login-lang') : ''}</div>
       <h1>Log in to take orders</h1>
       <p class="muted">Your restaurant admin gives you the restaurant ID and the waiter PIN. Ask them if you don't have them yet.</p>
       ${msg ? `<div class="w-err">${esc(msg)}</div>` : ''}
@@ -133,6 +133,7 @@
       <header class="w-top">
         <div class="w-who"><b>${esc(S.me.restaurant.name)}</b><small>${esc(S.me.name)}</small></div>
         <span class="w-net ${S.online ? 'on' : 'off'}"><i></i><span>${S.online ? 'Online' : 'Offline'}</span></span>
+        <button class="icon-btn" id="whelp" aria-label="Help" onclick="VDHelp.open('waiter')">${icon('info', 20)}</button>
         <button class="icon-btn" id="snd" aria-label="${S.sound ? 'Sound on' : 'Sound off'}">${icon(S.sound ? 'sound' : 'mute', 20)}</button>
         <button class="icon-btn" id="out" aria-label="Log out">${icon('logout', 20)}</button>
       </header>

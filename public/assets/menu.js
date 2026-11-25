@@ -106,7 +106,7 @@
       <header class="hero">
         <div class="cover ${r.cover ? 'has-img' : ''}" style="${r.cover ? `background-image:url('${esc(r.cover)}')` : ''}"></div>
         <div class="top-actions">
-          ${mine.length ? `<a class="pill-btn" href="#order=${mine[0].id}">${icon('receipt', 16)} My orders</a>` : '<span></span>'}
+          <span class="ta-left">${window.VDI18n ? VDI18n.picker('pill-lang') : ''}${mine.length ? `<a class="pill-btn" href="#order=${mine[0].id}">${icon('receipt', 16)} My orders</a>` : ''}</span>
           ${D.table ? `<span class="ta-right">${B && B.lines.length ? `<a class="pill-btn" href="#bill">${icon('receipt', 16)} Bill</a>` : ''}<button class="pill-btn" id="helpBtn">${icon('hand', 16)} Call waiter</button></span>` : ''}
         </div>
         <div class="identity">

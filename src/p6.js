@@ -186,7 +186,7 @@ document.addEventListener('submit', async e => {
     btn.disabled = true;
     try {
       if (kind === 'login') { const r = await API.login(em, pw); await afterLogin(r); }
-      else if (kind === 'signup') { const r = await API.signup({ academy: val('f-ac'), name: val('f-nm'), city: val('f-city'), email: em, pw }); await afterLogin(Object.assign({ created: true }, r)); toast(`Academy created. Your ${CFG.plans.trial}-day trial has started.`); }
+      else if (kind === 'signup') { const r = await API.signup({ academy: val('f-ac'), name: val('f-nm'), city: val('f-city'), phone: val('f-ph'), email: em, pw }); await afterLogin(Object.assign({ created: true }, r)); toast(`Academy created. Your ${CFG.plans.trial}-day trial has started.`); }
       else if (kind === 'forgot') { const r = await API.forgot(em); showAuthErr(''); toast(r.msg || 'If this email has an account, a link is on its way.'); }
       else if (kind === 'reset') { await API.resetPw(f.dataset.token, pw); toast('Password saved. Log in now.'); go('login'); }
     } catch (er) { showAuthErr(er.message); }

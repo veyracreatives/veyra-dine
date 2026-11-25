@@ -4,6 +4,7 @@
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto'), https = require('https');
 const C = require('./public/core.js');
 require('./public/icons.js'); const L = require('./public/landing.js');
+const { Analytics } = require('./lib/analytics.js'); const { SEO } = require('./lib/seo.js');
 
 const ROOT = __dirname, PUB = path.join(ROOT, 'public'), DATA = process.env.DATA_DIR || path.join(ROOT, 'data');
 const PORT = +process.env.PORT || 3100, HOST = process.env.HOST || '127.0.0.1';
@@ -15,9 +16,11 @@ fs.mkdirSync(path.join(DATA, 'backups'), { recursive: true }); fs.mkdirSync(path
 /* ---------------- storage ---------------- */
 const DBF = path.join(DATA, 'db.json');
 let db;
-function fresh() { return { users: {}, mem: [], academies: {}, sessions: {}, resets: {}, files: {}, payments: {}, hq: { pw: null, plans: { monthly: 999, yearly: 7999, trial: 10 }, sales: [], keys: [], activity: [], seq: 0, settings: { razorpay: { keyId: '', keySecret: '', webhookSecret: '' }, googleClientId: '', smtp: { host: '', port: 465, user: '', pass: '', from: '' } }, hqSessions: {} } }; }
+function fresh() { return { users: {}, mem: [], academies: {}, sessions: {}, resets: {}, files: {}, payments: {}, hq: { pw: null, plans: { monthly: 999, yearly: 7999, trial: 10 }, sales: [], keys: [], activity: [], seq: 0, settings: { razorpay: { keyId: '', keySecret: '', webhookSecret: '' }, googleClientId: '', smtp: { host: '', port: 465, user: '', pass: '', from: '' }, seo: { gsc: { sa: '', site: '' }, bing: { key: '' }, psi: { key: '' }, verify: { google: '', bing: '' } } }, hqSessions: {} } }; }
 try { db = JSON.parse(fs.readFileSync(DBF, 'utf8')); } catch (e) { if (fs.existsSync(DBF)) { console.error('db.json could not be read. Not starting, so nothing is overwritten. Restore from data/backups.'); process.exit(1); } db = fresh(); }
 const F0 = fresh(); for (const k of Object.keys(F0)) if (db[k] == null) db[k] = F0[k]; for (const k of Object.keys(F0.hq)) if (db.hq[k] == null) db.hq[k] = F0.hq[k];
+for (const k of Object.keys(F0.hq.settings)) if (db.hq.settings[k] == null) db.hq.settings[k] = F0.hq.settings[k];
+for (const k of Object.keys(F0.hq.settings.seo)) if (db.hq.settings.seo[k] == null) db.hq.settings.seo[k] = F0.hq.settings.seo[k];
 let saveT = null;
 function save() { clearTimeout(saveT); saveT = setTimeout(saveNow, 150); }
 function saveNow() { const tmp = DBF + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(db)); fs.renameSync(tmp, DBF); }
@@ -44,6 +47,18 @@ const bad = (res, msg, code) => send(res, code || 400, { error: msg });
 function body(req, limit) { return new Promise((ok, no) => { let n = 0; const ch = []; req.on('data', c => { n += c.length; if (n > (limit || 1e6)) { no(Object.assign(new Error('Too big'), { code: 413 })); req.destroy(); } else ch.push(c); }); req.on('end', () => { const raw = Buffer.concat(ch); req.raw = raw; try { ok(raw.length ? JSON.parse(raw) : {}); } catch (e) { no(Object.assign(new Error('Bad JSON'), { code: 400 })); } }); req.on('error', no); }); }
 const hits = new Map();
 function limited(req, key, max, win) { const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim(); const k = key + ip; const now = Date.now(); const h = (hits.get(k) || []).filter(t => now - t < win); h.push(now); hits.set(k, h); return h.length > max; }
+/* ---------------- visitor stats + SEO (free, self-hosted) ---------------- */
+const FUNNEL = [
+  { label: 'Visited the website', match: e => e.t === 'view' },
+  { label: 'Clicked Free trial', match: e => e.t === 'click' && (/#signup/.test(e.x || '') || /trial/i.test(e.n || '')) },
+  { label: 'Opened the sign-up form', match: e => e.t === 'view' && e.h === '#signup' },
+  { label: 'Started filling it in', match: e => e.t === 'form' && e.n === 'signup' },
+  { label: 'Trial started', match: e => e.t === 'signup' },
+  { label: 'Paid for a plan', match: e => e.t === 'paid' }];
+const A = Analytics({ dataDir: DATA, base: BASE, funnel: FUNNEL });
+const HOST_NAME = (() => { try { return new URL(BASE).hostname; } catch (_) { return 'localhost'; } })();
+const seo = SEO({ dataDir: DATA, base: BASE, host: HOST_NAME, settings: () => db.hq.settings.seo });
+const SEO_WORDS = ['football academy', 'Navi Mumbai', 'Thane', 'attendance', 'fee'];
 function hqLog(text) { db.hq.activity.unshift({ at: Date.now(), text }); if (db.hq.activity.length > 500) db.hq.activity.length = 500; }
 
 /* ---------------- email (optional: npm i nodemailer, then fill SMTP in HQ) ---------------- */
@@ -98,7 +113,7 @@ function applyPaid(aid, plan, amt, paymentId, orderId) {
   C.applyPlan(ac, plan, Date.now());
   const sale = recordSale(ac, plan, amt, 'Razorpay', paymentId);
   db.payments[paymentId] = { aid, plan, amt, orderId, at: Date.now(), sale: sale.id };
-  hqLog(`${ac.name} paid ₹${amt.toLocaleString('en-IN')} for ${plan} (Razorpay ${paymentId})`);
+  hqLog(`${ac.name} paid ₹${amt.toLocaleString('en-IN')} for ${plan} (Razorpay ${paymentId})`); A.server(ac.vid, 'paid', { n: ac.name, id: ac.id, amt });
   const owner = db.users[(ac.admins || [])[0]];
   if (owner) mail(owner.email, `Payment received: Veyra Academy ${plan} plan`, `Hi ${owner.name},\n\nWe received ₹${amt.toLocaleString('en-IN')} for the ${plan} plan of ${ac.name}.\nReceipt: ${sale.id}\nPaid until: ${C.T.full(C.T.date(ac.plan.until))}\nNo GST charged.\n`);
   save(); ping(aid); return db.payments[paymentId];
@@ -125,8 +140,10 @@ function page(mode) {
   const p = db.hq.plans; const c = cfg(mode);
   let h = fs.readFileSync(path.join(PUB, 'index.html'), 'utf8');
   h = h.replace(/{{TRIAL}}/g, p.trial).replace(/{{MONTHLY_F}}/g, p.monthly.toLocaleString('en-IN')).replace(/{{YEARLY_F}}/g, p.yearly.toLocaleString('en-IN')).replace(/{{MONTHLY}}/g, p.monthly).replace(/{{YEARLY}}/g, p.yearly).replace(/{{URL}}/g, BASE);
-  h = h.replace('<!--CFG-->', `<script>window.VF_CFG=${JSON.stringify(c).replace(/</g, '\\u003c')}</script>`);
+  const V = db.hq.settings.seo.verify; const metas = (mode === 'live' && V.google ? `<meta name="google-site-verification" content="${String(V.google).replace(/[^\w-]/g, '')}">` : '') + (mode === 'live' && V.bing ? `<meta name="msvalidate.01" content="${String(V.bing).replace(/[^\w-]/g, '')}">` : '');
+  h = h.replace('<!--CFG-->', `${metas}<script>window.VF_CFG=${JSON.stringify(c).replace(/</g, '\\u003c')}</script><script src="/va.js?v=${VERSION}" defer></script>`);
   h = h.replace(/(href|src)="(style\.css|app\.css|core\.js|icons\.js|landing\.js|app\.js)"/g, `$1="/$2?v=${VERSION}"`);
+  h = h.replace('<!--LD-->', mode === 'live' ? L.ld(c, BASE) : '');
   if (mode === 'live') h = h.replace('<!--LANDING-->', L.render(c, globalThis.IC));
   else h = h.replace('<meta name="description"', '<meta name="robots" content="noindex"><meta name="description"');
   return h;
@@ -171,7 +188,7 @@ function hqState() {
   const acs = Object.values(db.academies).map(ac => { const owner = db.users[(ac.admins || [])[0]] || {}; return { id: ac.id, name: ac.name, place: ac.place, plan: ac.plan.type, until: ac.plan.until, active: C.planActive(ac, now), suspended: !!ac.suspended, players: ac.players.filter(p => !p.left).length, staff: ac.staff.length, batches: ac.batches.length, createdAt: ac.createdAt, owner: owner.name || '', email: owner.email || '', lastActive: ac.updatedAt || ac.createdAt }; }).sort((a, b) => b.createdAt - a.createdAt);
   const s = db.hq.settings;
   return { academies: acs, sales: db.hq.sales.slice(0, 500), keys: db.hq.keys, plans: db.hq.plans, activity: db.hq.activity.slice(0, 100), users: Object.keys(db.users).length,
-    settings: { razorpay: { keyId: s.razorpay.keyId, hasSecret: !!s.razorpay.keySecret, hasWebhook: !!s.razorpay.webhookSecret, webhookUrl: BASE + '/api/razorpay/webhook' }, googleClientId: s.googleClientId, smtp: { host: s.smtp.host, port: s.smtp.port, user: s.smtp.user, from: s.smtp.from, hasPass: !!s.smtp.pass } }, base: BASE, version: VERSION };
+    settings: { razorpay: { keyId: s.razorpay.keyId, hasSecret: !!s.razorpay.keySecret, hasWebhook: !!s.razorpay.webhookSecret, webhookUrl: BASE + '/api/razorpay/webhook' }, googleClientId: s.googleClientId, smtp: { host: s.smtp.host, port: s.smtp.port, user: s.smtp.user, from: s.smtp.from, hasPass: !!s.smtp.pass }, seo: { google: !!s.seo.gsc.sa, bing: !!s.seo.bing.key } }, base: BASE, version: VERSION, features: ['visitors', 'users', 'seo'] };
 }
 function hqAct(p) {
   const T = C.T; const ac = p.aid && db.academies[p.aid];
@@ -182,7 +199,7 @@ function hqAct(p) {
       hqLog(`Licence key ${code} made (${p.plan})`); return { msg: 'Key made', code }; }
     case 'key.stop': { const k = db.hq.keys.find(x => x.code === p.code); if (!k) throw new Error('Key not found'); k.stopped = !k.stopped; hqLog(`Key ${k.code} ${k.stopped ? 'stopped' : 'restarted'}`); return k.stopped ? 'Key stopped. It cannot be used now.' : 'Key works again'; }
     case 'academy.extend': { if (!ac) throw new Error('Academy not found'); const d = Math.max(1, Math.min(365, +p.days || 10)); ac.plan.until = Math.max(Date.now(), ac.plan.until) + d * DAY; ac.v++; hqLog(`${ac.name}: added ${d} days`); ping(ac.id); return `Added ${d} days to ${ac.name}`; }
-    case 'academy.paid': { if (!ac) throw new Error('Academy not found'); if (!C.PLAN_DAYS[p.plan]) throw new Error('Pick a plan'); C.applyPlan(ac, p.plan, Date.now()); recordSale(ac, p.plan, Math.round(+p.amount || db.hq.plans[p.plan]), 'Manual · ' + (p.via || 'UPI')); hqLog(`${ac.name} marked paid (${p.plan})`); ping(ac.id); return `${ac.name} is on the ${p.plan} plan`; }
+    case 'academy.paid': { if (!ac) throw new Error('Academy not found'); if (!C.PLAN_DAYS[p.plan]) throw new Error('Pick a plan'); C.applyPlan(ac, p.plan, Date.now()); A.server(ac.vid, 'paid', { n: ac.name, id: ac.id, amt: Math.round(+p.amount || db.hq.plans[p.plan]) }); recordSale(ac, p.plan, Math.round(+p.amount || db.hq.plans[p.plan]), 'Manual · ' + (p.via || 'UPI')); hqLog(`${ac.name} marked paid (${p.plan})`); ping(ac.id); return `${ac.name} is on the ${p.plan} plan`; }
     case 'academy.suspend': { if (!ac) throw new Error('Academy not found'); ac.suspended = !ac.suspended; ac.v++; hqLog(`${ac.name} ${ac.suspended ? 'paused' : 'restored'}`); ping(ac.id); return ac.suspended ? `${ac.name} is paused` : `${ac.name} is back on`; }
     case 'sale.manual': { const amt = Math.round(+p.amount); if (!amt) throw new Error('Add the amount'); recordSale(ac || null, p.plan || 'other', amt, 'Manual · ' + (p.via || 'UPI')); if (!ac) db.hq.sales[0].academy = String(p.forName || 'Other'); hqLog(`Manual sale ₹${amt}`); return 'Sale added'; }
     case 'settings.save': { const s = db.hq.settings;
@@ -196,6 +213,60 @@ function hqAct(p) {
   }
 }
 
+/* ---------------- people, visitor stats and SEO for HQ ---------------- */
+const BUILT = (() => { try { return fs.statSync(path.join(PUB, 'landing.js')).mtimeMs; } catch (_) { return Date.now(); } })();
+function loggedIn(usr, via, vid) { usr.lastLogin = Date.now(); usr.logins = (usr.logins || 0) + 1; usr.lastVia = via; if (via === 'google') usr.google = true; vid = String(vid || '').replace(/[^\w-]/g, '').slice(0, 24); if (vid && !usr.vid) usr.vid = vid; if (vid) A.server(vid, 'login', { n: usr.name, x: usr.email, id: usr.id }); save(); }
+function hqUsers() {
+  const now = Date.now(); const out = [];
+  for (const u of Object.values(db.users)) {
+    const ms = db.mem.filter(m => m.uid === u.id);
+    const roles = ms.map(m => { const ac = db.academies[m.aid] || {}; return { role: m.role, aid: m.aid, academy: ac.name || '', plan: ac.plan ? ac.plan.type : '', until: ac.plan ? ac.plan.until : 0, active: ac.plan ? C.planActive(ac, now) && !ac.suspended : false }; });
+    const ft = u.vid ? A.first(u.vid) : null;
+    out.push({ id: u.id, name: u.name, email: u.email, phone: u.phone || '', createdAt: u.createdAt, lastLogin: u.lastLogin || 0, seen: Math.max(u.seen || 0, u.lastLogin || 0), logins: u.logins || 0, signIn: u.google ? (u.lastVia === 'email' ? 'Google + email' : 'Google') : 'Email', roles, source: ft ? { src: ft.src, ref: ft.ref, utm: ft.utm, city: ft.ct, device: ft.dv, page: ft.p, first: ft.f } : null });
+  }
+  return { users: out.sort((a, b) => b.createdAt - a.createdAt) };
+}
+function seoState() {
+  const S = db.hq.settings.seo; const html = page('live');
+  return { connected: { google: !!S.gsc.sa, bing: !!S.bing.key, psiKey: !!S.psi.key }, clientEmail: seo.clientEmail(), site: S.gsc.sa ? seo.site() : '', base: BASE, host: HOST_NAME, verify: S.verify,
+    check: seo.check(html, SEO_WORDS), last: seo.last(), geo: A.geoReady() };
+}
+async function seoRun(b) {
+  const S = db.hq.settings.seo;
+  switch (b.what) {
+    case 'save': {
+      if (b.sa != null && String(b.sa).trim()) { let j; try { j = JSON.parse(b.sa); } catch (_) { throw new Error('That is not the JSON key file. Open the downloaded .json file and copy all of it.'); } if (!j.client_email || !j.private_key) throw new Error('This JSON has no client_email or private_key. Download a key for the service account (Keys > Add key > JSON).'); S.gsc.sa = JSON.stringify({ client_email: j.client_email, private_key: j.private_key }); }
+      if (b.clearGoogle) S.gsc.sa = '';
+      if (b.site != null) S.gsc.site = String(b.site).trim().slice(0, 200);
+      if (b.bing != null && String(b.bing).trim()) S.bing.key = String(b.bing).trim().slice(0, 100); if (b.clearBing) S.bing.key = '';
+      if (b.psi != null && String(b.psi).trim()) S.psi.key = String(b.psi).trim().slice(0, 100);
+      if (b.vGoogle != null) S.verify.google = String(b.vGoogle).replace(/.*content="([^"]+)".*/, '$1').trim().slice(0, 100);
+      if (b.vBing != null) S.verify.bing = String(b.vBing).replace(/.*content="([^"]+)".*/, '$1').trim().slice(0, 100);
+      hqLog('SEO settings changed'); return { msg: 'Saved' };
+    }
+    case 'sites': return { sites: await seo.sites() };
+    case 'google': return { google: await seo.google(b.days, b.force) };
+    case 'sitemap': { const m = await seo.submitSitemap(); hqLog(m); return { msg: m }; }
+    case 'inspect': return { inspect: await seo.inspect(b.url) };
+    case 'backlinks': return { backlinks: await seo.backlinks(b.force) };
+    case 'pagespeed': return { pagespeed: await seo.pagespeed(b.strategy) };
+    default: throw new Error('Unknown action');
+  }
+}
+function privacyPage() {
+  return `<!doctype html><html lang="en-IN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Privacy policy | Veyra Academy</title><meta name="description" content="How Veyra Academy handles academy, coach, parent and visitor data. No data is sold. Contact marketing@veyracreatives.com."><link rel="canonical" href="${BASE}/privacy"><link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Inter:wght@400;600;700&display=swap"><link rel="stylesheet" href="/style.css?v=${VERSION}"><style>.doc{max-width:760px;margin:0 auto;padding:40px 16px 80px;display:grid;gap:18px;line-height:1.65}.doc h1{font:900 clamp(32px,6vw,48px)/1 var(--f-display);text-transform:uppercase;font-stretch:75%}.doc h2{font:700 19px/1.3 var(--f-body);margin-top:10px}.doc ul{padding-left:20px;display:grid;gap:6px}</style><script src="/va.js?v=${VERSION}" defer></script></head><body><main class="doc">
+<a href="/" style="font-weight:600;color:var(--brand)">← Veyra Academy</a><h1>Privacy policy</h1><p class="muted">Last updated ${new Date(BUILT).toISOString().slice(0, 10)}. Veyra Academy is made by Veyra Creatives, India.</p>
+<h2>What academies put in the app</h2><p>Academy owners add batches, players, parents, coaches, attendance, fees and documents. This data belongs to the academy. We store it on our server in India to run the app, keep daily backups, and never sell it or use it for ads.</p>
+<h2>Accounts</h2><p>For each login we keep the name, email, an optional phone number, a scrambled (hashed) password, when you signed up and when you last logged in. If you use Sign in with Google we only receive your name and email from Google.</p>
+<h2>Website visit statistics</h2><p>To learn which parts of this website help academies, our own server counts visits. We do not use Google Analytics, Facebook Pixel or advertising cookies. What we record:</p>
+<ul><li>a random visitor number kept in your browser (not a cookie, not linked to your name unless you sign up)</li><li>pages and sections viewed, buttons clicked, how long you stayed</li><li>the website that sent you (for example Google or Instagram)</li><li>phone, tablet or computer, the browser, and your approximate city, worked out from your internet address. The address itself is not saved.</li></ul>
+<p>We never record what you type into forms. If you create an account, your visit history is linked to that account so we can see how academies found us. Visit records are deleted after 400 days. To stop being counted on a device, open <a href="/?notrack">${HOST_NAME}/?notrack</a> once.</p>
+<h2>Payments</h2><p>Plan payments go through Razorpay. We do not see or store card or bank details. Parent fee payments go straight to each academy's own UPI ID.</p>
+<h2>Emails</h2><p>We send emails needed to run your account, such as receipts, reminders and password resets.</p>
+<h2>Your choices</h2><p>Academy owners can download all their data from Settings. To correct or delete your data, email <a href="mailto:marketing@veyracreatives.com">marketing@veyracreatives.com</a>.</p>
+<p class="muted">City data: IP Geolocation by <a href="https://db-ip.com">DB-IP</a>.</p></main></body></html>`;
+}
+
 /* ---------------- routes ---------------- */
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, BASE); const p = u.pathname; const M = req.method;
@@ -205,12 +276,14 @@ const server = http.createServer(async (req, res) => {
     /* Veyra HQ is a Windows app only (user, 2026-11-25). The website never serves it. */
     if (p === '/sw.js') return send(res, 200, fs.readFileSync(path.join(PUB, 'sw.js'), 'utf8').replace('__VERSION__', VERSION), MIME['.js'], { 'cache-control': 'no-cache' });
     if (p === '/robots.txt') return send(res, 200, `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /demo\nSitemap: ${BASE}/sitemap.xml\n`, MIME['.txt']);
-    if (p === '/sitemap.xml') return send(res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${BASE}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url></urlset>`, 'application/xml');
+    if (p === '/sitemap.xml') { const lm = new Date(BUILT).toISOString().slice(0, 10); return send(res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${BASE}/</loc><lastmod>${lm}</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url><url><loc>${BASE}/privacy</loc><lastmod>${lm}</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url></urlset>`, 'application/xml', { 'cache-control': 'public, max-age=3600' }); }
+    if (p === '/privacy' || p === '/privacy/') return send(res, 200, privacyPage(), MIME['.html'], { 'cache-control': 'public, max-age=3600' });
+    if (p === '/api/va' && M === 'POST') { try { A.track(req, await body(req, 3e4)); } catch (_) {} res.writeHead(204, { 'cache-control': 'no-store' }); return res.end(); }
     if (p === '/healthz') return send(res, 200, { ok: true, version: VERSION });
 
     if (p.startsWith('/api/')) {
       if (p === '/api/events') { const s = session(req); if (!s) return bad(res, 'Log in', 401); res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive', 'x-accel-buffering': 'no' }); res.write(': hi\n\n'); sub(s.aid, res); req.on('close', () => subs.get(s.aid) && subs.get(s.aid).delete(res)); return; }
-      if (p === '/api/boot' && M === 'GET') { const s = session(req); if (!s) return bad(res, 'Log in', 401); return send(res, 200, { boot: bootFor(s) }); }
+      if (p === '/api/boot' && M === 'GET') { const s = session(req); if (!s) return bad(res, 'Log in', 401); const U = db.users[s.uid]; if (!U.seen || Date.now() - U.seen > 600e3) { U.seen = Date.now(); save(); } return send(res, 200, { boot: bootFor(s) }); }
       if (p.startsWith('/api/file/') && M === 'GET') {
         const s = session(req); const f = db.files[p.slice(10)]; if (!s || !f) return bad(res, 'Not found', 404);
         const ac = db.academies[f.aid]; const pl = ac && ac.players.find(x => x.id === f.pid);
@@ -225,7 +298,7 @@ const server = http.createServer(async (req, res) => {
         if ((ev.event === 'payment.captured' || ev.event === 'order.paid') && pay && pay.notes && pay.notes.aid && pay.notes.plan) applyPaid(pay.notes.aid, pay.notes.plan, Math.round(pay.amount / 100), pay.id, pay.order_id);
         return send(res, 200, { ok: true });
       }
-      const hqGet = M === 'GET' && /^\/api\/hq\/(state|needs-setup|backup)$/.test(p);
+      const hqGet = M === 'GET' && /^\/api\/hq\/(state|needs-setup|backup|analytics|users|seo)$/.test(p);
       if (M !== 'POST' && !hqGet) return bad(res, 'Not found', 404);
       const b = hqGet ? {} : await body(req, p === '/api/upload' ? 7e6 : 2e5);
 
@@ -235,9 +308,10 @@ const server = http.createServer(async (req, res) => {
         if (String(b.pw || '').length < 8) return bad(res, 'Use at least 8 characters for the password');
         if (!String(b.academy || '').trim() || !String(b.name || '').trim()) return bad(res, 'Add the academy name and your name');
         if (userByEmail(email)) return bad(res, 'This email already has an account. Log in instead.');
-        const usr = env.ensureUser({ email, name: b.name, pw: b.pw });
+        const usr = env.ensureUser({ email, name: b.name, pw: b.pw }); const U = db.users[usr.uid]; const vid = String(b.vid || '').replace(/[^\w-]/g, '').slice(0, 24);
+        Object.assign(U, { phone: String(b.phone || '').replace(/[^\d+ -]/g, '').slice(0, 20), via: 'email', vid, lastLogin: Date.now(), logins: 1 });
         const ac = C.newAcademy({ name: String(b.academy).slice(0, 80), place: String(b.city || '').slice(0, 80), now: Date.now(), trialDays: db.hq.plans.trial });
-        ac.admins.push(usr.uid); db.academies[ac.id] = ac; env.link(usr.uid, ac.id, 'admin');
+        ac.admins.push(usr.uid); ac.vid = vid; db.academies[ac.id] = ac; env.link(usr.uid, ac.id, 'admin'); A.server(vid, 'signup', { n: ac.name, x: email, id: ac.id });
         hqLog(`New trial: ${ac.name} (${email})`); startSession(res, usr.uid);
         mail(email, 'Welcome to Veyra Academy', `Hi ${b.name},\n\n${ac.name} is set up with a ${db.hq.plans.trial}-day free trial.\nOpen: ${BASE}/#admin\n\nStart by adding your batches, coaches and players.\n`);
         return send(res, 200, { ok: true, created: true });
@@ -246,14 +320,14 @@ const server = http.createServer(async (req, res) => {
         if (limited(req, 'li', 20, 15 * 60e3)) return bad(res, 'Too many tries. Wait 15 minutes.', 429);
         const usr = userByEmail(b.email); if (!usr || !checkPw(b.pw, usr.pw)) return bad(res, 'That email and password do not match', 401);
         if (!startSession(res, usr.id)) return bad(res, 'Your academy has not added you yet, or removed you.', 403);
-        return send(res, 200, { ok: true });
+        loggedIn(usr, 'email', b.vid); return send(res, 200, { ok: true });
       }
       if (p === '/api/google') {
         if (!db.hq.settings.googleClientId) return bad(res, 'Google sign-in is not set up yet');
         const g = await googleCheck(b.credential); const usr = userByEmail(g.email);
         if (!usr) return bad(res, `No account for ${g.email}. Ask your academy to add this email, or start a free trial.`, 404);
         if (!startSession(res, usr.id)) return bad(res, 'Your academy has not added you yet.', 403);
-        return send(res, 200, { ok: true });
+        loggedIn(usr, 'google', b.vid); return send(res, 200, { ok: true });
       }
       if (p === '/api/logout') { const t = cookies(req).vfs; if (t) delete db.sessions[t]; setCookie(res, 'vfs', '', 0); save(); return send(res, 200, { ok: true }); }
       if (p === '/api/forgot') {
@@ -274,6 +348,10 @@ const server = http.createServer(async (req, res) => {
         if (p === '/api/hq/needs-setup') return send(res, 200, { setup: !db.hq.pw });
         if (!hqSession(req)) return bad(res, 'Log in to HQ', 401);
         if (p === '/api/hq/state') return send(res, 200, hqState());
+        if (p === '/api/hq/analytics') return send(res, 200, A.report({ days: u.searchParams.get('days') }));
+        if (p === '/api/hq/users') return send(res, 200, hqUsers());
+        if (p === '/api/hq/seo') return send(res, 200, seoState());
+        if (p === '/api/hq/seo-run') { const r = await seoRun(b); save(); return send(res, 200, Object.assign({ seo: seoState() }, r)); }
         if (p === '/api/hq/logout') { delete db.hq.hqSessions[hqToken(req)]; save(); return send(res, 200, { ok: true }); }
         if (p === '/api/hq/act') { const r = hqAct(b); save(); return send(res, 200, Object.assign(typeof r === 'string' ? { msg: r } : r, { state: hqState() })); }
         if (p === '/api/hq/backup') { saveNow(); return send(res, 200, fs.readFileSync(DBF), 'application/json', { 'content-disposition': `attachment; filename="veyra-academy-db-${C.T.date()}.json"` }); }
@@ -303,7 +381,7 @@ const server = http.createServer(async (req, res) => {
         if (s.role !== 'admin') return bad(res, 'Only the academy admin can do this', 403);
         const code = String(b.code || '').toUpperCase().trim(); const k = db.hq.keys.find(x => x.code === code);
         if (!k) return bad(res, 'This key is not valid. Keys look like VFB-XXXX-XXXX-XXXX'); if (k.used) return bad(res, 'This key was already used'); if (k.stopped) return bad(res, 'This key was stopped by Veyra');
-        C.applyPlan(ac, k.plan, Date.now()); k.used = { aid: ac.id, name: ac.name, at: Date.now() }; hqLog(`${ac.name} used key ${code}`); save(); ping(ac.id);
+        C.applyPlan(ac, k.plan, Date.now()); k.used = { aid: ac.id, name: ac.name, at: Date.now() }; A.server(ac.vid, 'paid', { n: ac.name, id: ac.id, amt: 0 }); hqLog(`${ac.name} used key ${code}`); save(); ping(ac.id);
         return send(res, 200, { msg: 'Key activated. Your plan is on.' });
       }
       if (p === '/api/plan/order') {

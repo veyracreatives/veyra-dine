@@ -112,11 +112,11 @@ const LiveAPI = (() => {
     req,
     boot: () => req('/api/boot').then(j => j.boot).catch(e => { if (e.code === 401) return null; throw e; }),
     act: (type, p) => req('/api/act', { type, p }),
-    login: (email, pw) => req('/api/login', { email, pw }),
+    login: (email, pw) => req('/api/login', { email, pw, vid: (window.VA && VA.vid ? VA.vid() : '') }),
     switchTo: (aid, role) => req('/api/switch', { aid, role }),
-    signup: f => req('/api/signup', f),
+    signup: f => req('/api/signup', Object.assign({ vid: (window.VA && VA.vid ? VA.vid() : '') }, f)),
     logout: () => req('/api/logout', {}),
-    google: credential => req('/api/google', { credential, intent: location.hash.includes('signup') ? 'signup' : 'login' }),
+    google: credential => req('/api/google', { credential, vid: (window.VA && VA.vid ? VA.vid() : ''), intent: location.hash.includes('signup') ? 'signup' : 'login' }),
     forgot: email => req('/api/forgot', { email }),
     resetPw: (token, pw) => req('/api/reset', { token, pw }),
     changePw: (oldPw, newPw) => req('/api/password', { oldPw, newPw }),
@@ -219,14 +219,15 @@ function auth(kind, token) {
   <aside class="auth-art"><a class="brand" href="#">${logo()}<div><b>VEYRA ACADEMY</b><small>Academy app</small></div></a>
     <div style="display:grid;gap:18px;position:relative"><h2 class="disp">${up ? `${['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen'][CFG.plans.trial] || CFG.plans.trial} days free.<br><em>No card.</em>` : 'Back on<br><em>the pitch</em>'}</h2><p class="muted" style="max-width:420px">${up ? 'Set up your batches, invite coaches and send parents the app link today.' : 'Admins, managers, coaches and parents all log in here. You land in your own app.'}</p></div>
     ${pitchSVG()}<a class="faint" href="mailto:marketing@veyracreatives.com" style="position:relative;font-size:13px">marketing@veyracreatives.com</a></aside>
-  <main class="auth-form"><form class="auth-box" id="authForm" data-kind="${kind}" data-token="${esc(token || '')}" novalidate>
+  <main class="auth-form"><form class="auth-box" id="authForm" data-track-form="${kind}" data-kind="${kind}" data-token="${esc(token || '')}" novalidate>
     <a href="#" class="faint" style="font-size:14px;font-weight:600;text-decoration:none">← Back to home</a>
     <a class="brand" href="#" style="padding:0">${logo()}<div><b>VEYRA ACADEMY</b><small>Academy app</small></div></a>
     <div><h1>${head[0]}</h1><p class="muted" style="margin-top:6px">${head[1]}</p></div>
     ${B && !up && !rs ? `<div class="banner">${ic('ok')}<span class="grow">You are logged in as <b>${esc(B.me.name)}</b>.</span><a class="btn btn-primary btn-sm" href="#${B.me.role}">Open my app</a></div>` : ''}
     ${google ? `<div id="gbtn" style="min-height:48px;display:grid">${LIVE ? '' : `<button class="btn btn-google btn-block" type="button" data-act="google">${ic('google')}Continue with Google</button>`}</div><div class="or">or with email</div>` : ''}
     ${up ? `<label class="field" for="f-ac"><span>Academy name</span><input class="input" id="f-ac" placeholder="e.g. Kickstart FC Academy" autocomplete="organization" required></label>
-    <div class="grid g2"><label class="field" for="f-nm"><span>Your name</span><input class="input" id="f-nm" autocomplete="name" required></label><label class="field" for="f-city"><span>Area or city</span><input class="input" id="f-city" placeholder="Kharghar, Navi Mumbai"></label></div>` : ''}
+    <div class="grid g2"><label class="field" for="f-nm"><span>Your name</span><input class="input" id="f-nm" autocomplete="name" required></label><label class="field" for="f-city"><span>Area or city</span><input class="input" id="f-city" placeholder="Kharghar, Navi Mumbai"></label></div>
+    <label class="field" for="f-ph"><span>Phone or WhatsApp <span class="faint" style="font-weight:500">(optional)</span></span><input class="input" id="f-ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="So we can help you set up"></label>` : ''}
     ${rs ? '' : `<label class="field" for="f-em"><span>Email</span><input class="input" id="f-em" type="email" autocomplete="email" placeholder="you@academy.in" required></label>`}
     ${fg ? '' : `<label class="field" for="f-pw"><span class="between" style="width:100%"><span>${rs ? 'New password' : 'Password'}</span>${up || rs ? '' : '<a href="#forgot" class="faint" style="font-weight:500">Forgot password?</a>'}</span><input class="input" id="f-pw" type="password" autocomplete="${up || rs ? 'new-password' : 'current-password'}" placeholder="${up || rs ? 'At least 8 characters' : ''}" required></label>`}
     <p class="faint" id="authErr" role="alert" style="font-size:13.5px;color:var(--bad);min-height:0"></p>
@@ -758,8 +759,8 @@ function render() {
     html = shell(r.role, tab, VIEWS[r.role][tab]());
   } else if (['login', 'signup', 'forgot', 'reset'].includes(r.view)) html = auth(r.view, r.token);
   else html = VFL.render(CFG, IC);
-  $('#app').innerHTML = html + modal();
-  document.title = r.view === 'landing' ? 'Football Academy Management App | Veyra Academy' : r.view === 'app' ? `${ROLES[r.role].tabs.find(t => t[0] === r.tab)[1]} · ${B.academy.name}` : 'Veyra Academy';
+  $('#app').innerHTML = html + modal(); $('#app').toggleAttribute('data-notrack', r.view === 'app');
+  document.title = r.view === 'landing' ? 'Football Academy Management App India | Veyra Academy' : r.view === 'app' ? `${ROLES[r.role].tabs.find(t => t[0] === r.tab)[1]} · ${B.academy.name}` : 'Veyra Academy';
   if (location.hash !== lastView) { lastView = location.hash; if (r.view === 'login' || r.view === 'signup') mountGoogle(); }
 }
 function rerender() { const y = window.scrollY; render(); window.scrollTo(0, y); }
@@ -1076,7 +1077,7 @@ document.addEventListener('submit', async e => {
     btn.disabled = true;
     try {
       if (kind === 'login') { const r = await API.login(em, pw); await afterLogin(r); }
-      else if (kind === 'signup') { const r = await API.signup({ academy: val('f-ac'), name: val('f-nm'), city: val('f-city'), email: em, pw }); await afterLogin(Object.assign({ created: true }, r)); toast(`Academy created. Your ${CFG.plans.trial}-day trial has started.`); }
+      else if (kind === 'signup') { const r = await API.signup({ academy: val('f-ac'), name: val('f-nm'), city: val('f-city'), phone: val('f-ph'), email: em, pw }); await afterLogin(Object.assign({ created: true }, r)); toast(`Academy created. Your ${CFG.plans.trial}-day trial has started.`); }
       else if (kind === 'forgot') { const r = await API.forgot(em); showAuthErr(''); toast(r.msg || 'If this email has an account, a link is on its way.'); }
       else if (kind === 'reset') { await API.resetPw(f.dataset.token, pw); toast('Password saved. Log in now.'); go('login'); }
     } catch (er) { showAuthErr(er.message); }

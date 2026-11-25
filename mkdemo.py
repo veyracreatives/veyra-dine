@@ -14,6 +14,6 @@ for k, v in {'{{TRIAL}}': '10', '{{MONTHLY_F}}': '999', '{{YEARLY_F}}': '7,999',
     h = h.replace(k, v)
 h = h.replace('href="/manifest.webmanifest"', 'href="manifest.webmanifest"').replace('href="/icon.svg"', 'href="icon.svg"').replace('href="/icon-180.png"', 'href="icon-180.png"')
 h = h.replace('<link rel="canonical" href="/">', '').replace('<meta property="og:url" content="/">', '').replace('content="/og.png"', 'content="og.png"')
-h = h.replace('<!--CFG-->', '')
+h = h.replace('<!--CFG-->', '').replace('<!--LD-->', '')
 open(os.path.join(OUT, 'index.html'), 'w', encoding='utf-8').write(h)
 print('preview built in', OUT)

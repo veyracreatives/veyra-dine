@@ -1,6 +1,30 @@
 /* Veyra Academy landing page. Plain function so the server can pre-render it for search engines. */
 (function (root) {
 'use strict';
+const AREAS = ['Vashi', 'Nerul', 'Seawoods', 'CBD Belapur', 'Kharghar', 'Kamothe', 'Panvel', 'Ulwe', 'Sanpada', 'Airoli', 'Ghansoli', 'Koparkhairane', 'Thane West', 'Ghodbunder Road', 'Majiwada', 'Kalwa', 'Mulund', 'Dombivli', 'Kalyan'];
+function faqs(P) {
+  const r = n => '₹' + Math.round(n).toLocaleString('en-IN');
+  return [['What is football academy management software?', 'It is one app that replaces the attendance register, fee notebook and WhatsApp groups. Veyra Academy keeps players, batches, coaches, attendance, UPI fees, reminders, tournaments and parent updates together, on phone and laptop.'],
+    ['Do parents need to download anything?', 'Parents open a link and tap Add to Home Screen. It works like an app on Android and iPhone, and it also works in a normal browser.'],
+    ['How do parents pay fees?', 'They pay to your academy UPI ID from any UPI app, then paste the 12-digit transaction ID. You approve it and the receipt goes out. Money goes to your bank, not to us.'],
+    ['Do the apps update for everyone at once?', 'Yes. When a coach saves attendance or you approve a fee, the admin, manager and parent apps update within seconds.'],
+    ['Can coaches mark attendance with weak signal?', 'Yes. If the turf has no signal, the marks wait on the phone and send as soon as the network is back.'],
+    ['Can I manage tournaments and match results?', 'Yes. Pick squads, add fixtures and scores, track scorers and send player of the match certificates to parents.'],
+    ['Is Veyra Academy available in Navi Mumbai and Thane?', 'Yes. Veyra Academy is made for academies in Navi Mumbai, Thane and Mumbai, and it works the same for academies anywhere in India.'],
+    [`What happens after the ${P.trial}-day trial?`, `Pick Monthly at ${r(P.monthly)} or Yearly at ${r(P.yearly)} and pay through Razorpay by UPI, card or net banking. If you do not, your data stays safe and you can still log in to pay.`],
+    ['Is GST added?', 'No. The price you see is the price you pay.']];
+}
+/* Schema for Google: organisation, the app with prices and areas served, and the FAQ shown on the page */
+function ld(cfg, base) {
+  const P = cfg.plans || { monthly: 999, yearly: 7999, trial: 10 };
+  const area = [{ '@type': 'City', name: 'Navi Mumbai' }, { '@type': 'City', name: 'Thane' }, { '@type': 'City', name: 'Mumbai' }, { '@type': 'Country', name: 'India' }];
+  const org = { '@type': 'Organization', '@id': 'https://veyracreatives.com/#org', name: 'Veyra Creatives', url: 'https://veyracreatives.com', email: 'marketing@veyracreatives.com', logo: base + '/icon-512.png', sameAs: ['https://www.instagram.com/veyralab.in/'], areaServed: area };
+  const app = { '@type': 'SoftwareApplication', '@id': base + '/#app', name: 'Veyra Academy', alternateName: 'Veyra Academy football academy app', applicationCategory: 'BusinessApplication', applicationSubCategory: 'Sports academy management', operatingSystem: 'Android, iOS, Windows, macOS, Web', url: base + '/', image: base + '/og.png', inLanguage: 'en-IN', description: 'Football academy management software for India: player and coach attendance, UPI fee collection with reminders, admissions, tournaments, training plans and a parent app.', featureList: 'Player attendance, Coach attendance, UPI fee collection, Fee reminders, Receipts and late fees, Admissions board, Tournaments, Training planner, Parent app, Reports', areaServed: area, publisher: { '@id': 'https://veyracreatives.com/#org' },
+    offers: [{ '@type': 'Offer', name: 'Monthly', price: String(P.monthly), priceCurrency: 'INR', url: base + '/#pricing' }, { '@type': 'Offer', name: 'Yearly', price: String(P.yearly), priceCurrency: 'INR', url: base + '/#pricing' }] };
+  const site = { '@type': 'WebSite', '@id': base + '/#site', name: 'Veyra Academy', url: base + '/', inLanguage: 'en-IN', publisher: { '@id': 'https://veyracreatives.com/#org' } };
+  const faq = { '@type': 'FAQPage', mainEntity: faqs(P).map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) };
+  return '<script type="application/ld+json">' + JSON.stringify({ '@context': 'https://schema.org', '@graph': [org, site, app, faq] }).replace(/</g, '\\u003c') + '</script>';
+}
 function render(cfg, IC) {
   const { ic, logo } = IC;
   const P = cfg.plans || { monthly: 999, yearly: 7999, trial: 10 };
@@ -87,6 +111,11 @@ function render(cfg, IC) {
     <div class="get-grid rv">${[['Android', 'Chrome: tap Install below, or ⋮ menu › Install app.'], ['iPhone and iPad', 'Safari: tap Share, then Add to Home Screen.'], ['Laptop and PC', 'Chrome or Edge: tap Install below, or the install icon in the address bar.']].map(([h, p]) => `<div class="get-card"><b>${h}</b><p>${p}</p></div>`).join('')}</div>
     <div class="hstack" style="margin-top:24px"><button class="btn btn-primary btn-lg" type="button" data-act="install">${ic('phone')}Install Veyra Academy</button><span class="faint" style="font-size:13.5px">Always the latest version. Nothing to download from a store.</span></div>
   </div></section>
+  <section class="sec" id="near-you" style="padding-top:0"><div class="wrap">
+    <div class="sec-head"><span class="eyebrow" style="justify-self:start">Navi Mumbai · Thane · all of India</span><h2 class="disp">Made for academies <em>near you</em></h2><p>Veyra Academy is made for grassroots football academies, turf coaching centres and school programmes in Navi Mumbai, Thane and Mumbai. It suits owners who run morning and evening batches across more than one turf, collect monthly fees by UPI and want parents updated without a WhatsApp group for every batch.</p></div>
+    <div class="areas rv">${AREAS.map(a => `<span class="pill p-mute plain">${a}</span>`).join('')}<span class="pill p-brand plain">and anywhere in India</span></div>
+    <p class="muted" style="max-width:760px;margin-top:20px">Whether you coach U-8 beginners on a box turf in Kharghar or run a U-17 squad on a full ground in Thane, the app works the same way: add your batches and players, give coaches the coach app, and send parents one link. Setup takes an afternoon, and we help by email.</p>
+  </div></section>
   <section class="sec" id="pricing" style="background:var(--surface);border-block:1px solid var(--line)"><div class="wrap">
     <div class="sec-head"><span class="eyebrow" style="justify-self:start">Pricing</span><h2 class="disp">One plan. <em>Everything in it.</em></h2><p>Unlimited players, coaches and parents. Start with ${P.trial} days free, then pay securely with Razorpay.</p></div>
     <div class="price-wrap rv">
@@ -100,20 +129,14 @@ function render(cfg, IC) {
   <section class="sec" id="faq"><div class="wrap">
     <div class="sec-head"><h2 class="disp">Questions</h2></div>
     <div class="faq rv">
-      ${[['Do parents need to download anything?', 'Parents open a link and tap Add to Home Screen. It works like an app on Android and iPhone, and it also works in a normal browser.'],
-        ['How do parents pay fees?', 'They pay to your academy UPI ID from any UPI app, then paste the 12-digit transaction ID. You approve it and the receipt goes out. Money goes to your bank, not to us.'],
-        ['Do the apps update for everyone at once?', 'Yes. When a coach saves attendance or you approve a fee, the admin, manager and parent apps update within seconds.'],
-        ['Can coaches mark attendance with weak signal?', 'Yes. If the turf has no signal, the marks wait on the phone and send as soon as the network is back.'],
-        ['Can I manage tournaments and match results?', 'Yes. Pick squads, add fixtures and scores, track scorers and send player of the match certificates to parents.'],
-        [`What happens after the ${P.trial}-day trial?`, `Pick Monthly at ${r(P.monthly)} or Yearly at ${r(P.yearly)} and pay through Razorpay by UPI, card or net banking. If you do not, your data stays safe and you can still log in to pay.`],
-        ['Is GST added?', 'No. The price you see is the price you pay.']].map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p></details>`).join('')}
+      ${faqs(P).map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p></details>`).join('')}
     </div>
   </div></section>
   <section class="sec" style="padding-top:0"><div class="wrap"><div class="final rv"><h2 class="disp">Your academy, <em>sorted by Monday</em></h2><p class="muted" style="max-width:520px">Set up batches, invite coaches and send the parent link in one afternoon.</p><div class="hstack" style="justify-content:center"><a class="btn btn-primary btn-lg" href="#signup">Start free trial</a><a class="btn btn-ghost btn-lg" href="#login">Log in</a></div></div></div></section>
   </main>
-  <footer class="lp-foot"><div class="wrap"><a class="brand" href="#">${logo()}<div><b>VEYRA ACADEMY</b><small>by Veyra Creatives</small></div></a><span>Questions? <a href="mailto:marketing@veyracreatives.com" style="color:inherit">marketing@veyracreatives.com</a></span><span>© ${new Date().getFullYear()} Veyra Creatives</span></div></footer>
+  <footer class="lp-foot"><div class="wrap"><a class="brand" href="#">${logo()}<div><b>VEYRA ACADEMY</b><small>by Veyra Creatives</small></div></a><span>Questions? <a href="mailto:marketing@veyracreatives.com" style="color:inherit">marketing@veyracreatives.com</a></span><span><a href="/privacy" style="color:inherit">Privacy policy</a></span><span>© ${new Date().getFullYear()} Veyra Creatives</span></div></footer>
   </div>`;
 }
-const L = { render };
+const L = { render, ld, faqs };
 if (typeof module !== 'undefined' && module.exports) module.exports = L; else root.VFL = L;
 })(typeof window !== 'undefined' ? window : globalThis);

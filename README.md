@@ -29,3 +29,12 @@ public/hq.html + hq.js   Veyra HQ screens (used by hq-windows; the server never 
 hq-windows/      Electron app: `sh build-ui.sh && npm i && npm run dist:win` (needs wine on Linux). Settings + daily backups in %APPDATA%\Veyra Academy HQ
 server.js        API, auth, live updates, Razorpay, HQ, reminders at 9 AM IST
 mkdemo.py        builds the static preview (no server)
+
+## Visitor stats, users and SEO (1.1.0)
+- `public/va.js` is a small first-party tracker on the website (no cookies, no third parties). It sends page views, button clicks, sections seen and time on page to `/api/va`.
+- `lib/analytics.js` saves one file per day in `data/analytics/` (kept 400 days) and builds the HQ Visitors report. The IP is only used to look up the city and is never saved.
+- `lib/geo.js` downloads the free DB-IP city database once a month into `data/geo/` (about 130 MB). Attribution: IP Geolocation by DB-IP.
+- Sign-ups, logins and payments are linked to the visitor id, so HQ shows which visitor became which academy.
+- `lib/seo.js`: Google Search Console API (service account key pasted in HQ › SEO), Bing Webmaster API (backlinks), PageSpeed Insights, and a page check.
+- HQ endpoints: `GET /api/hq/analytics?days=30`, `GET /api/hq/users`, `GET /api/hq/seo`, `POST /api/hq/seo-run`.
+- Stop counting your own visits on a device: open the site once with `?notrack` (undo with `?track`).

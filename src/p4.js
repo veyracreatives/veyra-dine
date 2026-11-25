@@ -119,8 +119,8 @@ function render() {
     html = shell(r.role, tab, VIEWS[r.role][tab]());
   } else if (['login', 'signup', 'forgot', 'reset'].includes(r.view)) html = auth(r.view, r.token);
   else html = VFL.render(CFG, IC);
-  $('#app').innerHTML = html + modal();
-  document.title = r.view === 'landing' ? 'Football Academy Management App | Veyra Academy' : r.view === 'app' ? `${ROLES[r.role].tabs.find(t => t[0] === r.tab)[1]} · ${B.academy.name}` : 'Veyra Academy';
+  $('#app').innerHTML = html + modal(); $('#app').toggleAttribute('data-notrack', r.view === 'app');
+  document.title = r.view === 'landing' ? 'Football Academy Management App India | Veyra Academy' : r.view === 'app' ? `${ROLES[r.role].tabs.find(t => t[0] === r.tab)[1]} · ${B.academy.name}` : 'Veyra Academy';
   if (location.hash !== lastView) { lastView = location.hash; if (r.view === 'login' || r.view === 'signup') mountGoogle(); }
 }
 function rerender() { const y = window.scrollY; render(); window.scrollTo(0, y); }

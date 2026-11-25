@@ -385,3 +385,4 @@ a.tick{text-decoration:none}
 .get-card p{color:var(--ink-2);font-size:14px}
 @media (max-width:760px){.get-grid{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:560px){.lp-cta .get-app span{display:none}.lp-cta .get-app{width:40px;padding:0}}
+.areas{display:flex;flex-wrap:wrap;gap:8px}.areas .pill{font-size:13px;padding:6px 12px}

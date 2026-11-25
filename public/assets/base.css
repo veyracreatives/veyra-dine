@@ -105,3 +105,24 @@ a { color: inherit; }
 .muted { color: var(--ink-3); }
 .empty { text-align: center; color: var(--ink-3); padding: 40px 16px; }
 .empty .ic { color: #C9C5BF; margin: 0 auto 10px; }
+
+/* dish choices picker (opts.js): guest dish sheet, admin and waiter pop-up */
+.vo-body { display: grid; gap: 12px; margin-top: 14px; }
+.vo-ov .vo-body { margin-top: 0; }
+.vo-g { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px 6px; margin: 0; min-width: 0; transition: border-color .2s, box-shadow .2s; }
+.vo-g.vo-miss { border-color: #DC2626; box-shadow: 0 0 0 3px rgba(220, 38, 38, .12); }
+.vo-g legend { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 0 4px; margin-left: -4px; font-size: 15px; }
+.vo-g legend small { color: var(--ink-3, #78716C); font-size: 12px; font-weight: 600; }
+.vo-c { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 0; border-top: 1px solid var(--line-2, #F1ECE4); cursor: pointer; }
+.vo-c:first-of-type { border-top: 0; }
+.vo-c input { width: 20px; height: 20px; margin: 0; accent-color: var(--brand); flex: none; }
+.vo-n { flex: 1; min-width: 0; font-size: 15px; overflow-wrap: anywhere; }
+.vo-p { flex: none; font-weight: 700; font-size: 14px; color: var(--ink-2, #57534E); }
+.vo-ov .sheet { display: flex; flex-direction: column; }
+.vo-ov .sheet-head small { display: block; font-size: 13px; margin-top: 2px; }
+.vo-foot { display: flex; gap: 12px; align-items: center; }
+.vo-foot .vo-add { flex: 1; min-width: 0; }
+.vo-qty { display: flex; align-items: center; gap: 4px; border: 1.5px solid var(--line); border-radius: 12px; padding: 3px; flex: none; }
+.vo-qty button { width: 38px; height: 38px; display: grid; place-items: center; border: 0; background: none; color: var(--ink); border-radius: 9px; cursor: pointer; }
+.vo-qty button:hover { background: var(--brand-soft); }
+.vo-qty b { min-width: 22px; text-align: center; }

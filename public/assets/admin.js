@@ -582,9 +582,11 @@
     const o = modal('<div class="pos-root"></div>', { wide: true });
     o.classList.add('pos-ov');
     const root = o.querySelector('.pos-root');
-    const count = () => Object.values(cart).reduce((a, b) => a + b, 0), total = () => Object.entries(cart).reduce((a, [id, n]) => a + n * ((items.find(i => i.id === id) || {}).price || 0), 0);
+    // cart keys are the dish id, plus the chosen options for dishes that have them (VDOpt.key)
+    const kInfo = k => { const { id, ids } = VDOpt.fromKey(k), it = items.find(i => i.id === id) || { id, name: '?', price: 0 }, p = VDOpt.pick(it, ids); return { it, ids, label: p.label || '', unit: VDOpt.unit(it, ids) }; };
+    const count = () => Object.values(cart).reduce((a, b) => a + b, 0), total = () => Object.entries(cart).reduce((a, [k, n]) => a + n * kInfo(k).unit, 0);
     const tName = () => { const t = tables.find(x => x.id === tId); return t ? t.name : 'Takeaway / counter'; };
-    const show = () => toDisplay(count() ? { mode: 'cart', title: tId ? tName() : 'Your order', lines: Object.entries(cart).map(([id, n]) => { const it = items.find(i => i.id === id) || {}; return { name: it.name, qty: n, price: it.price }; }) } : { mode: 'idle' });
+    const show = () => toDisplay(count() ? { mode: 'cart', title: tId ? tName() : 'Your order', lines: Object.entries(cart).map(([k, n]) => { const x = kInfo(k); return { name: x.it.name + (x.label ? ` (${x.label})` : ''), qty: n, price: x.unit }; }) } : { mode: 'idle' });
     onGone(o, () => toDisplay(sentOrder && !sentOrder.offline ? { mode: 'order', orderId: sentOrder.id } : { mode: 'idle' }, true));
 
     // step 1: which table
@@ -615,20 +617,28 @@
         </div>
         <div class="sheet-foot pos-foot"><div id="psum" class="muted">No dishes yet</div><button class="btn btn-primary btn-lg" id="psend" disabled>${icon('chef', 18)} Send to kitchen</button></div>`;
       const list = root.querySelector('#plist');
-      const row = i => { const n = cart[i.id], sold = i.available === false; return `<div class="pos-it ${n ? 'on' : ''} ${sold ? 'off' : ''}" data-i="${i.id}"><div class="pos-r"><span class="pos-dm">${dietMark(i.diet)}</span><span class="nm">${esc(i.name)}<small>${cur(i.price)}${sold ? ' · sold out' : ''}</small></span>
-        ${sold ? '' : n ? `<span class="pos-q"><button class="btn btn-sm" data-d="${i.id}" aria-label="One less">${icon('minus', 16)}</button><b>${n}</b><button class="btn btn-sm" data-a="${i.id}" aria-label="One more">${icon('plus', 16)}</button></span>` : `<button class="btn btn-sm" data-a="${i.id}">${icon('plus', 16)} Add</button>`}</div>
-        ${n ? (noteOpen.has(i.id) ? `<input class="input pos-dn" data-n="${i.id}" maxlength="140" placeholder="Note for this dish, e.g. no onion" value="${esc(notes[i.id] || '')}">` : `<button class="pos-nb" data-on="${i.id}">${icon('edit', 13)} ${notes[i.id] ? esc(notes[i.id]) : 'Add note'}</button>`) : ''}</div>`; };
+      const noteUi = k => noteOpen.has(k) ? `<input class="input pos-dn" data-n="${esc(k)}" maxlength="140" placeholder="Note for this dish, e.g. no onion" value="${esc(notes[k] || '')}">` : `<button class="pos-nb" data-on="${esc(k)}">${icon('edit', 13)} ${notes[k] ? esc(notes[k]) : 'Add note'}</button>`;
+      const qtyUi = (k, n) => `<span class="pos-q"><button class="btn btn-sm" data-d="${esc(k)}" aria-label="One less">${icon('minus', 16)}</button><b>${n}</b><button class="btn btn-sm" data-a="${esc(k)}" aria-label="One more">${icon('plus', 16)}</button></span>`;
+      const row = i => {
+        const sold = i.available === false, opt = VDOpt.has(i);
+        const vs = Object.keys(cart).filter(k => VDOpt.fromKey(k).id === i.id), n = vs.reduce((a, k) => a + cart[k], 0);
+        return `<div class="pos-it ${n ? 'on' : ''} ${sold ? 'off' : ''}" data-i="${i.id}"><div class="pos-r"><span class="pos-dm">${dietMark(i.diet)}</span><span class="nm">${esc(i.name)}<small>${cur(i.price)}${opt ? ' · has choices' : ''}${sold ? ' · sold out' : ''}</small></span>
+        ${sold ? '' : opt ? `<button class="btn btn-sm" data-ch="${i.id}">${icon('plus', 16)} ${n ? 'More' : 'Add'}</button>` : n ? qtyUi(i.id, n) : `<button class="btn btn-sm" data-a="${i.id}">${icon('plus', 16)} Add</button>`}</div>
+        ${opt ? vs.map(k => { const x = kInfo(k); return `<div class="pos-v"><div class="pos-vr"><span class="pos-vl">${x.label ? esc(x.label) : 'No choices'}<small>${cur(x.unit)} each</small></span>${qtyUi(k, cart[k])}</div>${noteUi(k)}</div>`; }).join('') : n ? noteUi(i.id) : ''}</div>`;
+      };
       const foot = () => {
         const n = count();
         root.querySelector('#psum').innerHTML = n ? `<b>${n} item${n === 1 ? '' : 's'}</b> · ${cur(total())}` : 'No dishes yet';
         root.querySelector('#psend').disabled = !n; show();
       };
       const draw = () => { const l = items.filter(i => (!cat || i.categoryId === cat) && (!q || i.name.toLowerCase().includes(q))); list.innerHTML = l.map(row).join('') || '<div class="empty" style="grid-column:1/-1">No dishes found</div>'; foot(); };
-      const redraw = id => { const el = list.querySelector(`[data-i="${id}"]`); if (el) el.outerHTML = row(items.find(i => i.id === id)); foot(); };
+      const redraw = k => { const id = VDOpt.fromKey(k).id, el = list.querySelector(`[data-i="${id}"]`); if (el) el.outerHTML = row(items.find(i => i.id === id)); foot(); };
       list.onclick = e => {
         const nb = e.target.closest('[data-on]'); if (nb) { noteOpen.add(nb.dataset.on); redraw(nb.dataset.on); const f = list.querySelector(`[data-n="${nb.dataset.on}"]`); if (f) f.focus(); return; }
-        const b = e.target.closest('[data-a],[data-d]'); if (!b) return; const id = b.dataset.a || b.dataset.d;
-        cart[id] = Math.max(0, (cart[id] || 0) + (b.dataset.a ? 1 : -1)); if (!cart[id]) { delete cart[id]; delete notes[id]; noteOpen.delete(id); } redraw(id);
+        const ch = e.target.closest('[data-ch]');
+        if (ch) { const it = items.find(i => i.id === ch.dataset.ch); VDOpt.choose(it, { cur }).then(r => { if (!r) return; const k = VDOpt.key(it.id, r.ids); cart[k] = Math.min(99, (cart[k] || 0) + r.qty); redraw(k); }); return; }
+        const b = e.target.closest('[data-a],[data-d]'); if (!b) return; const k = b.dataset.a || b.dataset.d;
+        cart[k] = Math.max(0, Math.min(99, (cart[k] || 0) + (b.dataset.a ? 1 : -1))); if (!cart[k]) { delete cart[k]; delete notes[k]; noteOpen.delete(k); } redraw(k);
       };
       list.oninput = e => { const f = e.target.closest('[data-n]'); if (f) notes[f.dataset.n] = f.value; };
       list.addEventListener('focusout', e => { const f = e.target.closest('[data-n]'); if (f && !f.value.trim()) { noteOpen.delete(f.dataset.n); setTimeout(() => redraw(f.dataset.n), 0); } });
@@ -638,11 +648,11 @@
       root.querySelector('#psend').onclick = async e => {
         const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Sending…';
         const t2 = tables.find(y => y.id === tId);
-        const body = { tableId: tId || null, label: t2 ? '' : 'Counter', items: Object.entries(cart).map(([id, n]) => ({ id, qty: n, price: (items.find(i => i.id === id) || {}).price, note: (notes[id] || '').trim() })), name: (root.querySelector('#pname').value || '').trim(), note: root.querySelector('#pnote').value.trim(), phone: root.querySelector('#pphone') ? root.querySelector('#pphone').value : '', status: 'preparing', clientId: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) };
+        const body = { tableId: tId || null, label: t2 ? '' : 'Counter', items: Object.entries(cart).map(([k, n]) => { const x = kInfo(k); return { id: x.it.id, qty: n, opt: x.ids, price: x.unit, note: (notes[k] || '').trim() }; }), name: (root.querySelector('#pname').value || '').trim(), note: root.querySelector('#pnote').value.trim(), phone: root.querySelector('#pphone') ? root.querySelector('#pphone').value : '', status: 'preparing', clientId: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) };
         let order;
         if (!S.offline) { try { order = await api('/api/admin/orders', { method: 'POST', body }); } catch (err) { if (!err.offline) { btn.disabled = false; foot(); btn.innerHTML = `${icon('chef', 18)} Send to kitchen`; return toast(esc(err.message), 'error'); } } }
         if (!order) { // offline: keep it here, print the KOT, sync later
-          const tmpId = 'off-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), lines = body.items.map(y => { const it = items.find(i => i.id === y.id); return { itemId: it.id, name: it.name, price: it.price, qty: y.qty, diet: it.diet, note: y.note }; });
+          const tmpId = 'off-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), lines = body.items.map(y => { const it = items.find(i => i.id === y.id), lb = VDOpt.pick(it, y.opt).label; return { itemId: it.id, name: it.name + (lb ? ` (${lb})` : ''), price: y.price, qty: y.qty, diet: it.diet, note: y.note, ...(y.opt && y.opt.length ? { opt: y.opt, opts: lb } : {}) }; });
           const tot = lines.reduce((a, l) => a + l.price * l.qty, 0);
           order = { id: tmpId, number: 'OFF-' + (outbox().filter(y => y.kind === 'order').length + 1), tableId: tId || null, tableName: t2 ? t2.name : 'Counter', items: lines, note: body.note, customerName: body.name, total: tot, subtotal: tot, discount: 0, coupon: '', status: 'preparing', createdAt: new Date().toISOString(), offline: true, source: 'counter' };
           queue({ kind: 'order', tmpId, body: { ...body, createdAt: order.createdAt } });
@@ -1002,7 +1012,7 @@
       <div class="panel"><div class="panel-head"><h2>${cat ? esc(cat.name) : 'Dishes'} <span class="muted" style="font-weight:600">· ${list.length} dishes</span></h2>${cat ? `<button class="btn btn-primary" id="addItem">${icon('plus', 18)} Add dish</button>` : ''}</div>
         <div>${list.map(it => `<div class="item-row ${it.available ? '' : 'off'}">
           ${it.photo ? `<img class="thumb" src="${esc(it.photo)}" alt="">` : `<div class="thumb">${icon('image', 22)}</div>`}
-          <div class="info"><b>${dietMark(it.diet)} ${esc(it.name)} ${it.bestseller ? '<span class="badge badge-amber">Bestseller</span>' : ''}</b><small>${esc(it.description) || '&nbsp;'}</small></div>
+          <div class="info"><b>${dietMark(it.diet)} ${esc(it.name)} ${it.bestseller ? '<span class="badge badge-amber">Bestseller</span>' : ''}${it.chef ? ' <span class="badge badge-brand">Chef\'s special</span>' : ''}${it.isNew ? ' <span class="badge badge-green">New</span>' : ''}</b><small>${(it.options || []).length ? `<span class="opt-sum">${icon('list', 13)} ${it.options.map(g => esc(g.name)).join(' · ')}</span> ` : ''}${esc(it.description) || '&nbsp;'}</small></div>
           <div class="pr">${cur(it.price)}</div>
           <label class="switch" title="Available today"><input type="checkbox" data-avail="${it.id}" ${it.available ? 'checked' : ''}><span class="track"></span><span class="hide-sm" style="width:72px">${it.available ? 'In stock' : 'Sold out'}</span></label>
           <button class="icon-btn" data-edit="${it.id}" aria-label="Edit">${icon('edit', 18)}</button>
@@ -1060,7 +1070,15 @@
         <div class="toggles">
           <label class="switch"><input type="checkbox" name="available" ${it.available ? 'checked' : ''}><span class="track"></span>In stock (customers can order it)</label>
           <label class="switch"><input type="checkbox" name="bestseller" ${it.bestseller ? 'checked' : ''}><span class="track"></span>Show “Bestseller” tag</label>
+          <label class="switch"><input type="checkbox" name="chef" ${it.chef ? 'checked' : ''}><span class="track"></span>Show “Chef's special” tag</label>
+          <label class="switch"><input type="checkbox" name="isNew" ${it.isNew ? 'checked' : ''}><span class="track"></span>Show “New” tag</label>
           <label class="switch"><input type="checkbox" name="spicy" ${it.spicy ? 'checked' : ''}><span class="track"></span>Spicy</label>
+        </div>
+        <div class="opt-ed">
+          <div class="opt-h"><b>Choices for this dish</b><small>Spice level, Jain, half or full, add-ons. Guests, waiters and you pick them when ordering, and they print on the KOT and the bill. The price next to a choice is added to the dish price. Use a minus amount, like -100, for a cheaper half portion.</small></div>
+          <div id="ogs"></div>
+          <div class="opt-add"><span class="muted">Add:</span><button type="button" class="chip" data-preset="spice">${icon('flame', 14)} Spice level</button><button type="button" class="chip" data-preset="jain">Jain / no onion-garlic</button><button type="button" class="chip" data-preset="portion">Half / Full</button><button type="button" class="chip" data-preset="addons">Add-ons</button><button type="button" class="chip" data-preset="own">${icon('plus', 14)} Your own</button></div>
+          <label class="switch" id="ocopyW" hidden><input type="checkbox" id="ocopy"><span class="track"></span><span id="ocopyT"></span></label>
         </div>
       </div>
       <div class="sheet-foot" style="display:flex;gap:10px">${iid ? `<button type="button" class="btn btn-danger" id="del">${icon('trash', 18)} Delete</button>` : ''}<button class="btn btn-primary btn-lg" style="flex:1">${iid ? 'Save changes' : 'Add dish'}</button></div></form>`, { wide: true });
@@ -1070,13 +1088,70 @@
       try { photo = await readImage(f, 1200); photoChanged = true; pd.innerHTML = `<img src="${photo}" alt=""><span class="btn btn-sm change">${icon('edit', 15)} Change</span>`; }
       catch (err) { toast(esc(err.message), 'error'); }
     };
+    // ---- choices (options) editor ----
+    const og = JSON.parse(JSON.stringify(it.options || []));
+    const ogs = o.querySelector('#ogs');
+    const TYPES = [['one', 'Pick one, must choose'], ['oneopt', 'Pick one, optional'], ['many', 'Pick any (add-ons)']];
+    const gType = g => g.multi ? 'many' : g.req ? 'one' : 'oneopt';
+    const priceNow = () => Number(o.querySelector('[name=price]').value) || 0;
+    const PRESETS = {
+      spice: () => ({ name: 'Spice level', req: true, choices: [['Mild', 0], ['Medium', 0], ['Hot', 0], ['Extra hot', 0]] }),
+      jain: () => ({ name: 'Preparation', req: false, choices: [['Regular', 0], ['Jain', 0], ['No onion, no garlic', 0]] }),
+      portion: () => ({ name: 'Portion', req: true, choices: [['Full', 0], ['Half', -Math.round(priceNow() * 0.4)]] }),
+      addons: () => ({ name: 'Add-ons', multi: true, choices: [['Extra cheese', 40], ['Extra butter', 20], ['Extra paneer', 60]] }),
+      own: () => ({ name: '', req: false, choices: [['', 0]] }),
+    };
+    const drawOg = () => {
+      ogs.innerHTML = og.map((g, gi) => `<div class="og" data-gi="${gi}">
+        <div class="og-top"><input class="input og-name" data-f="name" value="${esc(g.name)}" maxlength="40" placeholder="Group name, e.g. Spice level">
+          <select class="select og-type" data-f="type">${TYPES.map(([v, l]) => `<option value="${v}" ${gType(g) === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+          ${g.multi ? `<label class="og-max">Up to <input class="input" data-f="max" type="number" min="0" max="20" value="${g.max || ''}" placeholder="any"></label>` : ''}
+          <button type="button" class="icon-btn og-del" data-delg="${gi}" aria-label="Remove this group" title="Remove this group">${icon('trash', 17)}</button></div>
+        <div class="og-cs">${g.choices.map((c, ci) => `<div class="og-c" data-ci="${ci}"><input class="input" data-c="name" value="${esc(c.name)}" maxlength="40" placeholder="Choice, e.g. Hot"><label class="og-p"><span>${esc(S.me.restaurant.currency)}</span><input class="input" data-c="price" type="number" step="1" value="${c.price || ''}" placeholder="+0" title="Extra price. Use a minus amount, like -100, to make it cheaper"></label><button type="button" class="icon-btn" data-delc="${ci}" aria-label="Remove choice">${icon('x', 16)}</button></div>`).join('')}</div>
+        <button type="button" class="btn btn-sm btn-ghost" data-addc="${gi}">${icon('plus', 15)} Add choice</button>
+        ${!g.multi && g.req && g.choices.length ? `<small class="muted og-hint">“${esc(g.choices[0].name || 'The first choice')}” is ticked to start with. Put the usual one first.</small>` : ''}</div>`).join('');
+      const others = S.menu.items.filter(x => x.categoryId === o.querySelector('[name=categoryId]').value && x.id !== iid).length;
+      o.querySelector('#ocopyW').hidden = !og.length || !others;
+      o.querySelector('#ocopyT').textContent = `Also give these choices to the other ${others} dish${others === 1 ? '' : 'es'} in this category`;
+    };
+    ogs.addEventListener('input', e => {
+      const gEl = e.target.closest('[data-gi]'); if (!gEl) return; const g = og[gEl.dataset.gi];
+      const cEl = e.target.closest('[data-ci]');
+      if (cEl) { const c = g.choices[cEl.dataset.ci]; if (e.target.dataset.c === 'name') c.name = e.target.value; else { c.price = Number(e.target.value) || 0; } return; }
+      if (e.target.dataset.f === 'name') g.name = e.target.value;
+      if (e.target.dataset.f === 'max') g.max = parseInt(e.target.value, 10) || 0;
+    });
+    ogs.addEventListener('change', e => { if (e.target.dataset.f !== 'type') return; const g = og[e.target.closest('[data-gi]').dataset.gi], v = e.target.value; g.multi = v === 'many'; g.req = v === 'one'; drawOg(); });
+    ogs.addEventListener('click', e => {
+      const b = e.target.closest('[data-delg],[data-addc],[data-delc]'); if (!b) return;
+      const gi = b.closest('[data-gi]').dataset.gi, g = og[gi];
+      if (b.dataset.delg != null) og.splice(gi, 1);
+      else if (b.dataset.addc != null) { g.choices.push({ name: '', price: 0 }); drawOg(); const ins = ogs.querySelectorAll(`[data-gi="${gi}"] [data-c=name]`); ins[ins.length - 1].focus(); return; }
+      else if (b.dataset.delc != null) { g.choices.splice(b.dataset.delc, 1); if (!g.choices.length) og.splice(gi, 1); }
+      drawOg();
+    });
+    o.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => {
+      const x = PRESETS[b.dataset.preset](); og.push({ ...x, choices: x.choices.map(([name, price]) => ({ name, price })) }); drawOg();
+      if (b.dataset.preset === 'own') ogs.querySelector('.og:last-child .og-name').focus();
+    });
+    o.querySelector('[name=categoryId]').addEventListener('change', drawOg);
+    drawOg();
+    const cleanOg = () => og.map(g => ({ id: g.id, name: (g.name || '').trim(), multi: !!g.multi, req: !g.multi && !!g.req, max: g.multi ? g.max || 0 : 1, choices: g.choices.map(c => ({ id: c.id, name: (c.name || '').trim(), price: Number(c.price) || 0 })).filter(c => c.name) })).filter(g => g.choices.length);
     o.querySelector('form').onsubmit = async e => {
       e.preventDefault(); const f = new FormData(e.target); const btn = e.submitter; if (btn) btn.disabled = true;
-      const body = { name: f.get('name'), price: f.get('price'), categoryId: f.get('categoryId'), description: f.get('description'), diet: f.get('diet'), available: !!f.get('available'), bestseller: !!f.get('bestseller'), spicy: !!f.get('spicy') };
+      const opts = cleanOg(), noName = opts.find(g => !g.name);
+      if (noName) { if (btn) btn.disabled = false; return toast(`Give the group with “${esc(noName.choices[0].name)}” a name, like “Spice level”.`, 'error'); }
+      const body = { name: f.get('name'), price: f.get('price'), categoryId: f.get('categoryId'), description: f.get('description'), diet: f.get('diet'), available: !!f.get('available'), bestseller: !!f.get('bestseller'), chef: !!f.get('chef'), isNew: !!f.get('isNew'), spicy: !!f.get('spicy'), options: opts };
       if (photoChanged) body.photo = photo;
       try {
         const saved = await api(iid ? '/api/admin/items/' + iid : '/api/admin/items', { method: iid ? 'PUT' : 'POST', body });
         if (iid) Object.assign(it, saved); else S.menu.items.push(saved);
+        const cp = o.querySelector('#ocopy');
+        if (cp && cp.checked && !o.querySelector('#ocopyW').hidden) {
+          const rest = S.menu.items.filter(x => x.categoryId === saved.categoryId && x.id !== saved.id);
+          for (const x of rest) { try { Object.assign(x, await api('/api/admin/items/' + x.id, { method: 'PUT', body: { options: saved.options.map(g => ({ ...g, id: undefined, choices: g.choices.map(c => ({ ...c, id: undefined })) })) } })); } catch (err) { toast(esc(err.message), 'error'); break; } }
+          toast(`${icon('check', 18)} Choices added to ${rest.length} more dish${rest.length === 1 ? '' : 'es'}`, 'ok');
+        }
         S.selCat = saved.categoryId; o.close(); renderMenu(document.getElementById('content')); toast(`${icon('check', 18)} ${esc(saved.name)} saved`, 'ok');
       } catch (err) { toast(esc(err.message), 'error'); if (btn) btn.disabled = false; }
     };

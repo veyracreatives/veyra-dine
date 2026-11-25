@@ -85,10 +85,10 @@
     return [`${m} min`, m >= 20 ? 'late' : m >= 10 ? 'warn' : '', ''];
   }
   const diet = d => d === 'veg' || d === 'nonveg' || d === 'egg' ? `<span class="dt ${d}"></span>` : '';
-  const src = o => o.source === 'waiter' ? `Waiter${o.waiter ? ' ' + o.waiter : ''}` : o.source === 'counter' ? ((o.table || 'Counter') === 'Counter' ? 'Counter' : 'Staff') : o.source === 'wifi' ? 'WiFi backup' : 'QR order';
+  const src = o => o.channel === 'swiggy' ? 'Swiggy delivery' : o.channel === 'zomato' ? 'Zomato delivery' : o.source === 'waiter' ? `Waiter${o.waiter ? ' ' + o.waiter : ''}` : o.source === 'counter' ? ((o.table || 'Counter') === 'Counter' ? 'Counter' : 'Staff') : o.source === 'wifi' ? 'WiFi backup' : 'QR order';
   function ticket(o) {
     const [tt, tc, due] = timer(o), isNew = o.status === 'new', sub = [src(o) === 'Counter' && (o.table || 'Counter') === 'Counter' ? '' : src(o), o.name, due].filter(Boolean).join(' · ');
-    return `<article class="t ${isNew ? 'new' : ''} ${fresh.has(o.id) ? 'fresh' : ''}">
+    return `<article class="t ${isNew ? 'new' : ''} ${fresh.has(o.id) ? 'fresh' : ''} ${o.channel ? 'ch-' + esc(o.channel) : ''}">
       <div class="t-h"><span class="t-no">#${esc(o.number)}</span><div class="t-who"><b>${esc(o.table || 'Counter')}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div><span class="t-time ${tc}">${tt}</span></div>
       <ul class="t-items">${o.items.map(l => `<li><span class="q">${l.qty}×</span><span class="n">${diet(l.diet)}${esc(l.name)}</span>${l.note ? `<span class="ln">${esc(l.note)}</span>` : ''}</li>`).join('')}</ul>
       ${o.note ? `<div class="t-note">${esc(o.note)}</div>` : ''}

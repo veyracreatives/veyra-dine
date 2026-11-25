@@ -526,3 +526,26 @@ button.buy small { margin-bottom: 14px; }
 .pos-v .pos-nb, .pos-v .pos-dn { margin-left: 0; } .pos-v .pos-dn { width: 100%; }
 #ogs { display: grid; gap: 10px; } #ogs:empty { display: none; }
 .pos-it { align-content: start; } .pos-r > .btn { align-self: start; }
+/* Swiggy / Zomato */
+.plat-tag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 12px; font-weight: 800; color: #fff; letter-spacing: .01em; white-space: nowrap; vertical-align: middle; }
+.plat-swiggy { background: #FC8019; } .plat-zomato { background: #E23744; }
+.o-head .plat-tag { margin-bottom: 4px; }
+.pos-plats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: -4px 0 14px; }
+.pos-plat { display: grid; gap: 2px; text-align: left; padding: 12px 14px; border-radius: 14px; border: 0; color: #fff; font: inherit; cursor: pointer; }
+.pos-plat b { font-size: 16px; } .pos-plat small { opacity: .9; font-size: 12px; }
+.pos-plat:hover { filter: brightness(1.05); }
+.pos-h .plat-tag { height: 26px; font-size: 14px; }
+.pos-ref { display: grid; gap: 4px; margin: 0 0 10px; } .pos-ref small { font-size: 12px; }
+.plat-row { display: grid; grid-template-columns: 82px minmax(0, 1fr) 150px; gap: 12px; align-items: center; }
+.plat-row .plat-tag { justify-self: start; height: 26px; font-size: 13px; }
+.plat-pc { margin: 0; } .pc-in { display: flex; align-items: center; gap: 6px; } .pc-in .input { min-width: 0; }
+.plat-prices { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.plat-prices summary { cursor: pointer; display: flex; gap: 8px; align-items: center; font-weight: 650; font-size: 14px; list-style: none; }
+.plat-prices summary::-webkit-details-marker { display: none; }
+.plat-prices .row2 { margin-top: 10px; } .plat-prices > small { display: block; margin-top: 6px; font-size: 12px; }
+.ch-tbl td .plat-tag { height: 20px; font-size: 11px; }
+@media (max-width: 640px) { .plat-row { grid-template-columns: auto minmax(0, 1fr); } .plat-row .plat-pc { grid-column: 1 / -1; } }
+.range-bar .pick label { min-width: 0; }
+@media (max-width: 400px) { .range-bar .pick { grid-template-columns: 32px minmax(0, 1fr) minmax(0, 1fr) 32px; gap: 4px; } .range-bar .pick .input { font-size: 13px; padding: 6px 4px; } .range-bar .icon-only { width: 32px; } }
+.ch-tbl .ch-n { display: none; }
+@media (max-width: 640px) { .ch-tbl .ch-n { display: block; font-size: 11px; } .ch-tbl th, .ch-tbl td { padding-left: 8px; padding-right: 8px; } }

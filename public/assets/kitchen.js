@@ -85,7 +85,7 @@
     return [`${m} min`, m >= 20 ? 'late' : m >= 10 ? 'warn' : '', ''];
   }
   const diet = d => d === 'veg' || d === 'nonveg' || d === 'egg' ? `<span class="dt ${d}"></span>` : '';
-  const src = o => o.source === 'waiter' ? `Waiter${o.waiter ? ' ' + o.waiter : ''}` : o.source === 'counter' ? 'Counter' : o.source === 'wifi' ? 'WiFi backup' : 'QR order';
+  const src = o => o.source === 'waiter' ? `Waiter${o.waiter ? ' ' + o.waiter : ''}` : o.source === 'counter' ? ((o.table || 'Counter') === 'Counter' ? 'Counter' : 'Staff') : o.source === 'wifi' ? 'WiFi backup' : 'QR order';
   function ticket(o) {
     const [tt, tc, due] = timer(o), isNew = o.status === 'new', sub = [src(o) === 'Counter' && (o.table || 'Counter') === 'Counter' ? '' : src(o), o.name, due].filter(Boolean).join(' · ');
     return `<article class="t ${isNew ? 'new' : ''} ${fresh.has(o.id) ? 'fresh' : ''}">

@@ -5,13 +5,13 @@
 @property --v{syntax:"<number>";inherits:false;initial-value:0}
 :root{
   color-scheme:light;
-  --bg:#F5F6F2; --surface:#FFFFFF; --surface-2:#EFF2EC; --line:#E2E7DF; --line-2:#CDD5C9;
-  --ink:#0F1A14; --ink-2:#4A5951; --ink-3:#7B8880;
-  --brand:#0B6B45; --brand-2:#0F8257; --brand-ink:#FFFFFF; --brand-soft:#E1F1E8;
-  --gold-grad:linear-gradient(135deg,#0A5E3D 0%,#159A64 50%,#0B6B45 100%);
-  --glow:0 0 0 1px rgba(11,107,69,.10),0 24px 50px -24px rgba(11,107,69,.35);
-  --wash:rgba(11,107,69,.05); --panel-hi:#F1F8F4; --chev-off:rgba(15,26,20,.12); --chip:#FFFFFF; --flood:rgba(11,107,69,.12);
-  --pitch:#FFFFFF; --pitch-2:#F7F9F6; --chalk:#FFFFFF; --kit:#0B6B45;
+  --bg:#F4F6FA; --surface:#FFFFFF; --surface-2:#EDF1F7; --line:#DFE4EE; --line-2:#C9D1DF;
+  --ink:#0E1526; --ink-2:#475069; --ink-3:#7A8399;
+  --brand:#0B5EAA; --brand-2:#1474C9; --brand-ink:#FFFFFF; --brand-soft:#E2EDF8;
+  --gold-grad:linear-gradient(135deg,#084A87 0%,#1E7FD6 55%,#0B5EAA 100%);
+  --glow:0 0 0 1px rgba(11,94,170,.10),0 24px 50px -24px rgba(11,94,170,.35);
+  --wash:rgba(11,94,170,.05); --panel-hi:#EEF4FB; --chev-off:rgba(15,26,20,.12); --chip:#FFFFFF; --flood:rgba(11,94,170,.12);
+  --pitch:#FFFFFF; --pitch-2:#F6F8FC; --chalk:#FFFFFF; --kit:#0B5EAA;
   --blue:#3D63C9; --green:#1E8A5A; --red:#C9513D; --slate:#6E7682;
   --ok:#13824B; --ok-soft:#DDF1E5; --warn:#9A6400; --warn-soft:#FBEFD3; --bad:#C8372B; --bad-soft:#FBE3E0; --info:#2463B8; --info-soft:#E1EBFA;
   --shadow:0 1px 2px rgba(15,26,20,.06),0 4px 16px rgba(15,26,20,.06); --shadow-lg:0 18px 48px rgba(15,26,20,.18);

@@ -142,7 +142,7 @@ const LiveAPI = (() => {
     const o = await req('/api/plan/order', { plan: type });
     await loadScript('https://checkout.razorpay.com/v1/checkout.js');
     return new Promise((res, rej) => {
-      const rz = new window.Razorpay({ key: o.keyId, order_id: o.orderId, amount: o.amount, currency: 'INR', name: 'Veyra Academy', description: o.description, prefill: { name: o.name, email: o.email }, theme: { color: '#0B6B45' },
+      const rz = new window.Razorpay({ key: o.keyId, order_id: o.orderId, amount: o.amount, currency: 'INR', name: 'Veyra Academy', description: o.description, prefill: { name: o.name, email: o.email }, theme: { color: '#0B5EAA' },
         handler: r => req('/api/plan/verify', r).then(res, rej), modal: { ondismiss: () => rej(new Error('Payment cancelled')) } });
       rz.on('payment.failed', r => rej(new Error((r.error && r.error.description) || 'Payment failed')));
       rz.open();

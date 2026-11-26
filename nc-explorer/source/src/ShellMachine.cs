@@ -123,19 +123,13 @@ namespace VeyraNC
         // Ask for folders + files + hidden explicitly (SHCONTF 0x20|0x40|0x80); default listing can miss driver items.
         static dynamic AllItems(dynamic folder)
         {
-            dynamic items = folder.Items();
-            try { items.Filter(0x20 | 0x40 | 0x80, "*"); } catch { }
-            return items;
+            return folder.Items();
         }
 
         static dynamic FindItem(dynamic folder, string name)
         {
             dynamic items = AllItems(folder);
-            if (items.Count == 0)
-            {
-                // Driver hasn't listed this folder yet: ask for the name directly (used only for navigating).
-                try { dynamic pn = folder.ParseName(name); if (pn != null && pn.IsFolder) return pn; } catch { }
-            }
+
             for (int i = 0; i < items.Count; i++)
             {
                 dynamic it = items.Item(i);
@@ -149,31 +143,14 @@ namespace VeyraNC
             List<RemoteEntry> result = new List<RemoteEntry>();
             Sta(delegate
             {
-                dynamic sh = Shell();
-                dynamic f = Resolve(sh, folder);
-                // The driver can fill folders lazily: retry a few times if it comes back empty.
-                dynamic items = AllItems(f);
-                for (int r = 0; r < 6 && items.Count == 0; r++)
+                // Same simple listing as 1.0.2 (the version that worked on the machine PC).
+                dynamic items = null;
+                for (int r = 0; r < 3; r++)
                 {
-                    Pump(800);
-                    dynamic sh2 = Shell();
-                    f = Resolve(sh2, folder);
-                    items = AllItems(f);
-                    if (items.Count == 0)
-                    {
-                        // Try opening the same place by its full path, as Windows Explorer does.
-                        string full = rootPath + "\\" + machineName + (folder == "/" ? "" : "\\" + string.Join("\\", Split(folder)));
-                        try { dynamic f2 = sh2.NameSpace(full); if (f2 != null) { dynamic i2 = AllItems(f2); if (i2.Count > 0) { f = f2; items = i2; } } } catch { }
-                    }
-                }
-                if (items.Count == 0 && !warmed)
-                {
-                    // The driver fills folders only after Windows Explorer has opened them once. Open it, then read again.
-                    warmed = true;
-                    string full = rootPath + "\\" + machineName + (folder == "/" ? "" : "\\" + string.Join("\\", Split(folder)));
-                    Log("Waking up the Mitsubishi driver (opens an Explorer window once)…");
-                    try { System.Diagnostics.Process.Start("explorer.exe", "\"" + full + "\""); } catch { }
-                    for (int r = 0; r < 10 && items.Count == 0; r++) { Pump(1000); f = Resolve(Shell(), folder); items = AllItems(f); }
+                    dynamic f = Resolve(Shell(), folder);
+                    items = f.Items();
+                    if (items.Count > 0) break;
+                    Pump(700);
                 }
                 if (items.Count == 0 && folder == "/")
                 {
@@ -181,18 +158,6 @@ namespace VeyraNC
                     foreach (string n in new[] { "CNC MEMORY", "CNC MEMORY2", "DS", "MEMORY CARD", "USB MEMORY" })
                         result.Add(new RemoteEntry { Name = n, IsFolder = true });
                     return;
-                }
-                if (items.Count == 0) Log("Driver returned no items for " + folder + ".");
-                // Sizes: FolderItem.Size is empty with this driver, so use the Details columns (read AFTER listing).
-                int sizeCol = -1, dateCol = -1;
-                for (int c = 0; c < 20 && items.Count > 0; c++)
-                {
-                    string h = "";
-                    try { h = (string)f.GetDetailsOf(null, c); } catch { break; }
-                    if (string.IsNullOrEmpty(h)) continue;
-                    string hl = h.ToLowerInvariant();
-                    if (sizeCol < 0 && hl.Contains("size")) sizeCol = c;
-                    if (dateCol < 0 && (hl.Contains("modified") || hl.Contains("update") || hl == "date")) dateCol = c;
                 }
                 for (int i = 0; i < items.Count; i++)
                 {
@@ -203,31 +168,8 @@ namespace VeyraNC
                     if (!e.IsFolder)
                     {
                         try { long sz = (long)it.Size; if (sz > 0) e.Size = sz; } catch { }
-                        if (e.Size <= 0 && sizeCol >= 0)
-                        {
-                            try
-                            {
-                                string st = ((string)f.GetDetailsOf(it, sizeCol) ?? "").Trim();
-                                e.SizeText = st;
-                                long parsed = ParseSize(st);
-                                if (parsed >= 0) e.Size = parsed;
-                            }
-                            catch { }
-                        }
                     }
                     try { DateTime d = it.ModifyDate; if (d.Year > 1980) e.Modified = d; } catch { }
-                    if (!e.Modified.HasValue && dateCol >= 0)
-                    {
-                        try
-                        {
-                            string dt = ((string)f.GetDetailsOf(it, dateCol) ?? "").Trim();
-                            // Strip invisible direction marks Windows puts into dates.
-                            dt = System.Text.RegularExpressions.Regex.Replace(dt, @"[\u200e\u200f]", "");
-                            DateTime d2;
-                            if (DateTime.TryParse(dt, out d2) && d2.Year > 1980) e.Modified = d2; else e.ModifiedText = dt;
-                        }
-                        catch { }
-                    }
                     result.Add(e);
                 }
             });

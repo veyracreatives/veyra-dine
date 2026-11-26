@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Veyra Tool Advisor</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo">V</span><div><b>Veyra Tool Advisor</b><small>3-axis CNC · tools, clamping &amp; steps</small></div></div>
+  <div class="actions">
+    <button id="btnOpen" class="primary">Open part</button>
+    <button id="btnLib">Tool library</button>
+    <button id="btnPdf" disabled>Save job sheet (PDF)</button>
+  </div>
+  <input type="file" id="fileIn" accept=".step,.stp,.iges,.igs,.stl,.brep,.x_t,.x_b,.sldprt,.ipt,.prt" hidden>
+</header>
+
+<main class="layout">
+  <aside class="left panel">
+    <section class="card">
+      <h3>Part</h3>
+      <div id="partInfo" class="muted">No part loaded.</div>
+    </section>
+    <section class="card">
+      <h3>Job settings</h3>
+      <label>Material<select id="selMat"></select></label>
+      <label>Which side is the top?<select id="selUp">
+        <option value="+Z">+Z (as drawn)</option><option value="-Z">−Z</option><option value="+Y">+Y</option><option value="-Y">−Y</option><option value="+X">+X</option><option value="-X">−X</option>
+      </select></label>
+      <details>
+        <summary>Machine &amp; stock</summary>
+        <div class="grid2">
+          <label>Max spindle RPM<input type="number" id="setMaxRpm" step="100"></label>
+          <label>Max feed mm/min<input type="number" id="setMaxFeed" step="100"></label>
+          <label>Vise opening mm<input type="number" id="setVise" step="5"></label>
+          <label>Vise jaw height mm<input type="number" id="setJaw" step="1"></label>
+          <label>Stock extra / side mm<input type="number" id="setSide" step="0.5"></label>
+          <label>Facing extra mm<input type="number" id="setTop" step="0.5"></label>
+          <label>Extra height to grip mm<input type="number" id="setGrip" step="1"></label>
+          <label>Leave for finish mm<input type="number" id="setFin" step="0.05"></label>
+        </div>
+      </details>
+    </section>
+    <section class="card">
+      <h3>Features found</h3>
+      <div id="featList" class="muted">Open a part to see holes, pockets and radii.</div>
+    </section>
+  </aside>
+
+  <section class="center">
+    <div id="viewer" class="viewer">
+      <div id="drop" class="drop">
+        <div class="dropbox">
+          <div class="big">Drop a 3D part here</div>
+          <div>STEP (.stp/.step), IGES (.igs/.iges) or STL</div>
+          <button id="btnOpen2" class="primary">Choose file</button>
+          <div class="muted small">.x_t (Parasolid) cannot be read by any free software. In your CAD use <b>Save As → STEP</b>.</div>
+        </div>
+      </div>
+      <div id="busy" class="busy" hidden><div class="spin"></div><span id="busyText">Reading part…</span></div>
+      <div class="vtools" id="vtools" hidden>
+        <div class="seg"><button data-view="iso">3D</button><button data-view="top">Top</button><button data-view="front">Front</button><button data-view="right">Side</button></div>
+        <label class="chk"><input type="checkbox" id="chkColors" checked> Feature colours</label>
+        <label class="chk">Clamping<select id="selClampView"><option value="">Off</option></select></label>
+      </div>
+      <div class="legend" id="legend" hidden>
+        <span><i style="background:#3b82f6"></i>Hole</span><span><i style="background:#a855f7"></i>Tapped</span><span><i style="background:#22c55e"></i>Pocket floor</span><span><i style="background:#ef4444"></i>Inside corner</span><span><i style="background:#eab308"></i>Fillet / 3D</span><span><i style="background:#06b6d4"></i>Chamfer</span>
+      </div>
+    </div>
+  </section>
+
+  <aside class="right panel">
+    <nav class="tabs">
+      <button data-tab="plan" class="on">Steps</button>
+      <button data-tab="tools">Tools</button>
+      <button data-tab="clamp">Clamping</button>
+      <button data-tab="warn">Check <span id="warnCount" class="badge" hidden></span></button>
+    </nav>
+    <div class="tabbody">
+      <div id="tab-plan" class="tab on"><div class="muted">The step-by-step plan appears here.</div></div>
+      <div id="tab-tools" class="tab"></div>
+      <div id="tab-clamp" class="tab"></div>
+      <div id="tab-warn" class="tab"></div>
+    </div>
+    <p class="disclaimer">Suggestions only. The operator must check every tool, clamp and value before cutting. Start with feed override at 70% and increase.</p>
+  </aside>
+</main>
+
+<dialog id="libDlg">
+  <div class="dlghead"><h2>My tool library</h2><button id="libClose" class="x" aria-label="Close">✕</button></div>
+  <p class="muted small">Recommendations only use tools from this list. Edit sizes to match the tools in your machine and tool cabinet. Saved automatically.</p>
+  <div class="libbar">
+    <select id="libType"></select><button id="libAdd" class="primary">Add tool</button>
+    <span class="grow"></span>
+    <button id="libExport">Export</button><button id="libImport">Import</button><button id="libReset">Reset to default</button>
+    <input type="file" id="libFile" accept=".json" hidden>
+  </div>
+  <div class="libwrap"><table class="lib" id="libTable"></table></div>
+</dialog>
+
+<script src="vendor/occt-import-js.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

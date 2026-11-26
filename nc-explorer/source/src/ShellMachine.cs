@@ -119,9 +119,17 @@ namespace VeyraNC
             return f;
         }
 
-        static dynamic FindItem(dynamic folder, string name)
+        // Ask for folders + files + hidden explicitly (SHCONTF 0x20|0x40|0x80); default listing can miss driver items.
+        static dynamic AllItems(dynamic folder)
         {
             dynamic items = folder.Items();
+            try { items.Filter(0x20 | 0x40 | 0x80, "*"); } catch { }
+            return items;
+        }
+
+        static dynamic FindItem(dynamic folder, string name)
+        {
+            dynamic items = AllItems(folder);
             for (int i = 0; i < items.Count; i++)
             {
                 dynamic it = items.Item(i);
@@ -138,8 +146,21 @@ namespace VeyraNC
                 dynamic sh = Shell();
                 dynamic f = Resolve(sh, folder);
                 // The driver can fill folders lazily: retry a few times if it comes back empty.
-                dynamic items = f.Items();
-                for (int r = 0; r < 4 && items.Count == 0; r++) { Pump(700); f = Resolve(Shell(), folder); items = f.Items(); }
+                dynamic items = AllItems(f);
+                for (int r = 0; r < 6 && items.Count == 0; r++)
+                {
+                    Pump(800);
+                    dynamic sh2 = Shell();
+                    f = Resolve(sh2, folder);
+                    items = AllItems(f);
+                    if (items.Count == 0)
+                    {
+                        // Try opening the same place by its full path, as Windows Explorer does.
+                        string full = rootPath + "\\" + machineName + (folder == "/" ? "" : "\\" + string.Join("\\", Split(folder)));
+                        try { dynamic f2 = sh2.NameSpace(full); if (f2 != null) { dynamic i2 = AllItems(f2); if (i2.Count > 0) { f = f2; items = i2; } } } catch { }
+                    }
+                }
+                if (items.Count == 0) Log("Driver returned no items for " + folder + ".");
                 // Sizes: FolderItem.Size is empty with this driver, so use the Details columns (read AFTER listing).
                 int sizeCol = -1, dateCol = -1;
                 for (int c = 0; c < 20 && items.Count > 0; c++)

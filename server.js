@@ -453,7 +453,7 @@ async function seoRun(b) {
 }
 function seoState() {
   const S = seo && (seo.site(), db.config.seo); let html = '';
-  try { html = (siteCache && siteCache.home) || fs.readFileSync(path.join(PUBLIC_DIR, 'site', 'index.html'), 'utf8'); } catch {}
+  try { html = (siteCache && siteCache.home) || fs.readFileSync(path.join(PUBLIC_DIR, 'site', 'index.html'), 'utf8').replace(/<!--(MORE|FEAT)-->[\s\S]*?<!--\/\1-->\n?/g, ''); } catch {}  // check the home page as visitors get it (not home + /features together)
   return { connected: { google: !!S.gsc.sa, bing: !!S.bing.key, psiKey: !!S.psi.key }, clientEmail: seo.clientEmail(), site: S.gsc.sa ? seo.site() : '', base: SITE_URL, host: SEO_HOST, verify: S.verify, check: seo.check(html, SEO_WORDS), last: seo.last(), geo: VA.geoReady() };
 }
 function hqUsers() {

@@ -356,6 +356,19 @@ function payLines(pay) {
     pay.updatesUntil && (pay.plan === 'lifetime' || pay.plan === 'updates') ? ['Updates until', fmtDate(pay.updatesUntil)] : null,
     pay.mode === 'manual' ? (pay.paymentId ? ['Reference', pay.paymentId] : null) : ['Razorpay payment ID', pay.paymentId || '-'], pay.method ? ['Paid by', pay.method === 'netbanking' ? 'Netbanking' : pay.method.length <= 4 ? pay.method.toUpperCase() : pay.method[0].toUpperCase() + pay.method.slice(1)] : null].filter(Boolean);
 }
+function keyMail(code, to, b) {
+  const plan = ['monthly', 'yearly', 'lifetime'].includes(b.plan) ? b.plan : 'lifetime', name = str(b.name, 120), amt = Number(b.amount) || 0;
+  const rows = [['Restaurant', name || '-'], ['Plan', PLAN_NAMES[plan]]].concat(amt > 0 ? [['Amount paid', '₹' + amt.toLocaleString('en-IN') + (b.method ? ' by ' + str(b.method, 30) : '')]] : []).concat(b.receipt ? [['Receipt', str(b.receipt, 40)]] : []).concat(b.until ? [[plan === 'lifetime' ? 'Updates included until' : 'Active until', /^\d{4}-\d{2}-\d{2}$/.test(String(b.until)) ? new Date(b.until + 'T00:00:00Z').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : str(b.until, 20)]] : []);
+  const admin = SITE_URL + '/admin';
+  const steps = ['Open your Veyra Dine In admin (on the website or the Windows app) and log in.', 'Go to <b>Plan &amp; billing</b>, or tap <b>Enter license key</b>.', 'Paste the key and press <b>Activate</b>.'];
+  const text = `Hi,\n\nThank you for buying Veyra Dine In. Here is your license key:\n\n    ${code}\n\nHow to use it:\n1. Open your Veyra Dine In admin (on the website or the Windows app) and log in.\n2. Go to Plan & billing, or tap Enter license key.\n3. Paste the key and press Activate.\n\n${rows.map(([a, c]) => a + ': ' + c).join('\n')}\n\nAdmin: ${admin}\n\nNo GST is charged. Need help? Just reply to this email, or write to ${CONTACT_EMAIL}.\n\nVeyra Creative & Digital Lab`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:520px;color:#1f1a14"><h2 style="margin:0 0 6px">Your license key</h2><p>Thank you for buying Veyra Dine In. Here is your key. It works for one restaurant.</p>
+<div style="font:700 24px/1.2 Consolas,monospace;letter-spacing:2px;background:#FDE7DC;color:#C2410C;padding:16px;border-radius:12px;text-align:center;margin:14px 0">${escH(code)}</div>
+<ol style="padding-left:20px;line-height:1.6;margin:0 0 14px">${steps.map(x => `<li>${x}</li>`).join('')}</ol>
+<table style="border-collapse:collapse;width:100%;font-size:14px">${rows.map(([a, c], i) => `<tr><td style="padding:6px 0;color:#7a6f63;${i ? 'border-top:1px solid #eee' : ''}">${escH(a)}</td><td style="padding:6px 0;font-weight:bold;${i ? 'border-top:1px solid #eee' : ''}">${escH(c)}</td></tr>`).join('')}</table>
+<p><a href="${admin}" style="display:inline-block;background:#E4572E;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open my admin</a></p><p style="color:#7a6f63;font-size:13px">No GST is charged. Need help? Just reply to this email, or write to ${CONTACT_EMAIL}.<br>Veyra Creative &amp; Digital Lab</p></div>`;
+  return { to, replyTo: CONTACT_EMAIL, subject: `Your Veyra Dine In license key (${PLAN_NAMES[plan]})`, text, html };
+}
 async function payEmail(r, pay) {
   const cfg = smtpCfg(); if (!cfg || !r.email) return;
   const lines = payLines(pay);
@@ -1610,7 +1623,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     catch (e) { if (e.status === 404) failCount(tk); return fail(res, e.status || 400, e.message); }
   }
   // ---- Veyra HQ only: every request is signed with Veyra's private license key ----
-  if (m === 'POST' && (p.startsWith('/api/licenses/') || p.startsWith('/api/hq/')) && ['/api/licenses/status', '/api/licenses/reset', '/api/licenses/revoke', '/api/licenses/unrevoke', '/api/hq/overview', '/api/hq/restaurant', '/api/hq/payment', '/api/hq/lead', '/api/hq/site', '/api/hq/site/save', '/api/hq/site/preview', '/api/hq/site/media', '/api/hq/analytics', '/api/hq/users', '/api/hq/seo', '/api/hq/seo-run'].includes(p)) {
+  if (m === 'POST' && (p.startsWith('/api/licenses/') || p.startsWith('/api/hq/')) && ['/api/licenses/status', '/api/licenses/reset', '/api/licenses/revoke', '/api/licenses/unrevoke', '/api/hq/overview', '/api/hq/restaurant', '/api/hq/payment', '/api/hq/lead', '/api/hq/site', '/api/hq/site/save', '/api/hq/site/preview', '/api/hq/site/media', '/api/hq/analytics', '/api/hq/users', '/api/hq/seo', '/api/hq/seo-run', '/api/hq/license-email'].includes(p)) {
     const ts = Number(body.ts), raw = String(body.code || '');
     const { code: _c, ts: _t, sig: _s, ...rest } = body;
     const bh = crypto.createHash('sha256').update(JSON.stringify(rest)).digest('hex');
@@ -1658,6 +1671,13 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       if (['new', 'contacted', 'planned', 'won', 'closed'].includes(body.status)) l.status = body.status;
       if ('note' in body) l.note = str(body.note, 1000);
       l.updatedAt = now(); save(); return send(res, 200, { ok: true });
+    }
+    if (p === '/api/hq/license-email') { // Veyra HQ made a key for a UPI/cash/bank payment: email it to the owner with the steps
+      if (!L) return fail(res, 404, 'This key is not on the server yet. Check the internet and try again.');
+      const to = str(body.to, 160).toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(to)) return fail(res, 400, 'Check the email address');
+      const cfg = smtpCfg(); if (!cfg) return fail(res, 400, 'Email is not set up on the server. Open /platform > Email codes.');
+      try { await mailer.send(cfg, keyMail(code, to, body)); } catch (e) { return fail(res, 502, 'Email failed: ' + e.message); }
+      L.emailed = { to, at: now() }; save(); return send(res, 200, { ok: true, to });
     }
     if (p === '/api/hq/payment') { // Veyra HQ "Mark as paid": UPI, cash or bank transfer taken by hand (code = restaurant id)
       const r = db.restaurants.find(x => x.id === raw); if (!r) return fail(res, 404, 'Restaurant not found');

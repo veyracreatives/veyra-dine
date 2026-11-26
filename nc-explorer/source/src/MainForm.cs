@@ -358,7 +358,21 @@ namespace VeyraNC
                 bool problem;
                 foreach (string n in NetCheck.Check(ip, out problem)) Log("Network: " + n);
                 string why;
-                if (!M.Reachable(out why)) { detail = why; return; }
+                if (!M.Reachable(out why))
+                {
+                    Log("Port " + M.Port + " did not work. Trying the other ports the M80 may use…");
+                    List<string> open = new List<string>();
+                    int fp = M.FindFtpPort(open);
+                    if (fp < 0)
+                    {
+                        detail = "The machine answers on the network, but not on any file-transfer port the app knows." +
+                                 (open.Count > 0 ? " Open ports: " + string.Join(", ", open) + "." : " No open ports found.") +
+                                 " Please send a photo of this message to Veyra support.";
+                        return;
+                    }
+                    Log("Found the file service on port " + fp + ".");
+                    M.Port = fp; S.Port = fp; S.Save();
+                }
                 ok = M.AutoLogin(out detail);
                 if (!ok) return;
                 // Remember the login that worked.
@@ -840,7 +854,14 @@ namespace VeyraNC
             foreach (string n in NetCheck.Check(ip, out problem)) log("Network: " + n);
             FtpMachine m = new FtpMachine { Host = ip, Log = log };
             string why;
-            if (!m.Reachable(out why)) { log("Port 21: " + why); }
+            if (!m.Reachable(out why))
+            {
+                log("Port 21: " + why);
+                List<string> open = new List<string>();
+                int fp = m.FindFtpPort(open);
+                log("Open ports: " + (open.Count == 0 ? "none" : string.Join(", ", open)));
+                if (fp > 0) { m.Port = fp; string d2; bool ok2 = m.AutoLogin(out d2); log("FTP on " + fp + " login: " + (ok2 ? d2 : "FAILED " + d2)); if (ok2) Walk(m, "/", 0, log); }
+            }
             else
             {
                 log("Port 21: open");

@@ -1,4 +1,4 @@
-Veyra NC Explorer 1.0.0 - read and write programs on a Mitsubishi M80 over the network cable.
+Veyra NC Explorer 1.0.1 - read and write programs on a Mitsubishi M80 over the network cable.
 
 HOW TO USE
 1. Open "NC Explorer (Veyra)" from the desktop.

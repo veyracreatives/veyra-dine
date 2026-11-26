@@ -81,6 +81,43 @@ namespace VeyraNC
             return r;
         }
 
+        public static readonly int[] CandidatePorts = { 21, 683, 2121, 20, 990, 64758, 5001, 8021, 1021, 10021 };
+
+        /// <summary>Probes likely ports. Returns the first port that greets like an FTP server ("220"), or -1. Logs every open port.</summary>
+        public int FindFtpPort(List<string> openPorts)
+        {
+            int found = -1;
+            foreach (int p in CandidatePorts)
+            {
+                try
+                {
+                    using (TcpClient c = new TcpClient())
+                    {
+                        IAsyncResult ar = c.BeginConnect(Host, p, null, null);
+                        if (!ar.AsyncWaitHandle.WaitOne(1500)) continue;
+                        c.EndConnect(ar);
+                        string banner = "";
+                        NetworkStream ns = c.GetStream();
+                        ns.ReadTimeout = 2000;
+                        try
+                        {
+                            byte[] buf = new byte[256];
+                            int n = ns.Read(buf, 0, buf.Length);
+                            banner = Encoding.ASCII.GetString(buf, 0, Math.Max(0, n)).Trim();
+                        }
+                        catch { }
+                        string clean = Regex.Replace(banner, @"[^\x20-\x7E]", ".");
+                        if (clean.Length > 60) clean = clean.Substring(0, 60);
+                        openPorts.Add(p + (clean.Length > 0 ? " (" + clean + ")" : " (no greeting)"));
+                        Log("Port " + p + " is open" + (clean.Length > 0 ? ", says: " + clean : ", no greeting"));
+                        if (found < 0 && banner.StartsWith("220")) found = p;
+                    }
+                }
+                catch { }
+            }
+            return found;
+        }
+
         /// <summary>Quick TCP check so we fail fast instead of hanging.</summary>
         public bool Reachable(out string why)
         {

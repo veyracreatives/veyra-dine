@@ -1,4 +1,4 @@
-Veyra NC Explorer 1.0.3 - read and write programs on a Mitsubishi M80 over the network cable.
+Veyra NC Explorer 1.0.4 - read and write programs on a Mitsubishi M80 over the network cable.
 
 HOW TO USE
 1. Open "NC Explorer (Veyra)" from the desktop.
@@ -11,7 +11,7 @@ SAFETY
 - Before a program on the machine is replaced, the machine copy is saved to Documents\NC Programs Backups\Machine.
   If that backup fails, nothing is replaced.
 - After writing, the app reads the program back and checks it matches.
-- The app never deletes or renames anything on the machine.
+- Delete (button or Delete key) saves a copy to Documents\NC Programs Backups\Deleted first. If that backup fails, nothing is deleted.
 - Do not write a program that is running or open in Edit on the machine.
 
 HOW IT CONNECTS

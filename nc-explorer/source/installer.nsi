@@ -1,7 +1,7 @@
 Unicode true
 !include "MUI2.nsh"
 Name "Veyra NC Explorer"
-OutFile "build\VeyraNCExplorer-Setup-1.0.3.exe"
+OutFile "build\VeyraNCExplorer-Setup-1.0.4.exe"
 InstallDir "$PROGRAMFILES64\Veyra NC Explorer"
 RequestExecutionLevel admin
 !define MUI_ICON "app.ico"
@@ -14,13 +14,15 @@ RequestExecutionLevel admin
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "English"
-VIProductVersion "1.0.3.0"
+VIProductVersion "1.0.4.0"
 VIAddVersionKey "ProductName" "Veyra NC Explorer"
-VIAddVersionKey "FileVersion" "1.0.3"
+VIAddVersionKey "FileVersion" "1.0.4"
 VIAddVersionKey "CompanyName" "Veyra Creatives"
 VIAddVersionKey "FileDescription" "Veyra NC Explorer Setup"
 Section "Install"
   SetOutPath "$INSTDIR"
+  nsExec::Exec 'taskkill /IM NCExplorer.exe /F'
+  Sleep 800
   File "build\NCExplorer.exe"
   File "app.ico"
   File "README.txt"
@@ -31,7 +33,7 @@ Section "Install"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\VeyraNCExplorer" "DisplayName" "Veyra NC Explorer"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\VeyraNCExplorer" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\VeyraNCExplorer" "DisplayIcon" "$INSTDIR\app.ico"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\VeyraNCExplorer" "DisplayVersion" "1.0.3"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\VeyraNCExplorer" "DisplayVersion" "1.0.4"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\VeyraNCExplorer" "Publisher" "Veyra Creatives"
 SectionEnd
 Section "Uninstall"

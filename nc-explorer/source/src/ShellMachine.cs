@@ -13,6 +13,7 @@ namespace VeyraNC
         List<RemoteEntry> List(string folder);
         void Download(string remoteFile, string localFile);
         void Upload(string localFile, string remoteFile);
+        void Delete(string remoteFile);
     }
 
     /// <summary>
@@ -246,6 +247,28 @@ namespace VeyraNC
                 if (len == last) { if (++stable >= 3) return; } else { stable = 0; last = len; }
             }
             throw new Exception("Timed out waiting for the machine.");
+        }
+
+        public void Delete(string remoteFile)
+        {
+            string dir = FtpMachine.Parent(remoteFile);
+            string name = Split(remoteFile)[Split(remoteFile).Length - 1];
+            Sta(delegate
+            {
+                dynamic sh = Shell();
+                dynamic f = Resolve(sh, dir);
+                dynamic item = FindItem(f, name);
+                if (item == null) return;
+                item.InvokeVerb("delete");
+                // NC Explorer may ask to confirm; wait until the file is gone.
+                DateTime end = DateTime.Now.AddMinutes(2);
+                while (DateTime.Now < end)
+                {
+                    Pump(800);
+                    if (FindItem(Resolve(Shell(), dir), name) == null) return;
+                }
+                throw new Exception(name + " is still on the machine. It may be running, open in Edit, or protected.");
+            });
         }
 
         public void Upload(string localFile, string remoteFile)

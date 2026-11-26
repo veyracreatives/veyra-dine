@@ -133,6 +133,7 @@ namespace VeyraNC
         FlatBtn readBtn = new FlatBtn("Read  →", true);
         FlatBtn writeBtn = new FlatBtn("←  Write", true);
         FlatBtn viewBtn = new FlatBtn("View", false);
+        FlatBtn deleteBtn = new FlatBtn("Delete", false);
         FlatBtn backupsBtn = new FlatBtn("Backups", false);
         FlatBtn netBtn = new FlatBtn("Network check", false);
         FlatBtn settingsBtn = new FlatBtn("Settings", false);
@@ -207,7 +208,8 @@ namespace VeyraNC
 
             // Middle action column
             FlowLayoutPanel mid = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(10, 90, 10, 0), BackColor = Theme.Bg };
-            foreach (FlatBtn b in new FlatBtn[] { readBtn, writeBtn, viewBtn })
+            deleteBtn.ForeColor = Theme.Bad;
+            foreach (FlatBtn b in new FlatBtn[] { readBtn, writeBtn, viewBtn, deleteBtn })
             {
                 b.Width = 128; b.Height = 40; b.Margin = new Padding(0, 0, 0, 10);
                 mid.Controls.Add(b);
@@ -256,6 +258,8 @@ namespace VeyraNC
             readBtn.Click += delegate { ReadSelected(); };
             writeBtn.Click += delegate { WriteSelected(null); };
             viewBtn.Click += delegate { ViewSelected(); };
+            deleteBtn.Click += delegate { DeleteSelected(); };
+            machinePane.List.KeyDown += (s2, e2) => { if (e2.KeyCode == Keys.Delete) DeleteSelected(); };
             backupsBtn.Click += delegate { Directory.CreateDirectory(BackupRoot()); Process.Start("explorer.exe", "\"" + BackupRoot() + "\""); };
             netBtn.Click += delegate { RunNetCheck(true); };
             settingsBtn.Click += delegate { ShowSettings(); };
@@ -311,6 +315,7 @@ namespace VeyraNC
         void UpdateButtons()
         {
             readBtn.Enabled = connected && !busy;
+            deleteBtn.Enabled = connected && !busy;
             writeBtn.Enabled = connected && !busy;
             connectBtn.Enabled = !busy;
             machinePane.UpBtn.Enabled = connected && !busy;
@@ -676,6 +681,52 @@ namespace VeyraNC
             string s = System.Text.Encoding.ASCII.GetString(b).Replace("\r", "");
             s = string.Join("\n", s.Split('\n').Select(l => l.TrimEnd()).Where(l => l.Length > 0 && l != "%"));
             return s;
+        }
+
+        // ---------- Delete on machine (backs up first) ----------
+        void DeleteSelected()
+        {
+            if (!connected || busy) return;
+            List<RemoteEntry> sel = SelectedRemote().Where(x => !x.IsFolder).ToList();
+            if (sel.Count == 0) { MessageBox.Show(this, "Select one or more files on the Machine side first. Folders cannot be deleted here.", "Delete", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            string dir = remoteDir;
+            string msg = "Delete " + sel.Count + " file(s) from the machine folder " + dir + "?\n\n  " + string.Join("\n  ", sel.Select(x => x.Name).Take(10)) +
+                         (sel.Count > 10 ? "\n  …" : "") +
+                         "\n\nA copy of each file is saved to Backups on this PC first. If the backup fails, that file is not deleted." +
+                         "\n\nDo not delete a program that is running or open in Edit on the machine.";
+            if (MessageBox.Show(this, msg, "Delete from machine", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+            string stamp = DateTime.Now.ToString("yyyy-MM-dd_HHmmss");
+            int ok = 0; List<string> problems = new List<string>();
+            Run("Deleting " + sel.Count + " file(s)…", delegate
+            {
+                foreach (RemoteEntry e in sel)
+                {
+                    string remote = FtpMachine.Join(dir, e.Name);
+                    try
+                    {
+                        string bdir = Path.Combine(S.BackupFolder(), "Deleted", stamp + "_" + dir.Trim('/').Replace('/', '_'));
+                        Directory.CreateDirectory(bdir);
+                        string bfile = Path.Combine(bdir, e.Name);
+                        M.Download(remote, bfile);
+                        if (!File.Exists(bfile)) throw new Exception("backup was not saved, so the file was not deleted");
+                        M.Delete(remote);
+                        ok++;
+                        Log("Deleted " + e.Name + " from " + dir + " (backup: " + bfile + ").");
+                    }
+                    catch (Exception ex)
+                    {
+                        string d = FtpMachine.Describe(ex);
+                        Log("Delete " + e.Name + " failed: " + d);
+                        problems.Add(e.Name + ": " + d);
+                    }
+                }
+            }, delegate
+            {
+                ListRemote(dir);
+                Log("Delete finished: " + ok + " of " + sel.Count + " file(s).");
+                if (problems.Count > 0)
+                    MessageBox.Show(this, "Some files were not deleted:\n\n" + string.Join("\n", problems), "Delete from machine", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            });
         }
 
         // ---------- tools ----------

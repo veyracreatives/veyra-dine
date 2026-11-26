@@ -244,6 +244,12 @@ namespace VeyraNC
             File.Move(tmp, localFile);
         }
 
+        public void Delete(string remoteFile)
+        {
+            FtpWebRequest r = Make(MakeUri(remoteFile, false), WebRequestMethods.Ftp.DeleteFile);
+            using (FtpWebResponse resp = (FtpWebResponse)r.GetResponse()) { }
+        }
+
         public void Upload(string localFile, string remoteFile)
         {
             FtpWebRequest r = Make(MakeUri(remoteFile, false), WebRequestMethods.Ftp.UploadFile);

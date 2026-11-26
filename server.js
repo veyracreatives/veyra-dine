@@ -447,7 +447,7 @@ async function seoRun(b) {
     case 'sitemap': return { msg: await seo.submitSitemap() };
     case 'inspect': return { inspect: await seo.inspect(b.url) };
     case 'backlinks': return { backlinks: await seo.backlinks(b.force) };
-    case 'pagespeed': return { pagespeed: await seo.pagespeed(b.strategy) };
+    case 'pagespeed': { const ps = await seo.pagespeed(b.strategy); return { pagespeed: ps, msg: ps.note || (Date.now() - ps.at > 120e3 ? 'Showing the last test from the past 12 hours, to save Google\'s daily limit.' : undefined) }; }
     default: throw Object.assign(new Error('Unknown action'), { status: 400 });
   }
 }

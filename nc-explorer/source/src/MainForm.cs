@@ -117,7 +117,7 @@ namespace VeyraNC
     public class MainForm : Form
     {
         Settings S = Settings.Load();
-        FtpMachine M;
+        IMachineLink M;
         bool connected;
         bool busy;
         string remoteDir = "/";
@@ -292,7 +292,7 @@ namespace VeyraNC
             statusDot.BackColor = on ? Theme.Good : Color.FromArgb(120, 126, 138);
             statusText.Text = text;
             connectBtn.Text = on ? "Disconnect" : "Connect";
-            machinePane.Heading.Text = on ? "Machine  ·  " + M.Host : "Machine";
+            machinePane.Heading.Text = on ? "Machine  ·  " + M.Host + "  (" + M.Kind + ")" : "Machine";
             if (!on) { machinePane.List.Items.Clear(); machinePane.PathLabel.Text = "Press Connect to see the machine's files"; }
             UpdateButtons();
         }
@@ -350,7 +350,7 @@ namespace VeyraNC
             string ip = ipBox.Text.Trim();
             if (ip.Length == 0) return;
             S.Host = ip; S.Save();
-            M = new FtpMachine { Host = ip, Port = S.Port, User = S.User, Password = S.Password, Passive = S.Passive, Log = Log };
+            FtpMachine ftp = new FtpMachine { Host = ip, Port = S.Port, User = S.User, Password = S.Password, Passive = S.Passive, Log = Log };
             string detail = null; bool ok = false; List<RemoteEntry> root = null; string start = "/";
             Log("Connecting to " + ip + "…");
             Run("Connecting…", delegate
@@ -358,25 +358,35 @@ namespace VeyraNC
                 bool problem;
                 foreach (string n in NetCheck.Check(ip, out problem)) Log("Network: " + n);
                 string why;
-                if (!M.Reachable(out why))
+                bool useFtp = ftp.Reachable(out why);
+                if (!useFtp && !ShellMachine.Available())
                 {
-                    Log("Port " + M.Port + " did not work. Trying the other ports the M80 may use…");
+                    Log("Port " + ftp.Port + " did not work. Trying the other ports the M80 may use…");
                     List<string> open = new List<string>();
-                    int fp = M.FindFtpPort(open);
-                    if (fp < 0)
+                    int fp = ftp.FindFtpPort(open);
+                    if (fp > 0) { ftp.Port = fp; S.Port = fp; S.Save(); useFtp = true; }
+                    else
                     {
-                        detail = "The machine answers on the network, but not on any file-transfer port the app knows." +
-                                 (open.Count > 0 ? " Open ports: " + string.Join(", ", open) + "." : " No open ports found.") +
-                                 " Please send a photo of this message to Veyra support.";
+                        detail = "This M80 only talks Mitsubishi's own protocol (port 683). Install Mitsubishi NC Explorer on this PC once; this app then uses its driver." +
+                                 (open.Count > 0 ? " Open ports: " + string.Join(", ", open) + "." : "");
                         return;
                     }
-                    Log("Found the file service on port " + fp + ".");
-                    M.Port = fp; S.Port = fp; S.Save();
                 }
-                ok = M.AutoLogin(out detail);
-                if (!ok) return;
-                // Remember the login that worked.
-                S.User = M.User; S.Password = M.Password; S.Save();
+                if (useFtp)
+                {
+                    ok = ftp.AutoLogin(out detail);
+                    if (!ok) return;
+                    S.User = ftp.User; S.Password = ftp.Password; S.Save();
+                    M = ftp;
+                }
+                else
+                {
+                    Log("Direct file port is closed on this M80. Using the Mitsubishi NC Explorer driver on this PC.");
+                    ShellMachine sm = new ShellMachine { Log = Log };
+                    ok = sm.Open(ip, out detail);
+                    if (!ok) return;
+                    M = sm;
+                }
                 start = string.IsNullOrEmpty(S.LastRemoteDir) ? "/" : S.LastRemoteDir;
                 try { root = M.List(start); }
                 catch { start = "/"; root = M.List("/"); }
@@ -874,10 +884,23 @@ namespace VeyraNC
                     Walk(m, "/", 0, log);
                 }
             }
+            try
+            {
+                log("NC Explorer driver folder: " + (ShellMachine.FindRoot() ?? "not found"));
+                if (ShellMachine.Available())
+                {
+                    ShellMachine sm = new ShellMachine { Log = log };
+                    string sd;
+                    bool sok = sm.Open(ip, out sd);
+                    log("Driver: " + sd);
+                    if (sok) Walk(sm, "/", 0, log);
+                }
+            }
+            catch (Exception ex) { log("Driver error: " + ex.Message); }
             File.WriteAllLines(outFile, lines);
             return 0;
         }
-        static void Walk(FtpMachine m, string dir, int depth, Action<string> log)
+        static void Walk(IMachineLink m, string dir, int depth, Action<string> log)
         {
             if (depth > 2) return;
             try

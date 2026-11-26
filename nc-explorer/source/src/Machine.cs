@@ -21,9 +21,10 @@ namespace VeyraNC
     /// <summary>
     /// Talks to the M80 directly over FTP, only when asked. No background polling, no broadcast search.
     /// </summary>
-    public class FtpMachine
+    public class FtpMachine : IMachineLink
     {
-        public string Host;
+        public string Host { get; set; }
+        public string Kind { get { return "direct"; } }
         public int Port = 21;
         public string User = "";
         public string Password = "";

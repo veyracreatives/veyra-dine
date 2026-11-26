@@ -26,6 +26,7 @@ namespace VeyraNC
         public Action<string> Log = delegate { };
         string rootPath;
         string machineName; // e.g. H4AV(192,168,200,1)
+        bool warmed;
         public string Host { get { return machineName ?? "NC Explorer"; } }
         public string Kind { get { return "NC Explorer driver"; } }
 
@@ -130,6 +131,11 @@ namespace VeyraNC
         static dynamic FindItem(dynamic folder, string name)
         {
             dynamic items = AllItems(folder);
+            if (items.Count == 0)
+            {
+                // Driver hasn't listed this folder yet: ask for the name directly (used only for navigating).
+                try { dynamic pn = folder.ParseName(name); if (pn != null && pn.IsFolder) return pn; } catch { }
+            }
             for (int i = 0; i < items.Count; i++)
             {
                 dynamic it = items.Item(i);
@@ -159,6 +165,22 @@ namespace VeyraNC
                         string full = rootPath + "\\" + machineName + (folder == "/" ? "" : "\\" + string.Join("\\", Split(folder)));
                         try { dynamic f2 = sh2.NameSpace(full); if (f2 != null) { dynamic i2 = AllItems(f2); if (i2.Count > 0) { f = f2; items = i2; } } } catch { }
                     }
+                }
+                if (items.Count == 0 && !warmed)
+                {
+                    // The driver fills folders only after Windows Explorer has opened them once. Open it, then read again.
+                    warmed = true;
+                    string full = rootPath + "\\" + machineName + (folder == "/" ? "" : "\\" + string.Join("\\", Split(folder)));
+                    Log("Waking up the Mitsubishi driver (opens an Explorer window once)…");
+                    try { System.Diagnostics.Process.Start("explorer.exe", "\"" + full + "\""); } catch { }
+                    for (int r = 0; r < 10 && items.Count == 0; r++) { Pump(1000); f = Resolve(Shell(), folder); items = AllItems(f); }
+                }
+                if (items.Count == 0 && folder == "/")
+                {
+                    Log("Driver returned no list for the machine; showing its standard folders.");
+                    foreach (string n in new[] { "CNC MEMORY", "CNC MEMORY2", "DS", "MEMORY CARD", "USB MEMORY" })
+                        result.Add(new RemoteEntry { Name = n, IsFolder = true });
+                    return;
                 }
                 if (items.Count == 0) Log("Driver returned no items for " + folder + ".");
                 // Sizes: FolderItem.Size is empty with this driver, so use the Details columns (read AFTER listing).

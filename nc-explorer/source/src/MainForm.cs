@@ -73,7 +73,7 @@ namespace VeyraNC
             bar.Controls.Add(PathLabel);
             if (extra != null)
             {
-                ExtraBtn = new FlatBtn(extra, false) { Dock = DockStyle.Right, Width = 92, Height = 30 };
+                ExtraBtn = new FlatBtn(extra, false) { Dock = DockStyle.Right, Width = 120, Height = 30 };
                 bar.Controls.Add(ExtraBtn);
             }
             bar.Controls.Add(UpBtn);
@@ -129,7 +129,7 @@ namespace VeyraNC
         Label statusDot = new Label();
         Label statusText = new Label();
         Pane machinePane = new Pane("Machine", "Refresh");
-        Pane pcPane = new Pane("This PC", "Browse…");
+        Pane pcPane = new Pane("This PC", "Open files…");
         FlatBtn readBtn = new FlatBtn("Read  →", true);
         FlatBtn writeBtn = new FlatBtn("←  Write", true);
         FlatBtn viewBtn = new FlatBtn("View", false);
@@ -434,8 +434,8 @@ namespace VeyraNC
             foreach (RemoteEntry e in items)
             {
                 ListViewItem it = new ListViewItem(e.Name, e.IsFolder ? "folder" : "file");
-                it.SubItems.Add(e.IsFolder ? "" : FmtSize(e.Size));
-                it.SubItems.Add(e.Modified.HasValue ? e.Modified.Value.ToString("dd-MM-yyyy HH:mm") : "");
+                it.SubItems.Add(e.IsFolder ? "" : (e.Size > 0 ? FmtSize(e.Size) : (e.SizeText ?? FmtSize(e.Size))));
+                it.SubItems.Add(e.Modified.HasValue ? e.Modified.Value.ToString("dd-MM-yyyy HH:mm") : (e.ModifiedText ?? ""));
                 it.Tag = e;
                 lv.Items.Add(it);
             }
@@ -517,8 +517,26 @@ namespace VeyraNC
 
         void BrowseLocal()
         {
-            using (FolderBrowserDialog d = new FolderBrowserDialog { SelectedPath = localDir, Description = "Choose the folder on this PC for NC programs" })
-                if (d.ShowDialog(this) == DialogResult.OK) { localDir = d.SelectedPath; S.LocalFolder = localDir; S.Save(); RefreshLocal(); }
+            using (OpenFileDialog d = new OpenFileDialog())
+            {
+                d.Title = "Choose G-code programs to send to the machine";
+                d.Multiselect = true;
+                d.Filter = "NC / G-code programs (*.nc;*.tap;*.txt;*.gcode;*.ngc;*.cnc;*.eia;*.mpf;*.min;*.prg;*.ptp)|*.nc;*.tap;*.txt;*.gcode;*.ngc;*.cnc;*.eia;*.mpf;*.min;*.prg;*.ptp|All files (*.*)|*.*";
+                d.FilterIndex = 2; // show everything by default; many programs have no extension
+                d.InitialDirectory = localDir;
+                d.RestoreDirectory = true;
+                if (d.ShowDialog(this) != DialogResult.OK || d.FileNames.Length == 0) return;
+                localDir = Path.GetDirectoryName(d.FileNames[0]);
+                S.LocalFolder = localDir; S.Save();
+                RefreshLocal();
+                HashSet<string> pick = new HashSet<string>(d.FileNames, StringComparer.OrdinalIgnoreCase);
+                foreach (ListViewItem it in pcPane.List.Items) it.Selected = pick.Contains(it.Tag as string ?? "");
+                if (pcPane.List.SelectedItems.Count > 0) pcPane.List.SelectedItems[0].EnsureVisible();
+                pcPane.List.Focus();
+                Log("Picked " + d.FileNames.Length + " file(s) from " + localDir + ".");
+                if (connected && !busy) WriteSelected(d.FileNames.ToList());
+                else Log("Press Connect, open the machine folder you want, then press Write.");
+            }
         }
 
         List<string> SelectedLocalFiles()

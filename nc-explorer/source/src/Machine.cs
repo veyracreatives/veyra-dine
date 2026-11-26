@@ -16,6 +16,8 @@ namespace VeyraNC
         public bool IsFolder;
         public long Size = -1;
         public DateTime? Modified;
+        public string SizeText;
+        public string ModifiedText;
     }
 
     /// <summary>

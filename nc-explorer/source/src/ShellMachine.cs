@@ -136,6 +136,17 @@ namespace VeyraNC
             {
                 dynamic sh = Shell();
                 dynamic f = Resolve(sh, folder);
+                // NC Explorer leaves FolderItem.Size empty, so read the Details columns instead.
+                int sizeCol = -1, dateCol = -1;
+                for (int c = 0; c < 40; c++)
+                {
+                    string h = "";
+                    try { h = (string)f.GetDetailsOf(null, c); } catch { }
+                    if (string.IsNullOrEmpty(h)) continue;
+                    string hl = h.ToLowerInvariant();
+                    if (sizeCol < 0 && hl.Contains("size")) sizeCol = c;
+                    if (dateCol < 0 && (hl.Contains("modified") || hl.Contains("update") || hl == "date")) dateCol = c;
+                }
                 dynamic items = f.Items();
                 for (int i = 0; i < items.Count; i++)
                 {
@@ -143,8 +154,34 @@ namespace VeyraNC
                     RemoteEntry e = new RemoteEntry();
                     e.Name = it.Name;
                     e.IsFolder = it.IsFolder;
-                    if (!e.IsFolder) { try { e.Size = (long)it.Size; } catch { } }
+                    if (!e.IsFolder)
+                    {
+                        try { long sz = (long)it.Size; if (sz > 0) e.Size = sz; } catch { }
+                        if (e.Size <= 0 && sizeCol >= 0)
+                        {
+                            try
+                            {
+                                string st = ((string)f.GetDetailsOf(it, sizeCol) ?? "").Trim();
+                                e.SizeText = st;
+                                long parsed = ParseSize(st);
+                                if (parsed >= 0) e.Size = parsed;
+                            }
+                            catch { }
+                        }
+                    }
                     try { DateTime d = it.ModifyDate; if (d.Year > 1980) e.Modified = d; } catch { }
+                    if (!e.Modified.HasValue && dateCol >= 0)
+                    {
+                        try
+                        {
+                            string dt = ((string)f.GetDetailsOf(it, dateCol) ?? "").Trim();
+                            // Strip invisible direction marks Windows puts into dates.
+                            dt = System.Text.RegularExpressions.Regex.Replace(dt, @"[\u200e\u200f]", "");
+                            DateTime d2;
+                            if (DateTime.TryParse(dt, out d2) && d2.Year > 1980) e.Modified = d2; else e.ModifiedText = dt;
+                        }
+                        catch { }
+                    }
                     result.Add(e);
                 }
             });
@@ -154,6 +191,18 @@ namespace VeyraNC
                 return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
             });
             return result;
+        }
+
+        static long ParseSize(string st)
+        {
+            if (string.IsNullOrEmpty(st)) return -1;
+            System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(st.Replace(",", ""), @"([\d.]+)\s*(bytes|byte|b|kb|mb|gb)?", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!m.Success) return -1;
+            double v;
+            if (!double.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out v)) return -1;
+            string u = m.Groups[2].Value.ToLowerInvariant();
+            if (u == "kb") v *= 1024; else if (u == "mb") v *= 1048576; else if (u == "gb") v *= 1073741824;
+            return (long)v;
         }
 
         public void Download(string remoteFile, string localFile)

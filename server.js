@@ -256,7 +256,7 @@ async function seoRun(b) {
     case 'sitemap': { const m = await seo.submitSitemap(); hqLog(m); return { msg: m }; }
     case 'inspect': return { inspect: await seo.inspect(b.url) };
     case 'backlinks': return { backlinks: await seo.backlinks(b.force) };
-    case 'pagespeed': return { pagespeed: await seo.pagespeed(b.strategy) };
+    case 'pagespeed': { const ps = await seo.pagespeed(b.strategy); return { pagespeed: ps, msg: ps.note || (Date.now() - ps.at > 120e3 ? 'Showing the last test from the past 12 hours, to save Google\'s daily limit.' : undefined) }; }
     default: throw new Error('Unknown action');
   }
 }

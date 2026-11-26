@@ -134,6 +134,7 @@ namespace VeyraNC
         FlatBtn writeBtn = new FlatBtn("←  Write", true);
         FlatBtn viewBtn = new FlatBtn("View", false);
         FlatBtn deleteBtn = new FlatBtn("Delete", false);
+        FlatBtn compareBtn = new FlatBtn("Compare", false);
         FlatBtn backupsBtn = new FlatBtn("Backups", false);
         FlatBtn netBtn = new FlatBtn("Network check", false);
         FlatBtn settingsBtn = new FlatBtn("Settings", false);
@@ -209,7 +210,7 @@ namespace VeyraNC
             // Middle action column
             FlowLayoutPanel mid = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(10, 90, 10, 0), BackColor = Theme.Bg };
             deleteBtn.ForeColor = Theme.Bad;
-            foreach (FlatBtn b in new FlatBtn[] { readBtn, writeBtn, viewBtn, deleteBtn })
+            foreach (FlatBtn b in new FlatBtn[] { readBtn, writeBtn, viewBtn, compareBtn, deleteBtn })
             {
                 b.Width = 128; b.Height = 40; b.Margin = new Padding(0, 0, 0, 10);
                 mid.Controls.Add(b);
@@ -259,6 +260,7 @@ namespace VeyraNC
             writeBtn.Click += delegate { WriteSelected(null); };
             viewBtn.Click += delegate { ViewSelected(); };
             deleteBtn.Click += delegate { DeleteSelected(); };
+            compareBtn.Click += delegate { CompareSelected(); };
             machinePane.List.KeyDown += (s2, e2) => { if (e2.KeyCode == Keys.Delete) DeleteSelected(); };
             backupsBtn.Click += delegate { Directory.CreateDirectory(BackupRoot()); Process.Start("explorer.exe", "\"" + BackupRoot() + "\""); };
             netBtn.Click += delegate { RunNetCheck(true); };
@@ -316,6 +318,7 @@ namespace VeyraNC
         {
             readBtn.Enabled = connected && !busy;
             deleteBtn.Enabled = connected && !busy;
+            compareBtn.Enabled = connected && !busy;
             writeBtn.Enabled = connected && !busy;
             connectBtn.Enabled = !busy;
             machinePane.UpBtn.Enabled = connected && !busy;
@@ -485,7 +488,7 @@ namespace VeyraNC
             string path = FtpMachine.Join(remoteDir, e.Name);
             Run("Opening " + e.Name + "…", delegate { M.Download(path, tmp); }, delegate
             {
-                if (File.Exists(tmp)) new ViewerForm(tmp, "Machine: " + path, false).Show(this);
+                if (File.Exists(tmp)) new ProgramForm(tmp, "Machine: " + path, false).Show(this);
             });
         }
 
@@ -556,7 +559,7 @@ namespace VeyraNC
             if (pcPane.List.SelectedItems.Count != 1) return;
             string p = (string)pcPane.List.SelectedItems[0].Tag;
             if (Directory.Exists(p)) { localDir = p; RefreshLocal(); }
-            else if (File.Exists(p)) new ViewerForm(p, "This PC: " + p, true).Show(this);
+            else if (File.Exists(p)) new ProgramForm(p, "This PC: " + p, true).Show(this);
         }
 
         void ViewSelected()
@@ -625,8 +628,26 @@ namespace VeyraNC
             if (renamed.Count > 0) msg += "\n\nThe machine only accepts capital letters, no spaces. These will be renamed:\n  " + string.Join("\n  ", renamed.Take(8));
             if (replacing.Count > 0) msg += "\n\nThese already exist on the machine and will be REPLACED:\n  " + string.Join("\n  ", replacing.Take(8)) +
                 "\n\nThe machine's current copy is saved to Backups on this PC first. If that backup fails, nothing is replaced.";
+            List<string> found = new List<string>(); int errs = 0;
+            foreach (string[] p in plan)
+            {
+                try
+                {
+                    if (new FileInfo(p[0]).Length > 20000000) continue;
+                    GProgram gp = GProgram.Parse(File.ReadAllText(p[0]), ProgramForm.Limits);
+                    foreach (Issue i in gp.Issues)
+                    {
+                        if (i.Severity == Sev.Info) continue;
+                        if (i.Severity == Sev.Error) errs++;
+                        if (found.Count < 8) found.Add(p[1] + (i.Line >= 0 ? " line " + (i.Line + 1) : "") + ": " + i.Text);
+                    }
+                }
+                catch { }
+            }
+            if (found.Count > 0) msg += "\n\nSAFETY CHECK found " + (errs > 0 ? errs + " problem(s)" : "warnings") + ":\n  • " + string.Join("\n  • ", found) + "\n(Double-click the file to see details.)";
+            else msg += "\n\nSafety check: OK ✓";
             msg += "\n\nDo not write a program that is running or open in Edit on the machine.";
-            if (MessageBox.Show(this, msg, "Write to machine", MessageBoxButtons.OKCancel, replacing.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Question) != DialogResult.OK) return;
+            if (MessageBox.Show(this, msg + (found.Count > 0 ? "\n\nWrite anyway?" : ""), "Write to machine", MessageBoxButtons.OKCancel, (replacing.Count > 0 || found.Count > 0) ? MessageBoxIcon.Warning : MessageBoxIcon.Question, found.Count > 0 ? MessageBoxDefaultButton.Button2 : MessageBoxDefaultButton.Button1) != DialogResult.OK) return;
 
             string stamp = DateTime.Now.ToString("yyyy-MM-dd_HHmmss");
             int ok = 0;
@@ -681,6 +702,38 @@ namespace VeyraNC
             string s = System.Text.Encoding.ASCII.GetString(b).Replace("\r", "");
             s = string.Join("\n", s.Split('\n').Select(l => l.TrimEnd()).Where(l => l.Length > 0 && l != "%"));
             return s;
+        }
+
+        // ---------- Compare PC vs machine ----------
+        void CompareSelected()
+        {
+            if (!connected || busy) return;
+            List<string> pcs = SelectedLocalFiles();
+            RemoteEntry me = SelectedRemote().FirstOrDefault(x => !x.IsFolder);
+            if (me == null && pcs.Count == 1)
+            {
+                string n = NcName.Fix(Path.GetFileName(pcs[0]));
+                me = remoteItems.FirstOrDefault(x => !x.IsFolder && string.Equals(x.Name, n, StringComparison.OrdinalIgnoreCase));
+            }
+            string pc = pcs.Count == 1 ? pcs[0] : null;
+            if (pc == null && me != null)
+            {
+                string guess = Path.Combine(localDir, me.Name);
+                if (File.Exists(guess)) pc = guess;
+            }
+            if (me == null || pc == null)
+            {
+                MessageBox.Show(this, "Select one program on the Machine side and one on the This PC side (or files with the same name), then press Compare.", "Compare", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            string tmp = Path.Combine(Path.GetTempPath(), "VeyraNC_cmp_" + Guid.NewGuid().ToString("N"));
+            string remote = FtpMachine.Join(remoteDir, me.Name);
+            Run("Comparing…", delegate { M.Download(remote, tmp); }, delegate
+            {
+                if (!File.Exists(tmp)) return;
+                string mt = File.ReadAllText(tmp); File.Delete(tmp);
+                new DiffForm("Machine: " + me.Name, mt, "PC: " + Path.GetFileName(pc), File.ReadAllText(pc)).Show(this);
+            });
         }
 
         // ---------- Delete on machine (backs up first) ----------
@@ -910,6 +963,12 @@ namespace VeyraNC
         static int Main(string[] args)
         {
             if (args.Length > 0 && args[0] == "--diag") return Diag.Run(args);
+            if (args.Length > 0 && File.Exists(args[0]))
+            {
+                Application.EnableVisualStyles();
+                Application.Run(new ProgramForm(args[0], args[0], true));
+                return 0;
+            }
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             MainForm f = new MainForm();

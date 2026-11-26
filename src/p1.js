@@ -27,6 +27,12 @@ const staff = id => (B && B.staff.find(s => s.id === id)) || { id, name: 'No coa
 const player = id => (B && B.players.find(p => p.id === id)) || null;
 const ground = id => (B && B.grounds.find(g => g.id === id)) || { name: '' };
 const coachName = b => b.coach ? staff(b.coach).name : 'No coach yet';
+const waHref = (phone, text) => `https://wa.me/${!LIVE ? '' : String(phone || '').replace(/\D/g, '').replace(/^(\d{10})$/, '91$1')}?text=${encodeURIComponent(text)}`;
+const waBtn = (phone, text, label) => phone ? `<a class="btn ${label ? 'btn-ghost' : 'btn-quiet'} btn-sm wa-btn" target="_blank" rel="noopener" href="${waHref(phone, text)}" aria-label="Send on WhatsApp">${ic('chat')}<span${label ? '' : ' class="hide-sm"'}>${label || 'WhatsApp'}</span></a>` : '';
+const mapUrl = g => !g || !g.map ? '' : /^https?:\/\//i.test(g.map) ? g.map : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(g.map);
+const SP = () => C.sportOf(B && B.academy);
+const VN = (pl, low) => { const w = SP().vn + (pl ? 's' : ''); return low ? w.toLowerCase() : w; };
+const navL = l => l === 'Grounds' ? VN(1) : l;
 const jersey = (p, cls) => `<span class="jersey ${cls || ''}" style="background:${tintBg(batch(p.batch).tint)}">${p.no || initials(p.name)}</span>`;
 const av = (name, cls) => { let h = 0; for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) % 360; return `<span class="av ${cls || ''}" style="background:hsl(${h} 30% 30%)">${initials(name)}</span>`; };
 const feePill = s => ({ paid: '<span class="pill p-ok">Paid</span>', verify: '<span class="pill p-info">Check UPI</span>', due: '<span class="pill p-warn">Due</span>', overdue: '<span class="pill p-bad">Overdue</span>', waived: '<span class="pill p-mute">Waived</span>', break: '<span class="pill p-info plain">On break</span>', none: '<span class="pill p-mute plain">No bill</span>' }[s] || '');
@@ -66,9 +72,9 @@ const DemoAPI = (() => {
     db = { users: {}, mem: [], ac: {}, ses: null, hq: { plans: { monthly: 1450, yearly: 8500, trial: 10 }, sales: [], keys: [], activity: [], seq: 41 } };
     const ac = C.demo(env(), Date.now()); db.ac[ac.id] = ac; db.demoAid = ac.id;
     const now = Date.now(), D = 864e5;
-    db.hq.sales = [['Thane Tigers Football School', 'yearly', 8500, 'Razorpay', 2], ['Vashi United Juniors', 'monthly', 1450, 'Razorpay', 6], ['Belapur Ballers', 'yearly', 8500, 'Licence key', 12], ['Panvel Footie Kids', 'monthly', 1450, 'Razorpay', 27]].map(([academy, plan, amt, via, d], i) => ({ id: 'VFR-' + new Date().getFullYear() + '-00' + (38 + i), at: now - d * D, academy, plan, amt, via }));
-    db.hq.others = [['Thane Tigers Football School', 'Ghodbunder Rd, Thane', 'yearly', 142, 300], ['Vashi United Juniors', 'Vashi, Navi Mumbai', 'monthly', 68, 24], ['Belapur Ballers', 'CBD Belapur', 'yearly', 91, 200], ['Panvel Footie Kids', 'New Panvel', 'monthly', 37, 3], ['Airoli Strikers Academy', 'Airoli', 'monthly', 44, -9]].map(([name, place, type, players, days]) => ({ name, place, type, players, until: now + days * D }));
-    db.hq.activity = [['Thane Tigers Football School paid ₹8,500 for yearly (Razorpay)', 2], ['Vashi United Juniors paid ₹1,450 for monthly (Razorpay)', 6], ['Licence key made for Belapur Ballers (yearly)', 12], ['Airoli Strikers Academy plan ended', 16], ['Kickstart FC Academy started a trial', 1]].map(([text, d]) => ({ at: now - d * D, text })).sort((a, b) => b.at - a.at);
+    db.hq.sales = [['Thane Tigers Cricket Nets', 'yearly', 8500, 'Razorpay', 2], ['Vashi United Juniors', 'monthly', 1450, 'Razorpay', 6], ['Belapur Ballers', 'yearly', 8500, 'Licence key', 12], ['Panvel Swim School', 'monthly', 1450, 'Razorpay', 27]].map(([academy, plan, amt, via, d], i) => ({ id: 'VFR-' + new Date().getFullYear() + '-00' + (38 + i), at: now - d * D, academy, plan, amt, via }));
+    db.hq.others = [['Thane Tigers Cricket Nets', 'Ghodbunder Rd, Thane', 'yearly', 142, 300], ['Vashi United Juniors', 'Vashi, Navi Mumbai', 'monthly', 68, 24], ['Belapur Ballers', 'CBD Belapur', 'yearly', 91, 200], ['Panvel Swim School', 'New Panvel', 'monthly', 37, 3], ['Airoli Strikers Academy', 'Airoli', 'monthly', 44, -9]].map(([name, place, type, players, days]) => ({ name, place, type, players, until: now + days * D }));
+    db.hq.activity = [['Thane Tigers Cricket Nets paid ₹8,500 for yearly (Razorpay)', 2], ['Vashi United Juniors paid ₹1,450 for monthly (Razorpay)', 6], ['Licence key made for Belapur Ballers (yearly)', 12], ['Airoli Strikers Academy plan ended', 16], ['Kickstart FC Academy started a trial', 1]].map(([text, d]) => ({ at: now - d * D, text })).sort((a, b) => b.at - a.at);
     save();
   }
   function save() { store.set(db); }

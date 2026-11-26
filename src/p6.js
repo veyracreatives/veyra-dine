@@ -134,7 +134,7 @@ document.addEventListener('click', async e => {
     paySal: () => U.modal && U.modal.t === 'sal' ? act('salary.paid', { sid: U.modal.s, amt: val('sal-a'), note: val('sal-n') }) : act('salary.paid', { sid: d.s }),
     ground: () => { U.ground = d.v; rerender(); },
     addGround: () => openModal({ t: 'ground' }), editGround: () => openModal({ t: 'ground', id: d.v }),
-    saveGround: () => act('ground.save', { id: M.id, name: val('g-n') }),
+    saveGround: () => act('ground.save', { id: M.id, name: val('g-n'), map: val('g-m') }),
     delGround: () => { if (armed(a, 'Tap again: remove')) act('ground.delete', { id: d.v }); },
     book: () => openModal({ t: 'book', d: d.d, time: d.t }),
     saveBook: () => act('booking.add', { gid: U.ground, date: M.d, time: M.time, what: val('bk-w') }),
@@ -224,6 +224,14 @@ function shrinkImg(file) {
 }
 document.addEventListener('submit', async e => {
   e.preventDefault(); const f = e.target;
+  if (f.id === 'enqForm') {
+    const m = $('#eq-msg'), body = { name: val('eq-n'), academy: val('eq-a'), phone: val('eq-p'), email: val('eq-e'), website: val('eq-w'), vid: (window.VA && VA.vid ? VA.vid() : '') };
+    m.className = 'bad'; if (!body.name) { m.textContent = 'Add your name'; return; }
+    if (!/^\S+@\S+\.\S+$/.test(body.email) && body.phone.replace(/\D/g, '').length < 10) { m.textContent = 'Add a phone number or email so we can reach you'; return; }
+    const btn = f.querySelector('[type=submit]'); btn.disabled = true;
+    try { if (LIVE) await LiveAPI.req('/api/enquiry', body); f.reset(); m.className = 'ok'; m.textContent = 'Thanks! We will get back to you within a day.'; } catch (err) { m.textContent = err.message; }
+    btn.disabled = false; return;
+  }
   if (f.id === 'authForm') {
     const kind = f.dataset.kind, em = val('f-em').toLowerCase(), pw = $('#f-pw') ? $('#f-pw').value : '';
     const btn = f.querySelector('[type=submit]'); showAuthErr('');

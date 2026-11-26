@@ -230,7 +230,7 @@ function hqUsers() {
     const ft = u.vid ? A.first(u.vid) : null;
     out.push({ id: u.id, name: u.name, email: u.email, phone: u.phone || '', createdAt: u.createdAt, lastLogin: u.lastLogin || 0, seen: Math.max(u.seen || 0, u.lastLogin || 0), logins: u.logins || 0, signIn: u.google ? (u.lastVia === 'email' ? 'Google + email' : 'Google') : 'Email', roles, source: ft ? { src: ft.src, ref: ft.ref, utm: ft.utm, city: ft.ct, device: ft.dv, page: ft.p, first: ft.f } : null });
   }
-  (db.hq.leads || []).forEach(l => { if (!userByEmail(l.email)) out.push({ id: 'lead-' + l.email, name: l.name, email: l.email, phone: '', createdAt: l.at, lastLogin: 0, seen: l.at, logins: 0, signIn: 'Google · sign-up not finished', roles: [], lead: true, source: null }); });
+  (db.hq.leads || []).forEach((l, i) => { if (!l.email || !userByEmail(l.email)) out.push({ id: 'lead-' + (l.email || i), name: l.name, email: l.email || '', phone: l.phone || '', createdAt: l.at, lastLogin: 0, seen: l.at, logins: 0, signIn: l.via === 'Enquiry' ? 'Enquiry form' + (l.academy ? ' · ' + l.academy : '') + (l.sport ? ' · ' + l.sport : '') : 'Google · sign-up not finished', roles: [], lead: true, source: null }); });
   return { users: out.sort((a, b) => b.createdAt - a.createdAt) };
 }
 function seoState() {
@@ -324,6 +324,20 @@ const server = http.createServer(async (req, res) => {
         hqLog(`New trial: ${ac.name} (${email})`); startSession(res, usr.uid);
         mail(email, 'Welcome to Veyra Academy', `Hi ${b.name},\n\n${ac.name} is set up with a ${db.hq.plans.trial}-day free trial.\nOpen: ${BASE}/#admin\n\nStart by adding your batches, coaches and players.\n`);
         return send(res, 200, { ok: true, created: true });
+      }
+      if (p === '/api/enquiry') {
+        if (b.website) return send(res, 200, { ok: true });
+        if (limited(req, 'eq', 5, 60 * 60e3)) return bad(res, 'Too many requests. Try again in an hour.', 429);
+        const s = (v, n) => String(v || '').replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, n);
+        const name = s(b.name, 80), email = lc(s(b.email, 120)), phone = s(b.phone, 20).replace(/[^\d+ -]/g, '');
+        if (!name) return bad(res, 'Add your name');
+        if (!(email && /^\S+@\S+\.\S+$/.test(email)) && phone.replace(/\D/g, '').length < 10) return bad(res, 'Add a phone number or email so we can reach you');
+        db.hq.leads = db.hq.leads || [];
+        db.hq.leads.unshift({ email: email && /^\S+@\S+\.\S+$/.test(email) ? email : '', phone, name, academy: s(b.academy, 80), sport: own(C.SPORTS, b.sport) ? C.SPORTS[b.sport].name : '', at: Date.now(), via: 'Enquiry', vid: String(b.vid || '').replace(/[^\w-]/g, '').slice(0, 24) });
+        db.hq.leads.length = Math.min(db.hq.leads.length, 500);
+        hqLog(`Enquiry from ${name}${b.academy ? ' (' + s(b.academy, 80) + ')' : ''}`); save();
+        mail('marketing@veyracreatives.com', 'New Veyra Academy enquiry', `${name}\n${s(b.academy, 80)}\n${phone}\n${email}\n\nOpen Veyra Academy HQ > Users > Enquiries.`);
+        return send(res, 200, { ok: true });
       }
       if (p === '/api/login') {
         if (limited(req, 'li', 20, 15 * 60e3)) return bad(res, 'Too many tries. Wait 15 minutes.', 429);

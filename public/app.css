@@ -431,3 +431,19 @@ a.tick{text-decoration:none}
 #pricing .sec-head{margin-inline:auto;text-align:center;justify-items:center}
 #pricing .sec-head .eyebrow{justify-self:center!important}
 .price-wrap{margin-inline:auto}
+.sports-row{gap:8px}
+.sport-ic{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px 0 8px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none}
+.sport-ic span{font-size:16px;line-height:1}
+.sport-ic:hover{border-color:var(--brand);color:var(--brand)}
+.sport-ic.more{padding:0 12px;color:var(--brand);border-color:color-mix(in srgb,var(--brand) 40%,transparent)}
+
+@media(min-width:1000px){.hero h1{font-size:clamp(56px,5.3vw,80px)}}
+@media(max-width:359px){.lp-cta .get-app{display:none}}
+.enq{margin:28px auto 0;max-width:720px;display:grid;gap:12px;justify-items:center;text-align:center;position:relative}
+.enq-h{margin:0;font-size:14.5px;color:var(--muted)}
+.enq-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%}
+@media(max-width:560px){.enq-g{grid-template-columns:1fr}}
+.enq #eq-msg{min-height:18px;font-size:13.5px}.enq #eq-msg.bad{color:var(--bad)}.enq #eq-msg.ok{color:var(--ok)}
+.dir-link{display:inline-flex;align-items:center;gap:4px;margin-top:6px;font-size:13px;font-weight:600;color:var(--brand)}.dir-link svg{width:14px;height:14px}
+@media(max-width:560px){.fee-t thead{display:none}.fee-t,.fee-t tbody{display:block;min-width:0!important;width:100%}.fee-t tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;padding:12px 16px;border-bottom:1px solid var(--line)}.fee-t td{padding:0!important;border:0!important}.fee-t td:nth-child(1){grid-column:1;grid-row:1}.fee-t td:nth-child(3){grid-column:1;grid-row:2;align-self:center}.fee-t td:nth-child(4){grid-column:2;grid-row:1}.fee-t td:nth-child(5){grid-column:2;grid-row:2}.fee-t td[colspan]{grid-column:1/-1;grid-row:auto}}
+@media(min-width:561px) and (max-width:1240px){.fee-t th:nth-child(2),.fee-t td:nth-child(2){display:none}}

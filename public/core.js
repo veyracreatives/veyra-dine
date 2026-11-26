@@ -57,6 +57,7 @@ C.SPORTS = {
   martial: { name: 'Martial arts', skills: ['Technique', 'Forms', 'Sparring', 'Flexibility', 'Fitness', 'Discipline'], ball: 'Kick pads', drills: [D_('Warm-up and stretching', 'Warm-up', 10), D_('Basic stances and blocks', 'Technique', 12), D_('Kicks on pads', 'Technique', 12), D_('Forms practice', 'Forms', 15), D_('Controlled sparring', 'Sparring', 15), D_('Flexibility routine', 'Flexibility', 10), D_('Conditioning circuit', 'Fitness', 10)] },
   other: { name: 'Other', skills: ['Technique', 'Fitness', 'Focus', 'Teamwork', 'Discipline', 'Progress'], ball: 'Equipment', drills: [D_('Warm-up', 'Warm-up', 10), D_('Skill practice', 'Technique', 20), D_('Fitness circuit', 'Fitness', 12), D_('Game or performance', 'Game', 20), D_('Cool-down', 'Cool-down', 5)] }
 };
+(() => { const W = {"football": ["Goals", "⚽", "Turf 1, Sector 21", "Kick-off"], "cricket": ["Runs", "🏏", "Nets 2, Sector 21", "Start"], "badminton": ["Points", "🏸", "Court 2, Sports complex", "Start"], "tennis": ["Games", "🎾", "Court 1, Club", "Start"], "basketball": ["Points", "🏀", "Court A, Sector 21", "Tip-off"], "swimming": ["Medals", "🏅", "Pool, lanes 1–4", "Start"], "skating": ["Medals", "🏅", "Rink, Sector 21", "Start"], "athletics": ["Medals", "🏅", "Track, Sector 21", "Start"], "martial": ["Medals", "🏅", "Dojo hall 1", "Start"], "other": ["Points", "⭐", "Hall 1, Sector 21", "Start"]}; Object.keys(W).forEach(k => { const [pt, em, ven, start] = W[k]; Object.assign(C.SPORTS[k], { pt, em, ven, start, sub: {"football": "pitch", "cricket": "net", "badminton": "court", "tennis": "court", "basketball": "court", "swimming": "pool", "skating": "rink", "athletics": "track", "martial": "hall", "other": "venue"}[k], subEg: {"football": "Pitch 1, Vashi turf", "cricket": "Nets 2, Vashi", "badminton": "Court 3, Nerul complex", "tennis": "Court 1, Vashi club", "basketball": "Court A, Sector 21", "swimming": "Small pool, Vashi", "skating": "Rink 2, Kharghar", "athletics": "Track B, Thane", "martial": "Hall 2, Airoli", "other": "Hall 1, Sector 21"}[k], vn: {"football": "Ground", "cricket": "Ground", "badminton": "Court", "tennis": "Court", "basketball": "Court", "swimming": "Pool", "skating": "Rink", "athletics": "Track", "martial": "Hall", "other": "Venue"}[k] }); }); })();
 C.sportOf = ac => C.SPORTS[(ac && ac.sport) || 'football'] || C.SPORTS.football;
 C.PLAN_POINTS = { monthly: ['Admin, manager, coach and parent apps', 'Attendance for players and coaches', 'UPI fee collection and receipts', 'Player breaks, coach leave and salaries', 'Tournaments, training and kit', 'Fee reminders', 'Excel / CSV player import', 'Hindi and Marathi for parents and coaches', 'Free setup call for your batches'], yearly: ['Everything in Monthly', 'Priority help by email', 'One payment for the whole year'] };
 C.cleanPoints = a => (Array.isArray(a) ? a : String(a || '').split('\n')).map(x => String(x).trim().slice(0, 90)).filter(Boolean).slice(0, 12);
@@ -205,12 +206,13 @@ def('reminders.save', AD, (ac, ctx, p) => {
 /* grounds */
 def('ground.save', AD, (ac, ctx, p) => {
   const name = need(str(p.name, 80), 'Add the ground name');
-  if (p.id) { const g = ac.grounds.find(x => x.id === p.id) || err('Ground not found'); g.name = name; }
-  else ac.grounds.push({ id: C.id('g'), name });
+  const map = str(p.map, 300);
+  if (p.id) { const g = ac.grounds.find(x => x.id === p.id) || err('Ground not found'); g.name = name; g.map = map; }
+  else ac.grounds.push({ id: C.id('g'), name, map });
   return { msg: 'Ground saved' };
 });
 def('ground.delete', AD, (ac, ctx, p) => {
-  if (ac.batches.some(b => b.ground === p.id)) err('Move the batches on this ground first');
+  if (ac.batches.some(b => b.ground === p.id)) err('Move the batches here to another place first');
   ac.grounds = ac.grounds.filter(g => g.id !== p.id); ac.bookings = ac.bookings.filter(b => b.gid !== p.id);
   return { msg: 'Ground removed' };
 });
@@ -234,6 +236,11 @@ def('batch.save', AD, (ac, ctx, p) => {
   const fee = num(p.fee, 0, 1000000); if (fee == null) err('Add the monthly fee');
   const g = ac.grounds.find(x => x.id === p.ground) || ac.grounds[0];
   const data = { name, age: str(p.age, 40), days: [...new Set(days)], time: p.time, mins: num(p.mins, 30, 240) || 60, ground: g ? g.id : '', coach: p.coach || '', fee, tint: C.TINTS.includes(p.tint) ? p.tint : C.TINTS[ac.batches.length % 5] };
+  const mn = t => +t.slice(0, 2) * 60 + +t.slice(3, 5), s0 = mn(data.time), e0 = s0 + data.mins;
+  ac.batches.filter(x => x.id !== p.id && x.days.some(d => data.days.includes(d)) && s0 < mn(x.time) + (x.mins || 60) && mn(x.time) < e0).forEach(x => {
+    if (g && x.ground === g.id) err(`${x.name} is on ${g.name} at that time. Pick another ${C.sportOf(ac).vn.toLowerCase()} or time.`);
+    if (data.coach && x.coach === data.coach) { const c = ac.staff.find(s => s.id === x.coach); err(`${c ? c.name : 'This coach'} already has ${x.name} at that time.`); }
+  });
   if (p.id) Object.assign(batch(ac, p.id) || err('Batch not found'), data);
   else ac.batches.push({ id: C.id('b'), ...data });
   return { msg: p.id ? 'Batch saved' : 'Batch added' };
@@ -733,17 +740,17 @@ C.boot = (ac, me, now, extra) => {
 C.demo = (env, now) => {
   now = now || Date.now();
   const today = T.date(now); let seed = 11; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
-  const ac = C.newAcademy({ name: 'Kickstart FC Academy', place: 'Kharghar, Navi Mumbai', now: now - 4 * DAY });
-  Object.assign(ac, { upi: 'kickstartfc@okaxis', payee: 'Kickstart FC Academy', createdAt: now - 200 * DAY });
+  const ac = C.newAcademy({ name: 'Kickstart Sports Academy', place: 'Kharghar, Navi Mumbai', now: now - 4 * DAY });
+  Object.assign(ac, { upi: 'kickstartfc@okaxis', payee: 'Kickstart Sports Academy', createdAt: now - 200 * DAY });
   ac.plan = { type: 'trial', until: now + 7 * DAY };
-  ac.grounds = [{ id: 'g1', name: 'Turf 1, Sector 21' }, { id: 'g2', name: 'Turf 2, Sector 19' }];
+  ac.grounds = [{ id: 'g1', name: 'Ground 1, Sector 21' }, { id: 'g2', name: 'Ground 2, Sector 19' }];
   const owner = env.ensureUser({ email: 'owner@kickstart.demo', name: 'Nikhil Deshpande', pw: 'demo1234' }); ac.admins.push(owner.uid); env.link(owner.uid, ac.id, 'admin');
   const S = [['s1', 'Priya Menon', 'manager', 'Manager', 'month', 18000], ['s2', 'Arjun Nair', 'coach', 'Head coach', 'month', 22000], ['s3', 'Farhan Shaikh', 'coach', 'Coach', 'session', 600], ['s4', 'Meghna Rao', 'coach', 'Coach', 'session', 600], ['s5', 'Rohan D\'Souza', 'coach', 'Coach', 'session', 500]];
   S.forEach(([id, name, role, title, pt, pa]) => { const email = name.split(' ')[0].toLowerCase().replace(/[^a-z]/g, '') + '@kickstart.demo'; const u = env.ensureUser({ email, name, pw: 'demo1234' }); ac.staff.push({ id, uid: u.uid, name, email, phone: '', role, title, pay: { type: pt, amt: pa }, joined: T.add(today, -300) }); env.link(u.uid, ac.id, role, id); });
   ac.batches = [
     { id: 'b1', name: 'U-8 Minis', age: '6 to 8 yrs', days: [1, 3, 5], time: '06:30', mins: 60, ground: 'g1', coach: 's2', fee: 2000, tint: 'blue' },
-    { id: 'b2', name: 'U-10 Kickers', age: '8 to 10 yrs', days: [1, 3, 5], time: '07:30', mins: 60, ground: 'g1', coach: 's3', fee: 2500, tint: 'green' },
-    { id: 'b3', name: 'U-12 Strikers', age: '10 to 12 yrs', days: [2, 4, 6], time: '06:30', mins: 75, ground: 'g2', coach: 's4', fee: 2500, tint: 'red' },
+    { id: 'b2', name: 'U-10 Juniors', age: '8 to 10 yrs', days: [1, 3, 5], time: '07:30', mins: 60, ground: 'g1', coach: 's3', fee: 2500, tint: 'green' },
+    { id: 'b3', name: 'U-12 Squad', age: '10 to 12 yrs', days: [2, 4, 6], time: '06:30', mins: 75, ground: 'g2', coach: 's4', fee: 2500, tint: 'red' },
     { id: 'b4', name: 'U-15 Elite', age: '13 to 15 yrs', days: [1, 2, 3, 4, 5], time: '17:30', mins: 90, ground: 'g2', coach: 's2', fee: 3500, tint: 'lime' },
     { id: 'b5', name: 'Girls Weekend', age: '8 to 14 yrs', days: [6, 0], time: '08:00', mins: 90, ground: 'g1', coach: 's5', fee: 2000, tint: 'slate' }];
   const kidsList = [['Aarav Patil', 7, 'b2', 'Sneha Patil'], ['Kabir Shaikh', 10, 'b2', 'Imtiaz Shaikh'], ['Myra Nair', 4, 'b1', 'Divya Nair'], ['Vihaan Joshi', 9, 'b3', 'Amit Joshi'], ['Reyansh Kulkarni', 11, 'b2', 'Pooja Kulkarni'], ['Ishaan Desai', 8, 'b3', 'Ketan Desai'], ['Aditya Rao', 5, 'b4', 'Meera Rao'], ['Sara Fernandes', 14, 'b5', 'Leon Fernandes'], ['Arjun Menon', 6, 'b2', 'Rahul Menon'], ['Zoya Khan', 3, 'b1', 'Sana Khan'], ['Dev Sawant', 17, 'b4', 'Nikhil Sawant'], ['Anaya Pillai', 2, 'b5', 'Ritu Pillai'], ['Rudra Mhatre', 19, 'b4', 'Sagar Mhatre'], ['Tanay Gupta', 12, 'b3', 'Neha Gupta'], ['Om Bhosale', 1, 'b2', 'Vikas Bhosale'], ['Kiara D\'Mello', 21, 'b5', 'Joanna D\'Mello'], ['Yash Chavan', 23, 'b3', 'Mahesh Chavan'], ['Ved Iyer', 15, 'b1', 'Lakshmi Iyer'], ['Aryan Thakur', 22, 'b4', 'Deepak Thakur'], ['Riya Kamat', 8, 'b5', 'Kavita Kamat'], ['Anvi Patil', 16, 'b5', 'Sneha Patil'], ['Krish Naik', 13, 'b2', 'Sunil Naik'], ['Ira Kulkarni', 5, 'b1', 'Pooja Kulkarni'], ['Neel Bhatt', 20, 'b3', 'Harsh Bhatt']];
@@ -753,7 +760,7 @@ C.demo = (env, now) => {
     const id = 'p' + (i + 1); const email = parent.toLowerCase().replace(/[^a-z ]/g, '').replace(' ', '.') + '@parent.demo';
     if (!parentUids[parent]) { const u = env.ensureUser({ email, name: parent, pw: 'demo1234' }); parentUids[parent] = u.uid; env.link(u.uid, ac.id, 'parent'); }
     const dob = `${2026 - 7 - (b === 'b1' ? 0 : b === 'b2' ? 2 : b === 'b3' ? 4 : b === 'b4' ? 7 : 3)}-${pad(1 + (i * 5) % 12)}-${pad(1 + (i * 7) % 27)}`;
-    ac.players.push({ id, name, no, batch: b, parentName: parent, parentEmail: email, parentUid: parentUids[parent], parentPhone: '', dob, joined: i % 9 === 4 ? T.add(today, -20) : `${T.addMonth(month, -(1 + i % 5))}-${pad(1 + (i * 3) % 25)}`, fees: {}, med: {}, docs: {}, fee: null });
+    ac.players.push({ id, name, no, batch: b, parentName: parent, parentEmail: email, parentUid: parentUids[parent], parentPhone: '99999 ' + String(10000 + i).slice(-5), dob, joined: i % 9 === 4 ? T.add(today, -20) : `${T.addMonth(month, -(1 + i % 5))}-${pad(1 + (i * 3) % 25)}`, fees: {}, med: {}, docs: {}, fee: null });
   });
   // a birthday this week
   ac.players[9].dob = '2018-' + T.add(today, 3).slice(5); ac.players[23].dob = '2014-' + T.add(today, 6).slice(5);
@@ -784,14 +791,14 @@ C.demo = (env, now) => {
   AD_.forEach(([n, age, parent, src, fee, s, h], i) => ac.adm.push({ id: 'e' + i, n, age, parent, phone: '', src, fee, s, note: '', at: now - h * 3600e3, trial: s === 'trial' ? ['Sat 6:30 AM', 'Sat 8:00 AM', 'Sun 7:30 AM'][i % 3] : '' }));
   // notices
   ac.notices = [
-    { id: 'n1', title: 'Friendly vs Thane Tigers on Sunday', body: 'U-12 Strikers play on Sunday at 8:00 AM on Turf 2. Report by 7:30 AM in the white kit.', to: 'b3', tag: 'Fixture', at: now - 5 * 3600e3, by: 'Priya Menon' },
-    { id: 'n2', title: 'Turf maintenance next Thursday', body: 'Turf 2 is closed for maintenance next Thursday. Sessions move to Saturday, same time.', to: 'all', tag: 'Schedule', at: now - 26 * 3600e3, by: 'Nikhil Deshpande' },
+    { id: 'n1', title: 'Friendly vs Thane Tigers on Sunday', body: 'U-12 Squad play on Sunday at 8:00 AM on Ground 2. Report by 7:30 AM in the white kit.', to: 'b3', tag: 'Fixture', at: now - 5 * 3600e3, by: 'Priya Menon' },
+    { id: 'n2', title: 'Ground maintenance next Thursday', body: 'Ground 2 is closed for maintenance next Thursday. Sessions move to Saturday, same time.', to: 'all', tag: 'Schedule', at: now - 26 * 3600e3, by: 'Nikhil Deshpande' },
     { id: 'n3', title: 'Fees open for next month', body: `Fees are due by the ${ac.dueDay}th. Pay by UPI in the app and paste the transaction ID.`, to: 'all', tag: 'Fees', at: now - 3 * DAY, by: 'Nikhil Deshpande' }];
   // tournaments
   const sun = k => { let d = today; while (T.dow(d) !== 0) d = T.add(d, 1); return T.add(d, 7 * k); };
   ac.tournaments = [
     { id: 't1', name: 'Thane Junior League', cat: 'League', batch: 'b3', start: sun(-3), end: T.add(sun(-3), 80), venue: 'Home and away, Thane and Navi Mumbai', entry: 4000, format: 'League, 8 teams', squad: ['p4', 'p6', 'p14', 'p17', 'p24'], result: '',
-      matches: [{ id: 'm1', date: sun(-3), time: '08:00', vs: 'Belapur Ballers', venue: 'Turf 2, Sector 19', score: [1, 1], scorers: [['p24', 1]], assists: [['p6', 1]], potm: 'p24' }, { id: 'm2', date: sun(-2), time: '08:00', vs: 'Vashi United Juniors', venue: 'Sector 10 Ground, Vashi', score: [3, 1], scorers: [['p4', 2], ['p14', 1]], assists: [['p24', 2]], potm: 'p4' }, { id: 'm3', date: sun(-1), time: '08:30', vs: 'Airoli Strikers', venue: 'Turf 2, Sector 19', score: [2, 0], scorers: [['p14', 1], ['p6', 1]], assists: [['p4', 1]], potm: 'p14' }, { id: 'm4', date: sun(0), time: '08:00', vs: 'Thane Tigers', venue: 'Turf 2, Sector 19', score: null, scorers: [], potm: '' }, { id: 'm5', date: sun(1), time: '09:00', vs: 'Panvel Footie Kids', venue: 'New Panvel Turf', score: null, scorers: [], potm: '' }] },
+      matches: [{ id: 'm1', date: sun(-3), time: '08:00', vs: 'Belapur Ballers', venue: 'Ground 2, Sector 19', score: [1, 1], scorers: [['p24', 1]], assists: [['p6', 1]], potm: 'p24' }, { id: 'm2', date: sun(-2), time: '08:00', vs: 'Vashi United Juniors', venue: 'Sector 10 Ground, Vashi', score: [3, 1], scorers: [['p4', 2], ['p14', 1]], assists: [['p24', 2]], potm: 'p4' }, { id: 'm3', date: sun(-1), time: '08:30', vs: 'Airoli Strikers', venue: 'Ground 2, Sector 19', score: [2, 0], scorers: [['p14', 1], ['p6', 1]], assists: [['p4', 1]], potm: 'p14' }, { id: 'm4', date: sun(0), time: '08:00', vs: 'Thane Tigers', venue: 'Ground 2, Sector 19', score: null, scorers: [], potm: '' }, { id: 'm5', date: sun(1), time: '09:00', vs: 'Panvel Swim School', venue: 'New Panvel Sports Complex', score: null, scorers: [], potm: '' }] },
     { id: 't2', name: 'Navi Mumbai Youth Cup', cat: 'Cup', batch: 'b4', start: T.add(sun(1), -1), end: T.add(sun(2), 0), venue: 'CIDCO Ground, Vashi', entry: 3000, format: 'Groups, then knockouts', squad: ['p7', 'p11', 'p13', 'p19'], result: '',
       matches: [{ id: 'm6', date: T.add(sun(1), -1), time: '09:00', vs: 'Ghansoli FC', venue: 'CIDCO Ground, Vashi', score: null, scorers: [], potm: '' }, { id: 'm7', date: sun(1), time: '11:00', vs: 'Nerul Rangers', venue: 'CIDCO Ground, Vashi', score: null, scorers: [], potm: '' }] },
     { id: 't3', name: 'Kharghar Kids Festival', cat: 'Festival', batch: 'b2', start: T.add(sun(-5), -1), end: T.add(sun(-5), -1), venue: 'Central Park, Kharghar', entry: 1500, format: 'One day, 5-a-side', squad: ['p1', 'p2', 'p9', 'p15', 'p22'], result: 'Runners-up',
@@ -805,12 +812,12 @@ C.demo = (env, now) => {
   ac.injuries = [{ id: 'i1', pid: 'p11', what: 'Ankle sprain (left)', status: 'out', back: T.add(today, 7), since: T.add(today, -7), by: 'Arjun Nair' }, { id: 'i2', pid: 'p5', what: 'Bruised knee', status: 'light', back: T.add(today, 2), since: T.add(today, -4), by: 'Farhan Shaikh' }, { id: 'i3', pid: 'p16', what: 'Hamstring tightness', status: 'fit', back: '', since: T.add(today, -15), by: 'Rohan D\'Souza', fitOn: T.add(today, -3) }];
   ac.kit = [['Footballs, size 4', 38, 20], ['Footballs, size 5', 24, 15], ['Training cones', 120, 50], ['Bibs, orange', 14, 30], ['Bibs, blue', 31, 30], ['Goalkeeper gloves', 6, 6], ['First-aid kit', 2, 3], ['Training jersey, size S', 8, 10], ['Training jersey, size M', 19, 10], ['Match kit sets', 22, 20]].map(([name, have, min], i) => ({ id: 'k' + i, name, have, min }));
   ac.players.forEach((p, i) => { if (i % 5 !== 0) ac.kitGiven[p.id] = { size: ['XS', 'S', 'S', 'M', 'M', 'L'][p.no % 6], at: now - 60 * DAY }; });
-  ac.expenses = [['Turf rent, Turf 1 and 2', 'Rent', 15000, 1], ['New footballs (10)', 'Equipment', 4200, 6], ['Thane Junior League entry', 'Tournament', 4000, 2], ['First-aid refill', 'Medical', 900, 14], ['Bus to Vashi match', 'Travel', 2500, 16]].map(([what, cat, amt, d], i) => ({ id: 'x' + i, what, cat, amt, date: `${month}-${pad(Math.min(d, +today.slice(8)))}` }));
+  ac.expenses = [['Ground rent, Ground 1 and 2', 'Rent', 15000, 1], ['New footballs (10)', 'Equipment', 4200, 6], ['Thane Junior League entry', 'Tournament', 4000, 2], ['First-aid refill', 'Medical', 900, 14], ['Bus to Vashi match', 'Travel', 2500, 16]].map(([what, cat, amt, d], i) => ({ id: 'x' + i, what, cat, amt, date: `${month}-${pad(Math.min(d, +today.slice(8)))}` }));
   ac.salaries[month] = { s1: { amt: 18000, at: now - 2 * DAY } };
   ac.bookings = [{ id: 'k1', gid: 'g2', date: T.add(today, 3), time: '17:30', what: 'Birthday party rental', by: 'Priya Menon' }];
   // a recent feed so every app has something in the bell
   const ctxOf = (name) => ({ name, now: now - 3600e3 });
-  post(ac, ctxOf('Farhan Shaikh'), { ico: 'check', title: 'U-10 Kickers marked', sub: 'This morning · by Farhan Shaikh', aud: { roles: ['admin', 'manager'] }, href: { admin: 'attendance', manager: 'attendance' } });
+  post(ac, ctxOf('Farhan Shaikh'), { ico: 'check', title: 'U-10 Juniors marked', sub: 'This morning · by Farhan Shaikh', aud: { roles: ['admin', 'manager'] }, href: { admin: 'attendance', manager: 'attendance' } });
   ac.queue.forEach(q => { const p = pm_(q.pid); ac.feed.unshift({ id: C.id('f'), at: q.at, by: p.parentName, ico: 'upi', title: `UPI payment from ${p.parentName}`, sub: `₹${q.amt.toLocaleString('en-IN')} for ${p.name} · ID ${q.utr}`, href: { admin: 'fees' }, aud: { roles: ['admin'] } }); });
   ac.feed.unshift({ id: C.id('f'), at: now - 2 * 3600e3, by: 'Arjun Nair', ico: 'star', title: 'New progress card for Aarav Patil', sub: 'From Farhan Shaikh', href: { parent: 'progress' }, aud: { pids: ['p1'] } });
   // one player on a break this month and one paid leave day, so the demo shows both

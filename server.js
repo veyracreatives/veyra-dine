@@ -69,11 +69,44 @@ function hqLog(text) { db.hq.activity.unshift({ at: Date.now(), text }); if (db.
 
 /* ---------------- email (optional: npm i nodemailer, then fill SMTP in HQ) ---------------- */
 let mailer = null, mailerKey = '';
-function mail(to, subject, text) {
-  const s = db.hq.settings.smtp; if (!s.host || !s.user || !s.pass || !to) return false;
-  try { if (!mailer || mailerKey !== s.host + s.user + s.pass) { mailer = require('nodemailer').createTransport({ host: s.host, port: +s.port || 465, secure: +s.port !== 587, auth: { user: s.user, pass: s.pass } }); mailerKey = s.host + s.user + s.pass; }
-    mailer.sendMail({ from: s.from || `Veyra Academy <${s.user}>`, to, subject, text: text + '\n\nQuestions? marketing@veyracreatives.com' }).catch(e => console.error('mail', e.message)); return true; } catch (e) { console.error('mail setup', e.message); return false; }
+/* mail(to, subject, text, html?) returns a promise: true when the mail server accepted it, false when it failed or email is not set up. */
+function mail(to, subject, text, html) {
+  const s = db.hq.settings.smtp; if (!s.host || !s.user || !s.pass || !to) return Promise.resolve(false);
+  try { if (!mailer || mailerKey !== s.host + s.user + s.pass) { mailer = require('nodemailer').createTransport({ host: s.host, port: +s.port || 465, secure: +s.port !== 587, auth: { user: s.user, pass: s.pass }, connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 20000 }); mailerKey = s.host + s.user + s.pass; }
+    const m = { from: s.from || `Veyra Academy <${s.user}>`, replyTo: 'marketing@veyracreatives.com', to, subject, text: text + '\n\nQuestions? Reply to this email or write to marketing@veyracreatives.com' };
+    if (html) m.html = html;
+    return mailer.sendMail(m).then(() => true, e => { console.error('mail', e.message); hqLog(`Email to ${to} failed: ${e.message}`); save(); return false; }); } catch (e) { console.error('mail setup', e.message); return Promise.resolve(false); }
 }
+const escH = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const PLAN_NAME = { monthly: 'Monthly plan (30 days)', yearly: 'Yearly plan (365 days)' };
+/* One look for every plan email: heading, intro, a table of details, an optional big key, one button. */
+function planHtml(h, intro, rows, key, btn, steps) {
+  return `<div style="font-family:Arial,sans-serif;max-width:520px;color:#14202e"><h2 style="margin:0 0 6px;color:#0B5EAA">${escH(h)}</h2><p style="line-height:1.5">${intro}</p>`
+    + (key ? `<div style="font:700 24px/1.2 Consolas,monospace;letter-spacing:2px;background:#E8F1FB;color:#0B5EAA;padding:16px;border-radius:12px;text-align:center;margin:14px 0">${escH(key)}</div>` : '')
+    + (steps ? `<ol style="padding-left:20px;line-height:1.6;margin:0 0 14px">${steps.map(x => `<li>${x}</li>`).join('')}</ol>` : '')
+    + `<table style="border-collapse:collapse;width:100%;font-size:14px">${rows.map(([a, b], i) => `<tr><td style="padding:6px 0;color:#5b6b7c;${i ? 'border-top:1px solid #eee' : ''}">${escH(a)}</td><td style="padding:6px 0;font-weight:bold;${i ? 'border-top:1px solid #eee' : ''}">${escH(b)}</td></tr>`).join('')}</table>`
+    + `<p style="margin:18px 0"><a href="${BASE}/#admin-setup" style="display:inline-block;background:#0B5EAA;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">${escH(btn)}</a></p>`
+    + `<p style="color:#5b6b7c;font-size:13px">No GST is charged. Need help? Just reply to this email, or write to marketing@veyracreatives.com.<br>Veyra Creative &amp; Digital Lab</p></div>`;
+}
+const ownerOf = ac => ac && db.users[(ac.admins || [])[0]];
+/* Plan is already on (Razorpay, HQ "mark paid", key used, days added): tell the owner, no key needed. */
+function planOnMail(ac, how, amt, receipt) {
+  const o = ownerOf(ac); if (!o || !o.email) return Promise.resolve(false);
+  const until = C.T.full(C.T.date(ac.plan.until));
+  const rows = [['Academy', ac.name], ['Plan', PLAN_NAME[ac.plan.type] || ac.plan.type]].concat(amt ? [['Amount paid', '₹' + amt.toLocaleString('en-IN')]] : []).concat(receipt ? [['Receipt', receipt]] : []).concat([['Active until', until]]);
+  const head = how === 'key' ? 'Licence key activated' : how === 'days' ? 'Days added to your plan' : 'Payment received';
+  const lead = how === 'key' ? 'Your licence key worked. Your plan is now active.' : how === 'days' ? 'Veyra added days to your plan. Nothing to do on your side.' : 'Thank you for buying Veyra Academy. Your payment is received and your plan is already active. There is no key to enter: just open your admin.';
+  const text = `Hi ${o.name},\n\n${lead}\n\n${rows.map(([a, b]) => a + ': ' + b).join('\n')}\n\nOpen your admin: ${BASE}/#admin-setup\n\nNo GST is charged.\nVeyra Creative & Digital Lab`;
+  return mail(o.email, `${head}: Veyra Academy ${ac.plan.type === 'yearly' ? 'Yearly' : 'Monthly'} plan${receipt ? ` (${receipt})` : ''}`, text, planHtml(head, `Hi ${escH(o.name)},<br>${escH(lead)}`, rows, '', 'Open my admin'));
+}
+/* A key made in HQ (UPI, cash, bank): email the key itself with the 3 steps to use it. */
+function keyMail(to, k) {
+  const steps = [`Log in at <a href="${BASE}/#admin">${escH(BASE.replace(/^https?:\/\//, ''))}</a> as the academy owner. New here? Sign up first, the free trial starts right away.`, 'Open <b>Settings &amp; plan</b>.', 'Paste the key under <b>Have a licence key from Veyra?</b> and press <b>Activate key</b>.'];
+  const rows = [['Academy', k.forName || '-'], ['Plan', PLAN_NAME[k.plan] || k.plan]].concat(k.amt ? [['Amount paid', '₹' + k.amt.toLocaleString('en-IN') + (k.paidBy ? ' by ' + k.paidBy : '')]] : []);
+  const text = `Hi,\n\nThank you for buying Veyra Academy. Here is your licence key:\n\n    ${k.code}\n\nHow to use it:\n1. Log in at ${BASE}/#admin as the academy owner. New here? Sign up first, the free trial starts right away.\n2. Open Settings & plan.\n3. Paste the key under "Have a licence key from Veyra?" and press Activate key.\n\n${rows.map(([a, b]) => a + ': ' + b).join('\n')}\n\nThe days start when you activate the key. The key works once.\nOpen your admin: ${BASE}/#admin-setup\n\nNo GST is charged.\nVeyra Creative & Digital Lab`;
+  return mail(to, `Your Veyra Academy licence key (${k.plan === 'yearly' ? 'Yearly' : 'Monthly'} plan)`, text, planHtml('Your licence key', 'Thank you for buying Veyra Academy. Here is your key. The days start when you activate it, and it works once.', rows, k.code, 'Open my admin', steps));
+}
+const okEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
 const mailOn = () => { const s = db.hq.settings.smtp; return !!(s.host && s.user && s.pass); };
 
 /* ---------------- people & academies ---------------- */
@@ -120,8 +153,7 @@ function applyPaid(aid, plan, amt, paymentId, orderId) {
   const sale = recordSale(ac, plan, amt, 'Razorpay', paymentId);
   db.payments[paymentId] = { aid, plan, amt, orderId, at: Date.now(), sale: sale.id };
   hqLog(`${ac.name} paid ₹${amt.toLocaleString('en-IN')} for ${plan} (Razorpay ${paymentId})`); A.server(ac.vid, 'paid', { n: ac.name, id: ac.id, amt });
-  const owner = db.users[(ac.admins || [])[0]];
-  if (owner) mail(owner.email, `Payment received: Veyra Academy ${plan} plan`, `Hi ${owner.name},\n\nWe received ₹${amt.toLocaleString('en-IN')} for the ${plan} plan of ${ac.name}.\nReceipt: ${sale.id}\nPaid until: ${C.T.full(C.T.date(ac.plan.until))}\nNo GST charged.\n`);
+  planOnMail(ac, 'paid', amt, sale.id);
   save(); ping(aid); return db.payments[paymentId];
 }
 function rzp(method, p, payload) {
@@ -200,12 +232,24 @@ function hqAct(p) {
   const T = C.T; const ac = p.aid && own(db.academies, p.aid);
   switch (p.type) {
     case 'plans.save': { const m = +p.monthly, y = +p.yearly, t = +p.trial; if (!(m > 0 && y > 0 && t >= 1 && t <= 60)) throw new Error('Check the prices'); const pts = Object.assign({}, (db.hq.plans || {}).points || {}); if (p.mPoints != null) pts.monthly = C.cleanPoints(p.mPoints); if (p.yPoints != null) pts.yearly = C.cleanPoints(p.yPoints); db.hq.plans = { monthly: Math.round(m), yearly: Math.round(y), trial: Math.round(t), points: pts }; hqLog(`Prices changed: ₹${m}/month, ₹${y}/year, ${t}-day trial`); return 'Prices saved. The website shows them now.'; }
-    case 'key.make': { if (!C.PLAN_DAYS[p.plan]) throw new Error('Pick a plan'); const code = C.mkKey(); db.hq.keys.unshift({ code, plan: p.plan, made: Date.now(), note: String(p.note || '').slice(0, 120), forName: String(p.forName || '').slice(0, 80), paidBy: p.paidBy || '' });
-      if (p.paidBy && p.paidBy !== 'Free') recordSale(null, p.plan, Math.round(+p.amount || db.hq.plans[p.plan]), 'Licence key · ' + p.paidBy, code), db.hq.sales[0].academy = String(p.forName || 'Key ' + code);
-      hqLog(`Licence key ${code} made (${p.plan})`); return { msg: 'Key made', code }; }
+    case 'key.make': { if (!C.PLAN_DAYS[p.plan]) throw new Error('Pick a plan'); const forName = String(p.forName || '').slice(0, 80);
+      let email = String(p.email || '').trim().toLowerCase().slice(0, 120);
+      if (email && !okEmail(email)) throw new Error('Check the email address');
+      if (!email) { const m = Object.values(db.academies).find(a => a.name.trim().toLowerCase() === forName.trim().toLowerCase()); const o = ownerOf(m); if (o && o.email) email = o.email; }
+      const code = C.mkKey(); const amt = p.paidBy && p.paidBy !== 'Free' ? Math.round(+p.amount || db.hq.plans[p.plan]) : 0;
+      const k = { code, plan: p.plan, made: Date.now(), note: String(p.note || '').slice(0, 120), forName, paidBy: p.paidBy || '', email };
+      db.hq.keys.unshift(k);
+      if (amt) recordSale(null, p.plan, amt, 'Licence key · ' + p.paidBy, code), db.hq.sales[0].academy = String(forName || 'Key ' + code);
+      hqLog(`Licence key ${code} made (${p.plan})`);
+      if (!email) return { msg: 'Key made. No email added, so copy it or send it on WhatsApp.', code };
+      if (!mailOn()) return { msg: 'Key made, but NOT emailed: fill in Settings > Email first. Copy it or send it on WhatsApp.', code, mailed: false };
+      return keyMail(email, Object.assign({ amt }, k)).then(ok => { if (ok) { k.emailed = Date.now(); hqLog(`Key ${code} emailed to ${email}`); save(); } return { msg: ok ? `Key made and emailed to ${email}` : `Key made, but the email to ${email} failed. Check Settings > Email, then press Email again.`, code, mailed: ok }; }); }
+    case 'key.mail': { const k = db.hq.keys.find(x => x.code === p.code); if (!k) throw new Error('Key not found'); const email = String(p.email || k.email || '').trim().toLowerCase(); if (!okEmail(email)) throw new Error('Add a correct email'); if (!mailOn()) throw new Error('Fill in Settings > Email first');
+      k.email = email; return keyMail(email, k).then(ok => { if (!ok) throw new Error(`Email to ${email} failed. Check Settings > Email.`); k.emailed = Date.now(); hqLog(`Key ${k.code} emailed to ${email}`); save(); return `Key emailed to ${email}`; }); }
     case 'key.stop': { const k = db.hq.keys.find(x => x.code === p.code); if (!k) throw new Error('Key not found'); k.stopped = !k.stopped; hqLog(`Key ${k.code} ${k.stopped ? 'stopped' : 'restarted'}`); return k.stopped ? 'Key stopped. It cannot be used now.' : 'Key works again'; }
-    case 'academy.extend': { if (!ac) throw new Error('Academy not found'); const d = Math.max(1, Math.min(365, +p.days || 10)); ac.plan.until = Math.max(Date.now(), ac.plan.until) + d * DAY; ac.v++; hqLog(`${ac.name}: added ${d} days`); ping(ac.id); return `Added ${d} days to ${ac.name}`; }
-    case 'academy.paid': { if (!ac) throw new Error('Academy not found'); if (!C.PLAN_DAYS[p.plan]) throw new Error('Pick a plan'); C.applyPlan(ac, p.plan, Date.now()); A.server(ac.vid, 'paid', { n: ac.name, id: ac.id, amt: Math.round(+p.amount || db.hq.plans[p.plan]) }); recordSale(ac, p.plan, Math.round(+p.amount || db.hq.plans[p.plan]), 'Manual · ' + (p.via || 'UPI')); hqLog(`${ac.name} marked paid (${p.plan})`); ping(ac.id); return `${ac.name} is on the ${p.plan} plan`; }
+    case 'academy.extend': { if (!ac) throw new Error('Academy not found'); const d = Math.max(1, Math.min(365, +p.days || 10)); ac.plan.until = Math.max(Date.now(), ac.plan.until) + d * DAY; ac.v++; hqLog(`${ac.name}: added ${d} days`); ping(ac.id); return planOnMail(ac, 'days').then(ok => `Added ${d} days to ${ac.name}${ok ? '. Owner emailed.' : ''}`); }
+    case 'academy.paid': { if (!ac) throw new Error('Academy not found'); if (!C.PLAN_DAYS[p.plan]) throw new Error('Pick a plan'); const amt = Math.round(+p.amount || db.hq.plans[p.plan]); C.applyPlan(ac, p.plan, Date.now()); A.server(ac.vid, 'paid', { n: ac.name, id: ac.id, amt }); const sale = recordSale(ac, p.plan, amt, 'Manual · ' + (p.via || 'UPI')); hqLog(`${ac.name} marked paid (${p.plan})`); ping(ac.id);
+      return planOnMail(ac, 'paid', amt, sale.id).then(ok => `${ac.name} is on the ${p.plan} plan${ok ? '. Owner emailed the receipt.' : mailOn() ? '. Email to the owner failed (see Activity).' : '. No email sent: fill in Settings > Email.'}`); }
     case 'academy.suspend': { if (!ac) throw new Error('Academy not found'); ac.suspended = !ac.suspended; ac.v++; hqLog(`${ac.name} ${ac.suspended ? 'paused' : 'restored'}`); ping(ac.id); return ac.suspended ? `${ac.name} is paused` : `${ac.name} is back on`; }
     case 'sale.manual': { const amt = Math.round(+p.amount); if (!amt) throw new Error('Add the amount'); recordSale(ac || null, p.plan || 'other', amt, 'Manual · ' + (p.via || 'UPI')); if (!ac) db.hq.sales[0].academy = String(p.forName || 'Other'); hqLog(`Manual sale ₹${amt}`); return 'Sale added'; }
     case 'settings.save': { const s = db.hq.settings;
@@ -214,7 +258,7 @@ function hqAct(p) {
       if (p.smtp) { ['host', 'user', 'from'].forEach(k => { if (p.smtp[k] != null) s.smtp[k] = String(p.smtp[k]).trim(); }); if (p.smtp.port) s.smtp.port = +p.smtp.port; if (p.smtp.pass) s.smtp.pass = String(p.smtp.pass); }
       hqLog('Settings changed'); return 'Saved'; }
     case 'password': { if (String(p.pw || '').length < 10) throw new Error('Use at least 10 characters'); db.hq.pw = hashPw(p.pw); db.hq.hqSessions = {}; hqLog('HQ password changed'); return 'HQ password changed. Log in again.'; }
-    case 'mail.test': { if (!mailOn()) throw new Error('Fill in the email settings first'); mail(p.to || db.hq.settings.smtp.user, 'Veyra Academy test email', 'Email works.'); return 'Test email sent'; }
+    case 'mail.test': { if (!mailOn()) throw new Error('Fill in the email settings first'); const to = p.to || db.hq.settings.smtp.user; return mail(to, 'Veyra Academy test email', 'Email works.').then(ok => { if (!ok) throw new Error('Email failed. Check host, port, user and password.'); return 'Test email sent to ' + to; }); }
     default: throw new Error('Unknown action');
   }
 }
@@ -383,7 +427,7 @@ const server = http.createServer(async (req, res) => {
         if (p === '/api/hq/seo') return send(res, 200, seoState());
         if (p === '/api/hq/seo-run') { const r = await seoRun(b); save(); return send(res, 200, Object.assign({ seo: seoState() }, r)); }
         if (p === '/api/hq/logout') { delete db.hq.hqSessions[hqToken(req)]; save(); return send(res, 200, { ok: true }); }
-        if (p === '/api/hq/act') { const r = hqAct(b); save(); return send(res, 200, Object.assign(typeof r === 'string' ? { msg: r } : r, { state: hqState() })); }
+        if (p === '/api/hq/act') { const r = await hqAct(b); save(); return send(res, 200, Object.assign(typeof r === 'string' ? { msg: r } : r, { state: hqState() })); }
         if (p === '/api/hq/backup') { saveNow(); return send(res, 200, fs.readFileSync(DBF), 'application/json', { 'content-disposition': `attachment; filename="veyra-academy-db-${C.T.date()}.json"` }); }
         return bad(res, 'Not found', 404);
       }
@@ -411,7 +455,7 @@ const server = http.createServer(async (req, res) => {
         if (s.role !== 'admin') return bad(res, 'Only the academy admin can do this', 403);
         const code = String(b.code || '').toUpperCase().trim(); const k = db.hq.keys.find(x => x.code === code);
         if (!k) return bad(res, 'This key is not valid. Keys look like VFB-XXXX-XXXX-XXXX'); if (k.used) return bad(res, 'This key was already used'); if (k.stopped) return bad(res, 'This key was stopped by Veyra');
-        C.applyPlan(ac, k.plan, Date.now()); k.used = { aid: ac.id, name: ac.name, at: Date.now() }; A.server(ac.vid, 'paid', { n: ac.name, id: ac.id, amt: 0 }); hqLog(`${ac.name} used key ${code}`); save(); ping(ac.id);
+        C.applyPlan(ac, k.plan, Date.now()); k.used = { aid: ac.id, name: ac.name, at: Date.now() }; A.server(ac.vid, 'paid', { n: ac.name, id: ac.id, amt: 0 }); hqLog(`${ac.name} used key ${code}`); save(); ping(ac.id); planOnMail(ac, 'key');
         return send(res, 200, { msg: 'Key activated. Your plan is on.' });
       }
       if (p === '/api/plan/order') {

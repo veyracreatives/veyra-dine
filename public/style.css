@@ -118,7 +118,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .kpi .bar i{display:block;height:100%;background:var(--brand);border-radius:inherit}
 .up{color:var(--ok);font-weight:600} .down{color:var(--bad);font-weight:600}
 
-.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.table-wrap{position:relative;overflow-x:auto;-webkit-overflow-scrolling:touch}
 table.t{width:100%;border-collapse:collapse;font-size:14px}
 .t th{text-align:left;font:500 10.5px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);padding:12px 20px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface)}
 .t td{padding:12px 20px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}

@@ -337,7 +337,7 @@ function applyPayment(pay, info = {}) {
     const cur = r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null);
     r.updatesUntil = addYear((cur && cur > today ? cur : today) + 'T00:00:00Z').slice(0, 10);
   }
-  r.paidVia = 'razorpay'; r.activatedAt = r.activatedAt || t; r.lastPaymentId = pay.id;
+  r.paidVia = 'razorpay'; r.activatedAt = r.activatedAt || t; r.lastPaymentId = pay.id; if (r.vid) VA.server(r.vid, 'paid', { n: r.name, id: r.id, amt: Number(pay.amount) || 0 });
   db.config.paySeq = (db.config.paySeq || 0) + 1;
   Object.assign(pay, { status: 'paid', paidAt: t, paymentId: info.paymentId || pay.paymentId || '', method: info.method || pay.method || '', via: info.via || 'checkout',
     receipt: `VDP-${t.slice(0, 4)}-${String(db.config.paySeq).padStart(4, '0')}`, until: r.plan === 'lifetime' ? null : r.paidUntil, updatesUntil: r.updatesUntil || null });
@@ -410,6 +410,57 @@ function receiptHtml(r, pay) {
 // Lifetime: 7 days before the year of updates ends, and on the day. Sent once each (r.reminded), from /platform > Email codes.
 // Only the online server sends them (it has the email settings). Turn off with REMINDERS=0.
 const SITE_URL = (process.env.PUBLIC_URL || LICENSE_SERVER).replace(/\/$/, '');
+/* ---- visitor stats + SEO for Veyra HQ (online server only; never on restaurant PCs) ---- */
+const TRACK = !HUB && !process.versions.electron && process.env.VISITOR_STATS !== '0';
+const FUNNEL = [
+  { label: 'Visited the website', match: e => e.t === 'view' },
+  { label: 'Clicked Start free trial', match: e => e.t === 'click' && (/\/signup/.test(e.x || '') || /trial|sign ?up|get started/i.test(e.n || '')) },
+  { label: 'Opened the sign-up page', match: e => e.t === 'view' && e.p === '/signup' },
+  { label: 'Started filling it in', match: e => e.t === 'form' && e.p === '/signup' },
+  { label: 'Trial started', match: e => e.t === 'signup' },
+  { label: 'Paid for a plan', match: e => e.t === 'paid' }];
+const VA = TRACK ? require('./lib/analytics').Analytics({ dataDir: DATA_DIR, base: SITE_URL, funnel: FUNNEL }) : { track() {}, server() {}, report: () => ({ error: 'Visitor stats are off on this computer' }), first: () => null, geoReady: () => false };
+const SEO_HOST = (() => { try { return new URL(SITE_URL).hostname; } catch { return 'dinein.veyracreatives.com'; } })();
+const seo = require('./lib/seo').SEO({ dataDir: DATA_DIR, base: SITE_URL, host: SEO_HOST, settings: () => { const c = db.config.seo = db.config.seo || {}; c.gsc = c.gsc || { sa: '', site: '' }; c.bing = c.bing || { key: '' }; c.psi = c.psi || { key: '' }; c.verify = c.verify || { google: '', bing: '' }; return c; } });
+const SEO_WORDS = ['QR code menu', 'restaurant', 'Navi Mumbai', 'Thane', 'table ordering'];
+const vidOf = v => String(v || '').replace(/[^\w-]/g, '').slice(0, 24);
+function withTracking(html) { // tracker + search engine verification tags for public marketing pages
+  if (!TRACK) return html; const V = (db.config.seo || {}).verify || {};
+  const tags = (V.google ? `<meta name="google-site-verification" content="${String(V.google).replace(/[^\w-]/g, '')}">` : '') + (V.bing ? `<meta name="msvalidate.01" content="${String(V.bing).replace(/[^\w-]/g, '')}">` : '') + '<script src="/assets/va.js" defer></script>';
+  return html.includes('/assets/va.js') ? html : html.replace('</head>', tags + '</head>');
+}
+async function seoRun(b) {
+  const S = seo && db.config.seo;
+  switch (b.what) {
+    case 'save': {
+      if (b.sa != null && String(b.sa).trim()) { let j; try { j = JSON.parse(b.sa); } catch { throw Object.assign(new Error('That is not the JSON key file. Open the downloaded .json file and copy all of it.'), { status: 400 }); } if (!j.client_email || !j.private_key) throw Object.assign(new Error('This JSON has no client_email or private_key.'), { status: 400 }); S.gsc.sa = JSON.stringify({ client_email: j.client_email, private_key: j.private_key }); }
+      if (b.clearGoogle) S.gsc.sa = ''; if (b.site != null) S.gsc.site = str(b.site, 200);
+      if (b.bing != null && str(b.bing)) S.bing.key = str(b.bing, 100); if (b.clearBing) S.bing.key = '';
+      if (b.psi != null && str(b.psi)) S.psi.key = str(b.psi, 100);
+      if (b.vGoogle != null) S.verify.google = String(b.vGoogle).replace(/.*content="([^"]+)".*/, '$1').trim().slice(0, 100);
+      if (b.vBing != null) S.verify.bing = String(b.vBing).replace(/.*content="([^"]+)".*/, '$1').trim().slice(0, 100);
+      siteCache = null; save(); return { msg: 'Saved' };
+    }
+    case 'sites': return { sites: await seo.sites() };
+    case 'google': return { google: await seo.google(b.days, b.force) };
+    case 'sitemap': return { msg: await seo.submitSitemap() };
+    case 'inspect': return { inspect: await seo.inspect(b.url) };
+    case 'backlinks': return { backlinks: await seo.backlinks(b.force) };
+    case 'pagespeed': return { pagespeed: await seo.pagespeed(b.strategy) };
+    default: throw Object.assign(new Error('Unknown action'), { status: 400 });
+  }
+}
+function seoState() {
+  const S = seo && (seo.site(), db.config.seo); let html = '';
+  try { html = siteCache || fs.readFileSync(path.join(PUBLIC_DIR, 'site', 'index.html'), 'utf8'); } catch {}
+  return { connected: { google: !!S.gsc.sa, bing: !!S.bing.key, psiKey: !!S.psi.key }, clientEmail: seo.clientEmail(), site: S.gsc.sa ? seo.site() : '', base: SITE_URL, host: SEO_HOST, verify: S.verify, check: seo.check(html, SEO_WORDS), last: seo.last(), geo: VA.geoReady() };
+}
+function hqUsers() {
+  const lastOrder = {}; for (const o of db.orders) if (!lastOrder[o.restaurantId] || o.createdAt > lastOrder[o.restaurantId]) lastOrder[o.restaurantId] = o.createdAt;
+  return { users: db.restaurants.map(r => { const ft = r.vid ? VA.first(r.vid) : null; const a = access(r);
+    return { id: r.id, name: r.ownerName || r.name, email: r.email || '', phone: r.ownerPhone || r.phone || '', restaurant: r.name, slug: r.slug, createdAt: Date.parse(r.createdAt) || 0, lastLogin: Date.parse(r.lastLoginAt || '') || 0, seen: Math.max(Date.parse(r.lastLoginAt || '') || 0, Date.parse(lastOrder[r.id] || '') || 0), logins: r.logins || 0, signIn: r.google ? 'Google' : 'Email', plan: a.plan, until: a.until || '', active: !r.suspended && a.plan !== 'expired', suspended: !!r.suspended,
+      source: ft ? { src: ft.src, ref: ft.ref, utm: ft.utm, city: ft.ct, device: ft.dv, page: ft.p, first: ft.f } : null }; }).sort((x, y) => y.createdAt - x.createdAt) };
+}
 function reminderDue(r) {
   if (r.suspended || !r.email) return null;
   const a = access(r);
@@ -893,12 +944,13 @@ async function handle(req, res) {
   const SITE_DIR = path.join(PUBLIC_DIR, 'site');
   if (m === 'GET' && (p === '/' || p === '/index.html')) {
     // picture links carry ?v=<file time>, so browsers fetch a picture again as soon as it changes on an update
-    if (!siteCache) { const stockFile = path.join(SITE_DIR, 'content.json'), raw = fs.readFileSync(path.join(SITE_DIR, 'index.html'), 'utf8'); siteCache = db.siteContent ? siteContent.render(raw, db.siteContent, fs.existsSync(stockFile) ? JSON.parse(fs.readFileSync(stockFile, 'utf8')) : null) : raw; siteCache = siteCache.replace(/(src|content|href)="((?:https:\/\/[^"\/]+)?\/?(?:img\/[A-Za-z0-9._-]+|og\.jpg))"/g, (m, a, u) => { try { const f = path.join(SITE_DIR, u.replace(/^https:\/\/[^\/]+/, '').replace(/^\//, '')); return a + '="' + u + '?v=' + Math.round(fs.statSync(f).mtimeMs).toString(36) + '"'; } catch (e) { return m; } }); }
+    if (!siteCache) { const stockFile = path.join(SITE_DIR, 'content.json'), raw = fs.readFileSync(path.join(SITE_DIR, 'index.html'), 'utf8'); siteCache = withTracking(db.siteContent ? siteContent.render(raw, db.siteContent, fs.existsSync(stockFile) ? JSON.parse(fs.readFileSync(stockFile, 'utf8')) : null) : raw); siteCache = siteCache.replace(/(src|content|href)="((?:https:\/\/[^"\/]+)?\/?(?:img\/[A-Za-z0-9._-]+|og\.jpg))"/g, (m, a, u) => { try { const f = path.join(SITE_DIR, u.replace(/^https:\/\/[^\/]+/, '').replace(/^\//, '')); return a + '="' + u + '?v=' + Math.round(fs.statSync(f).mtimeMs).toString(36) + '"'; } catch (e) { return m; } }); }
     const etag = '"' + crypto.createHash('sha1').update(siteCache).digest('base64url').slice(0, 20) + '"';
     if (req.headers['if-none-match'] === etag) { res.writeHead(304, { ETag: etag, 'Cache-Control': 'no-cache' }); return res.end(); } // browsers and crawlers that already have the page get a tiny 304
     return send(res, 200, siteCache, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', ETag: etag });
   }
-  if (m === 'GET' && /^\/(privacy|terms|refund|contact)\/?$/.test(p)) return serveFile(res, path.join(SITE_DIR, p.replace(/\//g, ''), 'index.html'), 'no-cache');
+  if (m === 'GET' && /^\/(privacy|terms|refund|contact)\/?$/.test(p)) return send(res, 200, withTracking(fs.readFileSync(path.join(SITE_DIR, p.replace(/\//g, ''), 'index.html'), 'utf8')), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+  if (m === 'POST' && p === '/api/va') { if (TRACK) { try { VA.track(req, await readBody(req, 30000)); } catch {} } res.writeHead(204, { 'Cache-Control': 'no-store' }); return res.end(); }
   if (m === 'GET' && /^\/site-media\/[A-Za-z0-9]+\.(png|jpg|webp|svg)$/.test(p)) { const f = safeJoin(path.join(DATA_DIR, 'site-media'), p.slice(11)); return f ? serveFile(res, f, 'public, max-age=31536000, immutable') : fail(res, 404, 'Not found'); }
   if (m === 'GET' && (/^\/img\/[A-Za-z0-9._-]+$/.test(p) || /^\/(og\.jpg|favicon-32\.png|icon-180\.png|icon-192\.png|icon-512\.png)$/.test(p))) { const f = safeJoin(SITE_DIR, p); return f ? serveFile(res, f, 'public, max-age=86400') : fail(res, 404, 'Not found'); }
   // Windows installer: served from this server (fast in India, with a real file size) when the local copy is ready, else from GitHub Pages.
@@ -965,7 +1017,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     const b = baseUrl(req), h = fs.readFileSync(path.join(PUBLIC_DIR, 'admin.html'), 'utf8')
       .replace('<meta name="robots" content="noindex, nofollow">', `<meta name="robots" content="index, follow"><meta name="description" content="Start your free 10-day trial of Veyra Dine In, the QR code menu and table ordering system for restaurants, cafés and dhabas in India. No card needed."><link rel="canonical" href="${b}/signup"><meta property="og:title" content="Start your free trial · Veyra Dine In"><meta property="og:image" content="${b}/og.jpg">`)
       .replace(/<title>[^<]*<\/title>/, '<title>Free trial: QR Code Ordering for Restaurants · Veyra Dine In</title>');
-    return send(res, 200, h, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+    return send(res, 200, withTracking(h), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
   }
   if (m === 'GET' && p !== '/admin/google-link' && /^\/admin(\/[a-z0-9-]+)?\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'admin.html'));
   if (m === 'GET' && /^\/waiter(\/[a-z0-9-]+)?\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'waiter.html'));
@@ -1348,6 +1400,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     r.phone = str(body.phone, 30);
     for (const name of ['Starters', 'Main Course', 'Desserts', 'Drinks']) db.categories.push({ id: id(), restaurantId: r.id, name, sort: db.categories.length });
     save();
+    r.vid = vidOf(body.vid); r.lastLoginAt = now(); r.logins = 1; VA.server(r.vid, 'signup', { n: r.name, x: email, id: r.id });
     setCookie(res, 'vd_admin', sign(r.id + '|0')); trackEvent('signup'); save();
     return send(res, 201, { ok: true, slug: r.slug });
   }
@@ -1355,7 +1408,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     const who = str(body.slug, 120).toLowerCase();
     const r = db.restaurants.find(x => (who.includes('@') ? x.email === who : x.slug === slugify(who)));
     if (!r || !checkPassword(body.password || '', r.passwordHash)) return fail(res, 401, 'Wrong email / restaurant ID or password');
-    setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0))); trackEvent('login'); saveSoon();
+    setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0))); trackEvent('login'); r.lastLoginAt = now(); r.logins = (r.logins || 0) + 1; if (!r.vid && body.vid) r.vid = vidOf(body.vid); saveSoon();
     return send(res, 200, { ok: true, slug: r.slug });
   }
   if (m === 'GET' && p === '/api/auth/config') return send(res, 200, { googleClientId: googleClientId(req), emailReset: !!smtpCfg() });
@@ -1395,7 +1448,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
       if (!str(body.name)) return send(res, 200, { needSignup: true, email: gu.email, ownerName: gu.name });
       if (!/^[0-9+\s-]{8,16}$/.test(str(body.phone))) return fail(res, 400, 'Please enter a valid mobile number');
       r = newRestaurant({ name: body.name, password: crypto.randomBytes(12).toString('hex'), email: gu.email, ownerName: gu.name, phone: body.phone, plan: 'trial' });
-      r.phone = str(body.phone, 30); r.google = true;
+      r.phone = str(body.phone, 30); r.google = true; r.vid = vidOf(body.vid); VA.server(r.vid, 'signup', { n: r.name, x: gu.email, id: r.id });
       for (const name of ['Starters', 'Main Course', 'Desserts', 'Drinks']) db.categories.push({ id: id(), restaurantId: r.id, name, sort: db.categories.length });
       save();
       setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0)));
@@ -1465,7 +1518,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     catch (e) { if (e.status === 404) failCount(tk); return fail(res, e.status || 400, e.message); }
   }
   // ---- Veyra HQ only: every request is signed with Veyra's private license key ----
-  if (m === 'POST' && (p.startsWith('/api/licenses/') || p.startsWith('/api/hq/')) && ['/api/licenses/status', '/api/licenses/reset', '/api/licenses/revoke', '/api/licenses/unrevoke', '/api/hq/overview', '/api/hq/restaurant', '/api/hq/payment', '/api/hq/lead', '/api/hq/site', '/api/hq/site/save', '/api/hq/site/preview', '/api/hq/site/media'].includes(p)) {
+  if (m === 'POST' && (p.startsWith('/api/licenses/') || p.startsWith('/api/hq/')) && ['/api/licenses/status', '/api/licenses/reset', '/api/licenses/revoke', '/api/licenses/unrevoke', '/api/hq/overview', '/api/hq/restaurant', '/api/hq/payment', '/api/hq/lead', '/api/hq/site', '/api/hq/site/save', '/api/hq/site/preview', '/api/hq/site/media', '/api/hq/analytics', '/api/hq/users', '/api/hq/seo', '/api/hq/seo-run'].includes(p)) {
     const ts = Number(body.ts), raw = String(body.code || '');
     const { code: _c, ts: _t, sig: _s, ...rest } = body;
     const bh = crypto.createHash('sha256').update(JSON.stringify(rest)).digest('hex');
@@ -1504,6 +1557,10 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
         return send(res, 200, { url: '/site-media/' + name });
       }
     }
+    if (p === '/api/hq/analytics') return send(res, 200, VA.report({ days: body.days }));
+    if (p === '/api/hq/users') return send(res, 200, hqUsers());
+    if (p === '/api/hq/seo') return send(res, 200, seoState());
+    if (p === '/api/hq/seo-run') { try { const r2 = await seoRun(body); return send(res, 200, Object.assign({ seo: seoState() }, r2)); } catch (e) { return fail(res, e.status && e.status < 500 ? e.status : 502, e.message); } }
     if (p === '/api/hq/lead') {
       const l = (db.leads || []).find(x => x.id === raw); if (!l) return fail(res, 404, 'Not found');
       if (['new', 'contacted', 'planned', 'won', 'closed'].includes(body.status)) l.status = body.status;

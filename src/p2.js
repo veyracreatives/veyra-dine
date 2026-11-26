@@ -4,13 +4,13 @@ const ROLES = {
   admin: { label: 'Admin', tabs: [
     ['home', 'Dashboard', 'home', 'Academy'], ['admissions', 'Admissions', 'board', 'Academy'], ['players', 'Players', 'players', 'Academy'], ['batches', 'Batches', 'batch', 'Academy'],
     ['attendance', 'Attendance', 'check', 'Daily'], ['fees', 'Fees & billing', 'rupee', 'Daily'], ['reminders', 'Fee reminders', 'bell', 'Daily'],
-    ['tournaments', 'Tournaments', 'trophy', 'Football'], ['training', 'Training plan', 'whistle', 'Football'], ['health', 'Health & documents', 'shield', 'Football'], ['kit', 'Kit & equipment', 'gift', 'Football'],
+    ['tournaments', 'Tournaments', 'trophy', 'Coaching'], ['training', 'Training plan', 'whistle', 'Coaching'], ['health', 'Health & documents', 'shield', 'Coaching'], ['kit', 'Kit & equipment', 'gift', 'Coaching'],
     ['staff', 'Coaches & staff', 'players', 'People'], ['parents', 'Parents', 'parent', 'People'], ['notices', 'Notices', 'megaphone', 'People'],
     ['money', 'Expenses & salaries', 'receipt', 'Money & setup'], ['grounds', 'Grounds', 'pin', 'Money & setup'], ['reports', 'Reports', 'chart', 'Money & setup'], ['setup', 'Settings & plan', 'gear', 'Money & setup']],
     bar: ['home', 'attendance', 'fees', 'players'] },
   manager: { label: 'Manager', tabs: [
     ['home', 'Today', 'home', 'Manage'], ['staffatt', 'Coach attendance', 'whistle', 'Manage'], ['attendance', 'Player attendance', 'check', 'Manage'], ['admissions', 'Admissions', 'board', 'Manage'], ['players', 'Players', 'players', 'Manage'], ['batches', 'Batches', 'batch', 'Manage'], ['notices', 'Notices', 'megaphone', 'Manage'],
-    ['tournaments', 'Tournaments', 'trophy', 'Football'], ['training', 'Training plan', 'whistle', 'Football'], ['health', 'Health & documents', 'shield', 'Football'], ['grounds', 'Grounds', 'pin', 'Football'], ['kit', 'Kit & equipment', 'gift', 'Football']],
+    ['tournaments', 'Tournaments', 'trophy', 'Coaching'], ['training', 'Training plan', 'whistle', 'Coaching'], ['health', 'Health & documents', 'shield', 'Coaching'], ['grounds', 'Grounds', 'pin', 'Coaching'], ['kit', 'Kit & equipment', 'gift', 'Coaching']],
     bar: ['home', 'staffatt', 'attendance', 'admissions'] },
   coach: { label: 'Coach', tabs: [['home', 'Today', 'home', 'Coach'], ['mark', 'Take attendance', 'check', 'Coach'], ['training', 'Training plan', 'whistle', 'Coach'], ['matches', 'Matches', 'trophy', 'Coach'], ['progress', 'Player progress', 'star', 'Coach'], ['myatt', 'My attendance', 'clock', 'Coach'], ['notices', 'Notices', 'megaphone', 'Coach']],
     bar: ['home', 'mark', 'training', 'matches'] },
@@ -45,7 +45,8 @@ function auth(kind, token) {
     <div><h1>${head[0]}</h1><p class="muted" style="margin-top:6px">${head[1]}</p></div>
     ${B && !up && !rs ? `<div class="banner">${ic('ok')}<span class="grow">You are logged in as <b>${esc(B.me.name)}</b>.</span><a class="btn btn-primary btn-sm" href="#${B.me.role}">Open my app</a></div>` : ''}
     ${google ? `<div id="gbtn" class="gwrap"><button class="btn btn-google btn-lg btn-block" type="button" data-act="google">${ic('google')}Continue with Google</button>${LIVE ? '<div class="glayer" aria-hidden="false"></div>' : ''}</div><div class="or">or with email</div>` : ''}
-    ${up ? `<label class="field" for="f-ac"><span>Academy name</span><input class="input" id="f-ac" placeholder="e.g. Kickstart FC Academy" autocomplete="organization" required></label>
+    ${up ? `<label class="field" for="f-ac"><span>Academy name</span><input class="input" id="f-ac" placeholder="e.g. Kickstart Sports Academy" autocomplete="organization" required></label>
+    <label class="field" for="f-sport"><span>Sport</span><select class="select" id="f-sport">${[['football', 'Football'], ['cricket', 'Cricket'], ['badminton', 'Badminton'], ['tennis', 'Tennis'], ['basketball', 'Basketball'], ['swimming', 'Swimming'], ['skating', 'Skating'], ['athletics', 'Athletics'], ['martial', 'Martial arts'], ['other', 'Other sport']].map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></label>
     <div class="grid g2"><label class="field" for="f-nm"><span>Your name</span><input class="input" id="f-nm" autocomplete="name" required></label><label class="field" for="f-city"><span>Area or city</span><input class="input" id="f-city" placeholder="Kharghar, Navi Mumbai"></label></div>
     <label class="field" for="f-ph"><span>Phone or WhatsApp <span class="faint" style="font-weight:500">(optional)</span></span><input class="input" id="f-ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="So we can help you set up"></label>` : ''}
     ${rs ? '' : `<label class="field" for="f-em"><span>Email</span><input class="input" id="f-em" type="email" autocomplete="email" placeholder="you@academy.in" required></label>`}

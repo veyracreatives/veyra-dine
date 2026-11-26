@@ -43,18 +43,35 @@ C.DRILLS = [
 ];
 
 /* ---------- new academy ---------- */
-C.newAcademy = ({ name, place, now, trialDays }) => {
+/* ---------- sports: each academy picks one; skills, drills and kit words follow it ---------- */
+const D_ = (...a) => a;
+C.SPORTS = {
+  football: { name: 'Football', skills: ['Passing', 'Dribbling', 'Shooting', 'First touch', 'Fitness', 'Teamwork'], drills: C.DRILLS, ball: 'Footballs, size 4' },
+  cricket: { name: 'Cricket', skills: ['Batting', 'Bowling', 'Fielding', 'Catching', 'Fitness', 'Teamwork'], ball: 'Cricket balls', drills: [D_('Dynamic warm-up', 'Warm-up', 10), D_('Throwdowns: front-foot drives', 'Batting', 15), D_('Net session', 'Batting', 25), D_('Spot bowling to cones', 'Bowling', 15), D_('Run-up and action work', 'Bowling', 10), D_('High catches', 'Fielding', 10), D_('Ground fielding and throw', 'Fielding', 12), D_('Running between wickets', 'Batting', 8), D_('Slip catching', 'Fielding', 10), D_('Wicket-keeping basics', 'Keeping', 12), D_('Match simulation', 'Game', 30), D_('Agility ladder', 'Fitness', 8)] },
+  badminton: { name: 'Badminton', skills: ['Footwork', 'Serve', 'Smash', 'Net play', 'Fitness', 'Game sense'], ball: 'Shuttlecocks', drills: [D_('Skipping warm-up', 'Warm-up', 8), D_('Six-corner footwork', 'Footwork', 12), D_('Short and long serves', 'Serve', 10), D_('Clear and drop rally', 'Strokes', 15), D_('Smash and defend', 'Smash', 12), D_('Net kills and lifts', 'Net play', 10), D_('Multi-shuttle feeding', 'Strokes', 15), D_('Doubles rotation', 'Game', 15), D_('Singles practice game', 'Game', 20), D_('Agility ladder', 'Fitness', 8)] },
+  tennis: { name: 'Tennis', skills: ['Forehand', 'Backhand', 'Serve', 'Volley', 'Footwork', 'Fitness'], ball: 'Tennis balls', drills: [D_('Mini tennis warm-up', 'Warm-up', 10), D_('Cross-court forehands', 'Forehand', 15), D_('Down-the-line backhands', 'Backhand', 15), D_('Serve targets', 'Serve', 12), D_('Volley at the net', 'Volley', 10), D_('Split-step footwork', 'Footwork', 8), D_('Approach and finish', 'Game', 15), D_('Practice sets', 'Game', 30)] },
+  basketball: { name: 'Basketball', skills: ['Dribbling', 'Shooting', 'Passing', 'Defence', 'Fitness', 'Teamwork'], ball: 'Basketballs, size 6', drills: [D_('Dynamic warm-up', 'Warm-up', 10), D_('Two-ball dribbling', 'Dribbling', 10), D_('Form shooting', 'Shooting', 12), D_('Layup lines', 'Shooting', 10), D_('Chest and bounce passes', 'Passing', 8), D_('Defensive slides', 'Defence', 10), D_('3 v 3 half court', 'Game', 20), D_('Free throws', 'Shooting', 10)] },
+  swimming: { name: 'Swimming', skills: ['Freestyle', 'Backstroke', 'Breaststroke', 'Butterfly', 'Starts and turns', 'Endurance'], ball: 'Kickboards', drills: [D_('Easy warm-up swim', 'Warm-up', 10), D_('Kick with board', 'Kick', 10), D_('Catch-up freestyle', 'Freestyle', 12), D_('Backstroke rotation', 'Backstroke', 10), D_('Breaststroke timing', 'Breaststroke', 12), D_('Butterfly kick', 'Butterfly', 8), D_('Dive starts', 'Starts', 10), D_('Flip turns', 'Turns', 10), D_('Interval sets', 'Endurance', 20), D_('Cool-down swim', 'Cool-down', 5)] },
+  skating: { name: 'Skating', skills: ['Balance', 'Stride', 'Turns', 'Stopping', 'Speed', 'Confidence'], ball: 'Cones', drills: [D_('Stretch and balance', 'Warm-up', 8), D_('Duck walk and glide', 'Stride', 10), D_('T-stop and plough stop', 'Stopping', 10), D_('Crossovers on the circle', 'Turns', 12), D_('Cone slalom', 'Turns', 10), D_('Speed laps', 'Speed', 12), D_('Relay game', 'Game', 15)] },
+  athletics: { name: 'Athletics', skills: ['Sprint start', 'Speed', 'Endurance', 'Jumps', 'Throws', 'Technique'], ball: 'Hurdles', drills: [D_('Dynamic warm-up', 'Warm-up', 10), D_('A-skips and B-skips', 'Technique', 8), D_('Block starts', 'Sprint', 12), D_('Flying 30 m', 'Speed', 10), D_('Hurdle mobility', 'Technique', 10), D_('Long jump approach', 'Jumps', 15), D_('Shot put basics', 'Throws', 12), D_('Tempo runs', 'Endurance', 20)] },
+  martial: { name: 'Martial arts', skills: ['Technique', 'Forms', 'Sparring', 'Flexibility', 'Fitness', 'Discipline'], ball: 'Kick pads', drills: [D_('Warm-up and stretching', 'Warm-up', 10), D_('Basic stances and blocks', 'Technique', 12), D_('Kicks on pads', 'Technique', 12), D_('Forms practice', 'Forms', 15), D_('Controlled sparring', 'Sparring', 15), D_('Flexibility routine', 'Flexibility', 10), D_('Conditioning circuit', 'Fitness', 10)] },
+  other: { name: 'Other', skills: ['Technique', 'Fitness', 'Focus', 'Teamwork', 'Discipline', 'Progress'], ball: 'Equipment', drills: [D_('Warm-up', 'Warm-up', 10), D_('Skill practice', 'Technique', 20), D_('Fitness circuit', 'Fitness', 12), D_('Game or performance', 'Game', 20), D_('Cool-down', 'Cool-down', 5)] }
+};
+C.sportOf = ac => C.SPORTS[(ac && ac.sport) || 'football'] || C.SPORTS.football;
+C.drillsFor = sport => (C.SPORTS[sport] || C.SPORTS.football).drills.map((d, i) => ({ id: 'd' + (i + 1), name: d[0], cat: d[1], mins: d[2] }));
+C.newAcademy = ({ name, place, now, trialDays, sport }) => {
+  sport = C.SPORTS[sport] ? sport : 'football';
   now = now || Date.now();
   const id = C.id('a');
   return {
-    id, v: 1, name: name.trim(), place: (place || '').trim(), createdAt: now,
+    id, v: 1, name: name.trim(), place: (place || '').trim(), createdAt: now, sport,
     upi: '', payee: name.trim(), dueDay: 5, lateAfter: 10, lateFee: 100,
     settings: { google: true, rules: { before: true, due: true, after: true, weekly: true }, chan: { app: true, email: true, wa: true },
       tpl: 'Hi {parent}, {player}\'s {month} fee of {amount} is due on {due}. Pay by UPI in the Veyra Academy app and paste the transaction ID. Thank you, {academy}' },
     plan: { type: 'trial', until: now + (trialDays || 10) * DAY }, suspended: false,
     admins: [], batches: [], staff: [], players: [], grounds: [{ id: 'g1', name: 'Main ground' }], bookings: [],
     att: {}, staffAtt: {}, queue: [], payments: [], receiptSeq: 0, notices: [], adm: [], tournaments: [],
-    drills: C.DRILLS.map((d, i) => ({ id: 'd' + (i + 1), name: d[0], cat: d[1], mins: d[2] })), plans: {}, progress: {}, injuries: [],
+    drills: C.drillsFor(sport), plans: {}, progress: {}, injuries: [],
     kit: [], kitGiven: {}, expenses: [], salaries: {}, feed: [], seen: {}, reminded: {}
   };
 };
@@ -158,6 +175,14 @@ def('academy.save', AD, (ac, ctx, p) => {
   if (p.lateFee != null) ac.lateFee = num(p.lateFee, 0, 100000);
   if (ac.lateAfter < ac.dueDay) ac.lateAfter = ac.dueDay;
   if (p.google != null) ac.settings.google = !!p.google;
+  if (p.sport != null && C.SPORTS[p.sport] && p.sport !== (ac.sport || 'football')) {
+    // new sport: swap the starter drills (keep any the academy added or used in a plan)
+    const used = new Set(Object.values(ac.plans).flatMap(x => x.drills || []));
+    const starter = new Set(C.sportOf(ac).drills.map(d => d[0]));
+    ac.drills = ac.drills.filter(d => used.has(d.id) || !starter.has(d.name));
+    C.SPORTS[p.sport].drills.forEach(d => { if (!ac.drills.some(x => x.name === d[0])) ac.drills.push({ id: C.id('d'), name: d[0], cat: d[1], mins: d[2] }); });
+    ac.sport = p.sport; return { msg: `Sport set to ${C.SPORTS[p.sport].name}. Skills and drills now match.` };
+  }
   return { msg: 'Saved' };
 });
 def('reminders.save', AD, (ac, ctx, p) => {
@@ -511,8 +536,8 @@ def('drill.add', STAFF, (ac, ctx, p) => { const name = need(str(p.name, 60), 'Ad
 /* progress & health */
 def('progress.save', STAFF, (ac, ctx, p) => {
   const pl = playerOf(ac, p.pid) || err('Player not found'); if (!coachOwns(ac, ctx, pl.batch)) err('Only the coach of this batch can rate this player', 403);
-  const scores = C.SKILLS.map((_, i) => num((p.scores || [])[i], 1, 5) || 3);
-  ac.progress[pl.id] = { scores, note: str(p.note, 500), at: ctx.now, by: ctx.name, m: T.date(ctx.now).slice(0, 7) };
+  const skills = C.sportOf(ac).skills; const scores = skills.map((_, i) => num((p.scores || [])[i], 1, 5) || 3);
+  ac.progress[pl.id] = { skills, scores, note: str(p.note, 500), at: ctx.now, by: ctx.name, m: T.date(ctx.now).slice(0, 7) };
   post(ac, ctx, { ico: 'star', title: `New progress card for ${pl.name}`, sub: 'From ' + ctx.name, aud: { pids: [pl.id] }, href: { parent: 'progress' } });
   return { msg: 'Progress shared with the parent' };
 });
@@ -624,7 +649,7 @@ C.boot = (ac, me, now, extra) => {
   const att = {}; [today].forEach(d => { att[d] = {}; Object.entries(ac.att[d] || {}).forEach(([bid, r]) => { if (role === 'parent') { const m = {}; kids.forEach(k => { if (r.marks[k]) m[k] = r.marks[k]; }); att[d][bid] = { marks: m, at: r.at, by: r.by }; } else att[d][bid] = r; }); });
   const B = {
     v: ac.v, now, today, month, me: { uid: me.uid, role, sid: me.sid || '', name: me.name, email: me.email || '' },
-    academy: { id: ac.id, name: ac.name, place: ac.place, upi: ac.upi, payee: ac.payee || ac.name, dueDay: ac.dueDay, lateAfter: ac.lateAfter, lateFee: ac.lateFee, settings: role === 'admin' ? ac.settings : { google: ac.settings.google } },
+    academy: { id: ac.id, name: ac.name, place: ac.place, sport: ac.sport || 'football', upi: ac.upi, payee: ac.payee || ac.name, dueDay: ac.dueDay, lateAfter: ac.lateAfter, lateFee: ac.lateFee, settings: role === 'admin' ? ac.settings : { google: ac.settings.google } },
     plan: { type: ac.plan.type, until: ac.plan.until, active: C.planActive(ac, now), suspended: !!ac.suspended, daysLeft: Math.max(0, Math.ceil((ac.plan.until - now) / DAY)) },
     batches: ac.batches.map(b => ({ ...b, off: (b.off || []).filter(d => d >= T.add(today, -7)) })), grounds: ac.grounds, staff, players, kids, myBatches,
     att, sessionsToday: C.sessionsOn(ac, today).map(b => b.id),
@@ -634,7 +659,7 @@ C.boot = (ac, me, now, extra) => {
     progress: Object.fromEntries(Object.entries(ac.progress).filter(([pid]) => role !== 'parent' || kids.includes(pid))),
     injuries: ac.injuries.filter(i => role !== 'parent' || kids.includes(i.pid)),
     feed, unread: feed.filter(f => f.at > seen && f.by !== me.name).length, feedSeenAt: seen,
-    skills: C.SKILLS, docs: C.DOCS,
+    skills: C.sportOf(ac).skills, sport: ac.sport || 'football', sports: Object.entries(C.SPORTS).map(([k, v]) => [k, v.name]), sportInfo: { name: C.sportOf(ac).name, ball: C.sportOf(ac).ball }, docs: C.DOCS,
     bookings: role === 'parent' ? [] : ac.bookings.filter(b => b.date >= T.add(today, -1))
   };
   // upcoming 7 days of sessions for coach / parent

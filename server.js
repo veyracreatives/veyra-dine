@@ -58,7 +58,7 @@ const FUNNEL = [
 const A = Analytics({ dataDir: DATA, base: BASE, funnel: FUNNEL });
 const HOST_NAME = (() => { try { return new URL(BASE).hostname; } catch (_) { return 'localhost'; } })();
 const seo = SEO({ dataDir: DATA, base: BASE, host: HOST_NAME, settings: () => db.hq.settings.seo });
-const SEO_WORDS = ['football academy', 'Navi Mumbai', 'Thane', 'attendance', 'fee'];
+const SEO_WORDS = ['sports academy', 'football academy', 'cricket academy', 'Navi Mumbai', 'Thane', 'attendance', 'fee'];
 function hqLog(text) { db.hq.activity.unshift({ at: Date.now(), text }); if (db.hq.activity.length > 500) db.hq.activity.length = 500; }
 
 /* ---------------- email (optional: npm i nodemailer, then fill SMTP in HQ) ---------------- */
@@ -310,7 +310,7 @@ const server = http.createServer(async (req, res) => {
         if (userByEmail(email)) return bad(res, 'This email already has an account. Log in instead.');
         const usr = env.ensureUser({ email, name: b.name, pw: b.pw }); const U = db.users[usr.uid]; const vid = String(b.vid || '').replace(/[^\w-]/g, '').slice(0, 24);
         Object.assign(U, { phone: String(b.phone || '').replace(/[^\d+ -]/g, '').slice(0, 20), via: 'email', vid, lastLogin: Date.now(), logins: 1 });
-        const ac = C.newAcademy({ name: String(b.academy).slice(0, 80), place: String(b.city || '').slice(0, 80), now: Date.now(), trialDays: db.hq.plans.trial });
+        const ac = C.newAcademy({ name: String(b.academy).slice(0, 80), place: String(b.city || '').slice(0, 80), sport: String(b.sport || ''), now: Date.now(), trialDays: db.hq.plans.trial });
         ac.admins.push(usr.uid); ac.vid = vid; db.academies[ac.id] = ac; env.link(usr.uid, ac.id, 'admin'); A.server(vid, 'signup', { n: ac.name, x: email, id: ac.id });
         hqLog(`New trial: ${ac.name} (${email})`); startSession(res, usr.uid);
         mail(email, 'Welcome to Veyra Academy', `Hi ${b.name},\n\n${ac.name} is set up with a ${db.hq.plans.trial}-day free trial.\nOpen: ${BASE}/#admin\n\nStart by adding your batches, coaches and players.\n`);

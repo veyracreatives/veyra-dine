@@ -402,3 +402,5 @@ a.tick{text-decoration:none}
 .top-actions .role-switch>.btn{height:40px}
 .tr .label,.tr .eyebrow,.tr .kpi .label,.tr .card-h .pill.plain{letter-spacing:0;font-family:var(--f-body);text-transform:none}
 @media (max-width:600px){.lang-pick{padding-left:4px}.lang-pick svg{display:none}.lang-pick select{padding:0 8px}}
+.sports-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
+@media (max-width:600px){.hero .hstack>.btn{flex:1 1 100%}}

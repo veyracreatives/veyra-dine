@@ -1,7 +1,7 @@
 {
   "name": "Veyra Academy",
   "short_name": "Veyra Academy",
-  "description": "Football academy app for admins, managers, coaches and parents.",
+  "description": "Sports academy app for admins, managers, coaches and parents: football, cricket, badminton, swimming and more.",
   "start_url": "/#app",
   "scope": "/",
   "display": "standalone",

@@ -88,7 +88,7 @@ const DemoAPI = (() => {
     login(email, pw) { load(); const u = Object.values(db.users).find(x => x.email === String(email).toLowerCase().trim()); if (!u || u.pw !== pw) return no('That email and password do not match'); const m = db.mem.find(x => x.uid === u.id); if (!m) return no('Your academy has not added you yet'); db.ses = { uid: u.id, aid: m.aid, role: m.role, sid: m.sid }; save(); return ok(); },
     loginAs(role) { load(); const want = { admin: 'owner@kickstart.demo', manager: 'priya@kickstart.demo', coach: 'arjun@kickstart.demo', parent: 'sneha.patil@parent.demo' }[role]; const u = Object.values(db.users).find(x => x.email === want); const m = u && db.mem.find(x => x.uid === u.id && x.aid === db.demoAid); if (!m) { reset(); return this.loginAs(role); } db.ses = { uid: u.id, aid: m.aid, role: m.role, sid: m.sid }; save(); return ok(); },
     switchTo(aid, role) { load(); const m = db.mem.find(x => x.uid === db.ses.uid && x.aid === aid && x.role === role); if (!m) return no('Not allowed'); db.ses = { uid: m.uid, aid, role, sid: m.sid }; save(); return ok(); },
-    signup(f) { load(); if (Object.values(db.users).some(u => u.email === f.email)) return no('This email already has an account. Log in instead.'); const e = env(); const u = e.ensureUser({ email: f.email, name: f.name, pw: f.pw }); const a = C.newAcademy({ name: f.academy, place: f.city, now: Date.now(), trialDays: db.hq.plans.trial }); a.payee = f.academy; a.admins.push(u.uid); db.ac[a.id] = a; e.link(u.uid, a.id, 'admin'); db.ses = { uid: u.uid, aid: a.id, role: 'admin', sid: '' }; db.hq.activity.unshift({ at: Date.now(), text: `${f.academy} started a trial` }); save(); return ok(); },
+    signup(f) { load(); if (Object.values(db.users).some(u => u.email === f.email)) return no('This email already has an account. Log in instead.'); const e = env(); const u = e.ensureUser({ email: f.email, name: f.name, pw: f.pw }); const a = C.newAcademy({ name: f.academy, place: f.city, sport: f.sport, now: Date.now(), trialDays: db.hq.plans.trial }); a.payee = f.academy; a.admins.push(u.uid); db.ac[a.id] = a; e.link(u.uid, a.id, 'admin'); db.ses = { uid: u.uid, aid: a.id, role: 'admin', sid: '' }; db.hq.activity.unshift({ at: Date.now(), text: `${f.academy} started a trial` }); save(); return ok(); },
     logout() { load(); db.ses = null; save(); return ok(); },
     google() { return no('Google sign-in works on the live site. In this preview, use the demo logins below.'); },
     forgot() { return ok({ msg: 'On the live site we email a reset link. In this preview, use the demo logins.' }); },
@@ -185,13 +185,13 @@ const ROLES = {
   admin: { label: 'Admin', tabs: [
     ['home', 'Dashboard', 'home', 'Academy'], ['admissions', 'Admissions', 'board', 'Academy'], ['players', 'Players', 'players', 'Academy'], ['batches', 'Batches', 'batch', 'Academy'],
     ['attendance', 'Attendance', 'check', 'Daily'], ['fees', 'Fees & billing', 'rupee', 'Daily'], ['reminders', 'Fee reminders', 'bell', 'Daily'],
-    ['tournaments', 'Tournaments', 'trophy', 'Football'], ['training', 'Training plan', 'whistle', 'Football'], ['health', 'Health & documents', 'shield', 'Football'], ['kit', 'Kit & equipment', 'gift', 'Football'],
+    ['tournaments', 'Tournaments', 'trophy', 'Coaching'], ['training', 'Training plan', 'whistle', 'Coaching'], ['health', 'Health & documents', 'shield', 'Coaching'], ['kit', 'Kit & equipment', 'gift', 'Coaching'],
     ['staff', 'Coaches & staff', 'players', 'People'], ['parents', 'Parents', 'parent', 'People'], ['notices', 'Notices', 'megaphone', 'People'],
     ['money', 'Expenses & salaries', 'receipt', 'Money & setup'], ['grounds', 'Grounds', 'pin', 'Money & setup'], ['reports', 'Reports', 'chart', 'Money & setup'], ['setup', 'Settings & plan', 'gear', 'Money & setup']],
     bar: ['home', 'attendance', 'fees', 'players'] },
   manager: { label: 'Manager', tabs: [
     ['home', 'Today', 'home', 'Manage'], ['staffatt', 'Coach attendance', 'whistle', 'Manage'], ['attendance', 'Player attendance', 'check', 'Manage'], ['admissions', 'Admissions', 'board', 'Manage'], ['players', 'Players', 'players', 'Manage'], ['batches', 'Batches', 'batch', 'Manage'], ['notices', 'Notices', 'megaphone', 'Manage'],
-    ['tournaments', 'Tournaments', 'trophy', 'Football'], ['training', 'Training plan', 'whistle', 'Football'], ['health', 'Health & documents', 'shield', 'Football'], ['grounds', 'Grounds', 'pin', 'Football'], ['kit', 'Kit & equipment', 'gift', 'Football']],
+    ['tournaments', 'Tournaments', 'trophy', 'Coaching'], ['training', 'Training plan', 'whistle', 'Coaching'], ['health', 'Health & documents', 'shield', 'Coaching'], ['grounds', 'Grounds', 'pin', 'Coaching'], ['kit', 'Kit & equipment', 'gift', 'Coaching']],
     bar: ['home', 'staffatt', 'attendance', 'admissions'] },
   coach: { label: 'Coach', tabs: [['home', 'Today', 'home', 'Coach'], ['mark', 'Take attendance', 'check', 'Coach'], ['training', 'Training plan', 'whistle', 'Coach'], ['matches', 'Matches', 'trophy', 'Coach'], ['progress', 'Player progress', 'star', 'Coach'], ['myatt', 'My attendance', 'clock', 'Coach'], ['notices', 'Notices', 'megaphone', 'Coach']],
     bar: ['home', 'mark', 'training', 'matches'] },
@@ -226,7 +226,8 @@ function auth(kind, token) {
     <div><h1>${head[0]}</h1><p class="muted" style="margin-top:6px">${head[1]}</p></div>
     ${B && !up && !rs ? `<div class="banner">${ic('ok')}<span class="grow">You are logged in as <b>${esc(B.me.name)}</b>.</span><a class="btn btn-primary btn-sm" href="#${B.me.role}">Open my app</a></div>` : ''}
     ${google ? `<div id="gbtn" class="gwrap"><button class="btn btn-google btn-lg btn-block" type="button" data-act="google">${ic('google')}Continue with Google</button>${LIVE ? '<div class="glayer" aria-hidden="false"></div>' : ''}</div><div class="or">or with email</div>` : ''}
-    ${up ? `<label class="field" for="f-ac"><span>Academy name</span><input class="input" id="f-ac" placeholder="e.g. Kickstart FC Academy" autocomplete="organization" required></label>
+    ${up ? `<label class="field" for="f-ac"><span>Academy name</span><input class="input" id="f-ac" placeholder="e.g. Kickstart Sports Academy" autocomplete="organization" required></label>
+    <label class="field" for="f-sport"><span>Sport</span><select class="select" id="f-sport">${[['football', 'Football'], ['cricket', 'Cricket'], ['badminton', 'Badminton'], ['tennis', 'Tennis'], ['basketball', 'Basketball'], ['swimming', 'Swimming'], ['skating', 'Skating'], ['athletics', 'Athletics'], ['martial', 'Martial arts'], ['other', 'Other sport']].map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></label>
     <div class="grid g2"><label class="field" for="f-nm"><span>Your name</span><input class="input" id="f-nm" autocomplete="name" required></label><label class="field" for="f-city"><span>Area or city</span><input class="input" id="f-city" placeholder="Kharghar, Navi Mumbai"></label></div>
     <label class="field" for="f-ph"><span>Phone or WhatsApp <span class="faint" style="font-weight:500">(optional)</span></span><input class="input" id="f-ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="So we can help you set up"></label>` : ''}
     ${rs ? '' : `<label class="field" for="f-em"><span>Email</span><input class="input" id="f-em" type="email" autocomplete="email" placeholder="you@academy.in" required></label>`}
@@ -506,13 +507,13 @@ function setupView() {
     <button class="plan-opt" type="button" data-act="plan" data-v="yearly" aria-pressed="${y}"><span class="between"><span class="label">Yearly</span>${save > 0 ? `<span class="pill p-brand plain">Save ${inr(save)}</span>` : ''}</span><span class="amt">${inr(pr.yearly)}<small>/year</small></span><span class="faint" style="font-size:13px">${inr(Math.round(pr.yearly / 12))} a month</span></button></div>
     <div class="between"><span class="faint" style="font-size:13px">${ic('shield', '')} Secure payment by Razorpay: UPI, cards, net banking. No GST added.${P.active && P.type !== 'trial' ? ' Days are added on top of what you have left.' : ''}</span><button class="btn btn-primary btn-lg" type="button" data-act="buyPlan">Pay ${y ? inr(pr.yearly) : inr(pr.monthly)} with Razorpay</button></div>
     <div class="divider"></div><div class="between"><label class="field" for="lic" style="flex:1;min-width:220px"><span>Have a licence key from Veyra?</span><input class="input mono" id="lic" placeholder="VFB-XXXX-XXXX-XXXX" autocomplete="off"></label><button class="btn btn-ghost" type="button" data-act="lic" style="align-self:end">${ic('key')}Activate key</button></div></div></section>
-  <div class="grid g2 g2-wide"><div class="card"><div class="card-h"><h3>Fee collection</h3></div><div class="card-b" style="display:grid;gap:14px">
+  <div class="grid g2 g2-wide" style="align-items:start"><div class="card"><div class="card-h"><h3>Fee collection</h3></div><div class="card-b" style="display:grid;gap:14px">
     <label class="field" for="s-upi"><span>Academy UPI ID</span><input class="input mono" id="s-upi" value="${esc(B.academy.upi)}" placeholder="yourname@okaxis"></label>
     <label class="field" for="s-payee"><span>Name parents see</span><input class="input" id="s-payee" value="${esc(B.academy.payee)}"></label>
     <div class="grid g3"><label class="field" for="s-due"><span>Due on day</span><input class="input" id="s-due" inputmode="numeric" value="${B.academy.dueDay}"></label><label class="field" for="s-lateafter"><span>Late after day</span><input class="input" id="s-lateafter" inputmode="numeric" value="${B.academy.lateAfter}"></label><label class="field" for="s-late"><span>Late fee (₹)</span><input class="input" id="s-late" inputmode="numeric" value="${B.academy.lateFee}"></label></div>
     <div class="note">${ic('upi')}<span>Parents pay this UPI ID and paste the transaction ID. You approve it under Fees. Money never passes through Veyra.</span></div>
   </div><div class="card-f"><button class="btn btn-primary btn-sm" type="button" data-act="saveFees">Save</button></div></div>
-  <div class="stack"><div class="card"><div class="card-h"><h3>Academy</h3></div><div class="card-b" style="display:grid;gap:14px"><label class="field" for="s-name"><span>Academy name</span><input class="input" id="s-name" value="${esc(B.academy.name)}"></label><label class="field" for="s-place"><span>Area</span><input class="input" id="s-place" value="${esc(B.academy.place)}"></label></div><div class="card-f"><button class="btn btn-primary btn-sm" type="button" data-act="saveAcademy">Save</button></div></div>
+  <div class="stack"><div class="card"><div class="card-h"><h3>Academy</h3></div><div class="card-b" style="display:grid;gap:14px"><label class="field" for="s-name"><span>Academy name</span><input class="input" id="s-name" value="${esc(B.academy.name)}"></label><label class="field" for="s-place"><span>Area</span><input class="input" id="s-place" value="${esc(B.academy.place)}"></label><label class="field" for="s-sport"><span>Sport</span><select class="select" id="s-sport">${B.sports.map(([k, n]) => `<option value="${k}" ${k === B.academy.sport ? 'selected' : ''}>${n}</option>`).join('')}</select><small class="faint" style="font-size:12.5px">Skills on progress cards and the drill library follow this.</small></label></div><div class="card-f"><button class="btn btn-primary btn-sm" type="button" data-act="saveAcademy">Save</button></div></div>
   <div class="card"><label class="rule" for="s-google"><div class="grow"><b>Sign in with Google</b><small>Coaches and parents can log in with their Google account</small></div><span class="switch"><input type="checkbox" id="s-google" ${B.academy.settings.google ? 'checked' : ''}><i></i></span></label>
   <div class="rule"><div class="grow"><b>Grounds</b><small>${B.grounds.map(g => esc(g.name)).join(', ')}</small></div><a class="btn btn-ghost btn-sm" href="#admin-grounds">${ic('pin')}Manage</a></div>
   <div class="rule"><div class="grow"><b>Install on your phone</b><small>Works like an app on Android, iPhone and laptop</small></div><button class="btn btn-ghost btn-sm" type="button" data-act="install">${ic('phone')}Install</button></div>
@@ -633,7 +634,7 @@ function parentProgress() {
   const st = statsFor(p.id);
   const badges = []; if (p.att === 100 && p.attN >= 4) badges.push('🏅 Full attendance this month'); if (st.g) badges.push(`⚽ ${st.g} goal${st.g === 1 ? '' : 's'}`); if (st.potm) badges.push(`⭐ Player of the match ×${st.potm}`); if (pr && pr.scores[5] >= 5) badges.push('🤝 Team player');
   return `${tabs}<div><h2 style="font-size:24px">Progress card</h2><p class="muted" style="margin-top:4px">${pr ? `${T.monthName(pr.m || T.date(pr.at).slice(0, 7))} · by ${esc(pr.by)}` : 'The coach has not shared a card yet'}</p></div>
-  ${pr ? `<div class="card glow"><div class="card-b" style="display:grid;gap:16px">${B.skills.map((s, i) => `<div class="skill"><span>${s}</span><span class="pips">${[1, 2, 3, 4, 5].map(n => `<i class="${n <= pr.scores[i] ? 'on' : ''}"></i>`).join('')}</span><b class="tnum">${pr.scores[i]}/5</b></div>`).join('')}
+  ${pr ? `<div class="card glow"><div class="card-b" style="display:grid;gap:16px">${(pr.skills || B.skills).map((s, i) => `<div class="skill"><span>${s}</span><span class="pips">${[1, 2, 3, 4, 5].map(n => `<i class="${n <= pr.scores[i] ? 'on' : ''}"></i>`).join('')}</span><b class="tnum">${pr.scores[i]}/5</b></div>`).join('')}
   ${pr.note ? `<div class="divider"></div><div class="who" style="align-items:flex-start">${av(pr.by, 'sm')}<div><b>Coach's note</b><p class="muted" style="font-size:14px;margin-top:4px;white-space:normal">${esc(pr.note)}</p></div></div>` : ''}</div></div>` : `<div class="card"><div class="card-b">${empty('star', 'You get a notification when the coach shares the first progress card.')}</div></div>`}
   ${badges.length ? `<div class="card"><div class="card-h"><h3>Badges</h3></div><div class="card-b hstack" style="gap:10px">${badges.map(b => `<span class="pill p-brand plain" style="height:30px;font-size:13px">${b}</span>`).join('')}</div></div>` : ''}
   ${parentHealth(p)}`;
@@ -705,7 +706,7 @@ function kitView() {
   const low = B.kit.filter(k => k.have < k.min);
   return `<div class="page-head"><div><h2>Kit & equipment</h2><p>Stock at all grounds. Low items turn red.</p></div><button class="btn btn-primary" type="button" data-act="addStock">${ic('plus')}Add item</button></div>
   ${low.length ? `<div class="note warn-note">${ic('bell')}<span><b>${low.length} item${low.length === 1 ? ' is' : 's are'} running low:</b> ${low.map(k => esc(k.name)).join(', ')}.</span></div>` : ''}
-  <div class="grid g2 g2-wide"><div class="card"><div class="card-h"><h3>Stock</h3><span class="faint" style="font-size:12.5px">In stock / keep at least</span></div><div class="list">${B.kit.length ? B.kit.map(k => `<div class="row"><div class="grow" style="min-width:0"><button type="button" data-act="editStock" data-id="${k.id}" style="all:unset;cursor:pointer;font-weight:600;font-size:14px">${esc(k.name)}</button><span class="stock"><i style="width:${Math.min(100, k.have / Math.max(k.min * 2, 1) * 100)}%;background:${k.have < k.min ? 'var(--bad)' : 'var(--brand)'}"></i></span></div><b class="tnum" style="min-width:64px;text-align:right;${k.have < k.min ? 'color:var(--bad)' : ''}">${k.have}<span class="faint" style="font-weight:500"> / ${k.min}</span></b><div class="qty"><button type="button" data-act="qty" data-id="${k.id}" data-d="-1" aria-label="One less ${esc(k.name)}">−</button><button type="button" data-act="qty" data-id="${k.id}" data-d="1" aria-label="One more ${esc(k.name)}">+</button></div></div>`).join('') : `<div class="empty">No items yet. Add footballs, cones, bibs and kit.</div>`}</div></div>
+  <div class="grid g2 g2-wide"><div class="card"><div class="card-h"><h3>Stock</h3><span class="faint" style="font-size:12.5px">In stock / keep at least</span></div><div class="list">${B.kit.length ? B.kit.map(k => `<div class="row"><div class="grow" style="min-width:0"><button type="button" data-act="editStock" data-id="${k.id}" style="all:unset;cursor:pointer;font-weight:600;font-size:14px">${esc(k.name)}</button><span class="stock"><i style="width:${Math.min(100, k.have / Math.max(k.min * 2, 1) * 100)}%;background:${k.have < k.min ? 'var(--bad)' : 'var(--brand)'}"></i></span></div><b class="tnum" style="min-width:64px;text-align:right;${k.have < k.min ? 'color:var(--bad)' : ''}">${k.have}<span class="faint" style="font-weight:500"> / ${k.min}</span></b><div class="qty"><button type="button" data-act="qty" data-id="${k.id}" data-d="-1" aria-label="One less ${esc(k.name)}">−</button><button type="button" data-act="qty" data-id="${k.id}" data-d="1" aria-label="One more ${esc(k.name)}">+</button></div></div>`).join('') : `<div class="empty">No items yet. Add balls, cones, bibs and kit.</div>`}</div></div>
   <div class="card"><div class="card-h"><h3>Kit given to players</h3><span class="faint" style="font-size:12.5px">${Object.keys(B.kitGiven).filter(id => player(id)).length} of ${B.players.length}</span></div><div class="list">${B.players.length ? B.players.map(p => { const g = B.kitGiven[p.id]; return `<div class="row"><div class="who grow">${jersey(p)}<div><b>${esc(p.name)}</b><small>${g ? 'Size ' + esc(g.size) + ' · given ' + T.short(T.date(g.at)) : 'Not given yet'}</small></div></div>${g ? `<button class="btn btn-quiet btn-sm" type="button" data-act="kitUndo" data-p="${p.id}">Undo</button><span class="pill p-ok">Given</span>` : `<button class="btn btn-ghost btn-sm" type="button" data-act="giveKit" data-p="${p.id}">Mark given</button>`}</div>`; }).join('') : '<div class="empty">No players yet.</div>'}</div></div></div>`;
 }
 function moneyView() {
@@ -766,7 +767,7 @@ function render() {
   else html = VFL.render(CFG, IC);
   $('#app').innerHTML = html + modal(); $('#app').toggleAttribute('data-notrack', r.view === 'app');
   const tr = i18nOn(); $('#app').classList.toggle('tr', tr); if (tr) trDom($('#app'));
-  document.title = r.view === 'landing' ? 'Football Academy Management App India | Veyra Academy' : r.view === 'app' ? `${ROLES[r.role].tabs.find(t => t[0] === r.tab)[1]} · ${B.academy.name}` : 'Veyra Academy';
+  document.title = r.view === 'landing' ? 'Sports Academy Management App India | Veyra Academy' : r.view === 'app' ? `${ROLES[r.role].tabs.find(t => t[0] === r.tab)[1]} · ${B.academy.name}` : 'Veyra Academy';
   if (location.hash !== lastView) { lastView = location.hash; if (r.view === 'login' || r.view === 'signup') mountGoogle(); }
 }
 function rerender() { const y = window.scrollY; render(); window.scrollTo(0, y); }
@@ -857,7 +858,7 @@ function modal() {
     h = `<div class="grid g2">${SEL('md-b', 'Blood group', [['', 'Not sure'], ...['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(x => [x, x])], d.blood || '')}${F('md-a', 'Allergies', d.allergy, { ph: 'e.g. Peanuts' })}</div>${F('md-n', 'Note for the coach', d.note, { ph: 'e.g. Carries an inhaler' })}<div class="grid g2">${F('md-en', 'Emergency contact name', d.ename)}${F('md-ep', 'Emergency phone', d.ephone, { type: 'tel' })}</div>`;
     foot = btns('Cancel', 'Save', 'saveMed', 'ok'); }
   if (m.t === 'exp') { title = 'Add expense'; h = `${F('e-n', 'What was it for', '', { ph: 'e.g. New bibs' })}<div class="grid g3">${F('e-a', 'Amount (₹)', '', { im: 'numeric' })}${SEL('e-c', 'Type', ['Equipment', 'Rent', 'Tournament', 'Travel', 'Medical', 'Marketing', 'Other'].map(x => [x, x]), 'Equipment')}${F('e-d', 'Date', B.today, { type: 'date', max: B.today })}</div>`; foot = btns('Cancel', 'Add expense', 'saveExp', 'plus'); }
-  if (m.t === 'stock') { const k = m.id ? B.kit.find(x => x.id === m.id) : null; title = k ? 'Edit item' : 'Add item'; h = `${F('k-n', 'Item', k ? k.name : '', { ph: 'e.g. Footballs, size 4' })}<div class="grid g2">${F('k-h', 'In stock', k ? k.have : '', { im: 'numeric' })}${F('k-m', 'Keep at least', k ? k.min : '', { im: 'numeric' })}</div>`; foot = (k ? `<button class="btn btn-quiet" type="button" data-act="delStock" data-id="${k.id}">Remove</button>` : '') + btns('Cancel', 'Save', 'saveStock', 'ok'); }
+  if (m.t === 'stock') { const k = m.id ? B.kit.find(x => x.id === m.id) : null; title = k ? 'Edit item' : 'Add item'; h = `${F('k-n', 'Item', k ? k.name : '', { ph: 'e.g. ' + ((B.sportInfo || {}).ball || 'Training cones') })}<div class="grid g2">${F('k-h', 'In stock', k ? k.have : '', { im: 'numeric' })}${F('k-m', 'Keep at least', k ? k.min : '', { im: 'numeric' })}</div>`; foot = (k ? `<button class="btn btn-quiet" type="button" data-act="delStock" data-id="${k.id}">Remove</button>` : '') + btns('Cancel', 'Save', 'saveStock', 'ok'); }
   if (m.t === 'kitGive') { const p = player(m.p); title = 'Kit for ' + p.name; h = `${SEL('kg-s', 'Size', ['XS', 'S', 'M', 'L', 'XL'].map(x => [x, x]), 'M')}<p class="faint" style="font-size:13px">Jersey #${p.no} with the name on the back.</p>`; foot = btns('Cancel', 'Mark given', 'saveKit', 'ok'); }
   if (m.t === 'batch') { const b = m.b ? batch(m.b) : null; title = b ? 'Edit ' + b.name : 'New batch'; const days = b ? b.days : [1, 3, 5];
     h = `<div class="grid g2">${F('b-n', 'Batch name', b ? b.name : '', { ph: 'e.g. U-10 Kickers' })}${F('b-a', 'Ages', b ? b.age : '', { ph: 'e.g. 8 to 10 yrs' })}</div>
@@ -1050,7 +1051,7 @@ document.addEventListener('click', async e => {
     buyTest: async () => { const r = await DemoAPI.buyPlan(M.plan); await refresh(); U.modal = null; rerender(); toast(r.msg, CFG.hosted ? undefined : { href: 'hq.html', label: 'See it in HQ' }); },
     lic: async () => { const code = val('lic'); if (!/^VFB-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(code)) return toast('Keys look like VFB-XXXX-XXXX-XXXX'); try { const r = await API.activateKey(code); await refresh(); rerender(); toast(r.msg || 'Key activated'); } catch (er) { fail(er); } },
     saveFees: () => act('academy.save', { upi: val('s-upi'), payee: val('s-payee'), dueDay: val('s-due'), lateAfter: val('s-lateafter'), lateFee: val('s-late') }),
-    saveAcademy: () => act('academy.save', { name: val('s-name'), place: val('s-place') }),
+    saveAcademy: () => act('academy.save', { name: val('s-name'), place: val('s-place'), sport: val('s-sport') }),
     savePw: async () => { try { const r = await API.changePw(val('ac-old'), val('ac-new')); closeModal(); toast(r.msg || 'Password changed'); } catch (er) { fail(er); } },
     savePhone: () => act('parent.phone', { phone: val('ac-ph') })
   };
@@ -1127,7 +1128,7 @@ document.addEventListener('submit', async e => {
     btn.disabled = true;
     try {
       if (kind === 'login') { const r = await API.login(em, pw); await afterLogin(r); }
-      else if (kind === 'signup') { const r = await API.signup({ academy: val('f-ac'), name: val('f-nm'), city: val('f-city'), phone: val('f-ph'), email: em, pw }); await afterLogin(Object.assign({ created: true }, r)); toast(`Academy created. Your ${CFG.plans.trial}-day trial has started.`); }
+      else if (kind === 'signup') { const r = await API.signup({ academy: val('f-ac'), sport: val('f-sport'), name: val('f-nm'), city: val('f-city'), phone: val('f-ph'), email: em, pw }); await afterLogin(Object.assign({ created: true }, r)); toast(`Academy created. Your ${CFG.plans.trial}-day trial has started.`); }
       else if (kind === 'forgot') { const r = await API.forgot(em); showAuthErr(''); toast(r.msg || 'If this email has an account, a link is on its way.'); }
       else if (kind === 'reset') { await API.resetPw(f.dataset.token, pw); toast('Password saved. Log in now.'); go('login'); }
     } catch (er) { showAuthErr(er.message); }
@@ -1359,7 +1360,42 @@ Holiday|छुट्टी|सुट्टी
 Cup|कप|कप
 League|लीग|लीग
 Friendly|फ़्रेंडली|मैत्री सामना
-🤝 Team player|🤝 टीम प्लेयर|🤝 टीम प्लेयर`;
+🤝 Team player|🤝 टीम प्लेयर|🤝 टीम प्लेयर
+Batting|बल्लेबाज़ी|फलंदाजी
+Bowling|गेंदबाज़ी|गोलंदाजी
+Fielding|फ़ील्डिंग|क्षेत्ररक्षण
+Catching|कैच|झेल
+Footwork|फ़ुटवर्क|फूटवर्क
+Serve|सर्व|सर्व्ह
+Smash|स्मैश|स्मॅश
+Net play|नेट प्ले|नेट प्ले
+Game sense|खेल की समझ|खेळाची समज
+Forehand|फ़ोरहैंड|फोरहँड
+Backhand|बैकहैंड|बॅकहँड
+Volley|वॉली|व्हॉली
+Defence|डिफ़ेंस|डिफेन्स
+Freestyle|फ़्रीस्टाइल|फ्रीस्टाइल
+Backstroke|बैकस्ट्रोक|बॅकस्ट्रोक
+Breaststroke|ब्रेस्टस्ट्रोक|ब्रेस्टस्ट्रोक
+Butterfly|बटरफ़्लाई|बटरफ्लाय
+Starts and turns|स्टार्ट और टर्न|स्टार्ट आणि टर्न
+Endurance|सहनशक्ति|सहनशक्ती
+Balance|संतुलन|तोल
+Stride|स्ट्राइड|स्ट्राइड
+Turns|टर्न|टर्न
+Stopping|रुकना|थांबणे
+Speed|स्पीड|वेग
+Confidence|आत्मविश्वास|आत्मविश्वास
+Sprint start|स्प्रिंट स्टार्ट|स्प्रिंट स्टार्ट
+Jumps|कूद|उडी
+Throws|थ्रो|फेक
+Technique|तकनीक|तंत्र
+Forms|फ़ॉर्म|फॉर्म
+Sparring|स्पारिंग|स्पारिंग
+Flexibility|लचीलापन|लवचिकता
+Discipline|अनुशासन|शिस्त
+Focus|ध्यान|लक्ष
+Coaching|कोचिंग|कोचिंग`;
 const I18N = { hi: {}, mr: {} };
 I18.split('\n').forEach(l => { const [en, hi, mr] = l.split('|'); I18N.hi[en] = hi; I18N.mr[en] = mr; });
 const MONS = { hi: ['जनवरी', 'फ़रवरी', 'मार्च', 'अप्रैल', 'मई', 'जून', 'जुलाई', 'अगस्त', 'सितंबर', 'अक्टूबर', 'नवंबर', 'दिसंबर'], mr: ['जानेवारी', 'फेब्रुवारी', 'मार्च', 'एप्रिल', 'मे', 'जून', 'जुलै', 'ऑगस्ट', 'सप्टेंबर', 'ऑक्टोबर', 'नोव्हेंबर', 'डिसेंबर'] };

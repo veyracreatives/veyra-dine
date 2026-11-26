@@ -4,7 +4,8 @@
 const AREAS = ['Vashi', 'Nerul', 'Seawoods', 'CBD Belapur', 'Kharghar', 'Kamothe', 'Panvel', 'Ulwe', 'Sanpada', 'Airoli', 'Ghansoli', 'Koparkhairane', 'Thane West', 'Ghodbunder Road', 'Majiwada', 'Kalwa', 'Mulund', 'Dombivli', 'Kalyan'];
 function faqs(P) {
   const r = n => '₹' + Math.round(n).toLocaleString('en-IN');
-  return [['What is football academy management software?', 'It is one app that replaces the attendance register, fee notebook and WhatsApp groups. Veyra Academy keeps players, batches, coaches, attendance, UPI fees, reminders, tournaments and parent updates together, on phone and laptop.'],
+  return [['Does it work for cricket, badminton, swimming and other sports?', 'Yes. Pick your sport when you sign up (football, cricket, badminton, tennis, basketball, swimming, skating, athletics, martial arts or other). Progress cards, the drill library and the words in the app follow your sport. You can change it later in Settings.'],
+    ['What is sports academy management software?', 'It is one app that replaces the attendance register, fee notebook and WhatsApp groups. Veyra Academy keeps players, batches, coaches, attendance, UPI fees, reminders, tournaments and parent updates together, on phone and laptop.'],
     ['Do parents need to download anything?', 'Parents open a link and tap Add to Home Screen. It works like an app on Android and iPhone, and it also works in a normal browser.'],
     ['How do parents pay fees?', 'They pay to your academy UPI ID from any UPI app, then paste the 12-digit transaction ID or upload the payment screenshot. You approve it and the receipt goes out. Cash paid at the turf counts too: you record it in one tap. Money goes to your bank, not to us.'],
     ['Can I bring my players in from Excel?', 'Yes. Download the template in the Players page, fill one row per player, save it as CSV and import everyone at once. Parents get their app login by email.'],
@@ -22,7 +23,7 @@ function ld(cfg, base) {
   const P = cfg.plans || { monthly: 999, yearly: 7999, trial: 10 };
   const area = [{ '@type': 'City', name: 'Navi Mumbai' }, { '@type': 'City', name: 'Thane' }, { '@type': 'City', name: 'Mumbai' }, { '@type': 'Country', name: 'India' }];
   const org = { '@type': 'Organization', '@id': 'https://veyracreatives.com/#org', name: 'Veyra Creatives', url: 'https://veyracreatives.com', email: 'marketing@veyracreatives.com', logo: base + '/icon-512.png', sameAs: ['https://www.instagram.com/veyralab.in/'], areaServed: area };
-  const app = { '@type': 'SoftwareApplication', '@id': base + '/#app', name: 'Veyra Academy', alternateName: 'Veyra Academy football academy app', applicationCategory: 'BusinessApplication', applicationSubCategory: 'Sports academy management', operatingSystem: 'Android, iOS, Windows, macOS, Web', url: base + '/', image: base + '/og.png', inLanguage: 'en-IN', description: 'Football academy management software for India: player and coach attendance, UPI fee collection with reminders, admissions, tournaments, training plans and a parent app.', featureList: 'Player attendance, Coach attendance, UPI fee collection, Fee reminders, Receipts and late fees, Admissions board, Tournaments, Training planner, Parent app, Reports', areaServed: area, publisher: { '@id': 'https://veyracreatives.com/#org' },
+  const app = { '@type': 'SoftwareApplication', '@id': base + '/#app', name: 'Veyra Academy', alternateName: 'Veyra Academy sports academy app', applicationCategory: 'BusinessApplication', applicationSubCategory: 'Sports academy management', operatingSystem: 'Android, iOS, Windows, macOS, Web', url: base + '/', image: base + '/og.png', inLanguage: 'en-IN', description: 'Sports academy management software for India (football, cricket, badminton, swimming and more): player and coach attendance, UPI fee collection with reminders, admissions, tournaments, training plans and a parent app.', featureList: 'Player attendance, Coach attendance, UPI fee collection, Fee reminders, Receipts and late fees, Admissions board, Tournaments, Training planner, Parent app, Reports', areaServed: area, publisher: { '@id': 'https://veyracreatives.com/#org' },
     offers: [{ '@type': 'Offer', name: 'Monthly', price: String(P.monthly), priceCurrency: 'INR', url: base + '/#pricing' }, { '@type': 'Offer', name: 'Yearly', price: String(P.yearly), priceCurrency: 'INR', url: base + '/#pricing' }] };
   const site = { '@type': 'WebSite', '@id': base + '/#site', name: 'Veyra Academy', url: base + '/', inLanguage: 'en-IN', publisher: { '@id': 'https://veyracreatives.com/#org' } };
   const faq = { '@type': 'FAQPage', mainEntity: faqs(P).map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) };
@@ -58,10 +59,11 @@ function render(cfg, IC) {
   <main>
   <section class="hero"><div class="wrap">
     <div>
-      <span class="eyebrow">Football academy management software</span>
+      <span class="eyebrow">Sports academy management software</span>
       <h1 class="disp"><span class="ln">Run your academy</span><span class="ln"><em>like a pro club</em></span></h1>
       <p class="lead">Attendance, fees, coaches and parents in one app. Coaches mark a session in 30 seconds. Parents pay by UPI and see every session. You see everything, live.</p>
       <div class="hstack"><a class="btn btn-primary btn-lg" href="#signup">Start ${P.trial}-day free trial ${ic('arrow')}</a><a class="btn btn-ghost btn-lg" href="${demo}#admin">Try the live demo</a></div>
+      <div class="sports-row">${['Football', 'Cricket', 'Badminton', 'Tennis', 'Basketball', 'Swimming', 'Skating', 'Athletics', 'Martial arts'].map(x => `<span class="pill p-mute plain">${x}</span>`).join('')}<span class="pill p-brand plain">any sport</span></div>
       <div class="trust"><span>${ic('ok')}No card needed</span><span>${ic('ok')}Phone, tablet and laptop</span><span>${ic('ok')}Sign in with Google</span></div>
     </div>
     <div class="vis" aria-label="Preview of the admissions board">
@@ -115,7 +117,7 @@ function render(cfg, IC) {
     <div class="hstack" style="margin-top:24px"><button class="btn btn-primary btn-lg" type="button" data-act="install">${ic('phone')}Install Veyra Academy</button><span class="faint" style="font-size:13.5px">Always the latest version. Nothing to download from a store.</span></div>
   </div></section>
   <section class="sec" id="near-you" style="padding-top:0"><div class="wrap">
-    <div class="sec-head"><span class="eyebrow" style="justify-self:start">Navi Mumbai · Thane · all of India</span><h2 class="disp">Made for academies <em>near you</em></h2><p>Veyra Academy is made for grassroots football academies, turf coaching centres and school programmes in Navi Mumbai, Thane and Mumbai. It suits owners who run morning and evening batches across more than one turf, collect monthly fees by UPI and want parents updated without a WhatsApp group for every batch.</p></div>
+    <div class="sec-head"><span class="eyebrow" style="justify-self:start">Navi Mumbai · Thane · all of India</span><h2 class="disp">Made for academies <em>near you</em></h2><p>Veyra Academy is made for football and cricket academies, badminton and swimming coaching, skating and martial arts classes, turf coaching centres and school programmes in Navi Mumbai, Thane and Mumbai. It suits owners who run morning and evening batches across more than one turf, collect monthly fees by UPI and want parents updated without a WhatsApp group for every batch.</p></div>
     <div class="areas rv">${AREAS.map(a => `<span class="pill p-mute plain">${a}</span>`).join('')}<span class="pill p-brand plain">and anywhere in India</span></div>
     <p class="muted" style="max-width:760px;margin-top:20px">Whether you coach U-8 beginners on a box turf in Kharghar or run a U-17 squad on a full ground in Thane, the app works the same way: add your batches and players, give coaches the coach app, and send parents one link. Setup takes an afternoon, and we help by email.</p>
   </div></section>

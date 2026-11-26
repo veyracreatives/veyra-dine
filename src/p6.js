@@ -147,7 +147,7 @@ document.addEventListener('click', async e => {
     buyTest: async () => { const r = await DemoAPI.buyPlan(M.plan); await refresh(); U.modal = null; rerender(); toast(r.msg, CFG.hosted ? undefined : { href: 'hq.html', label: 'See it in HQ' }); },
     lic: async () => { const code = val('lic'); if (!/^VFB-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(code)) return toast('Keys look like VFB-XXXX-XXXX-XXXX'); try { const r = await API.activateKey(code); await refresh(); rerender(); toast(r.msg || 'Key activated'); } catch (er) { fail(er); } },
     saveFees: () => act('academy.save', { upi: val('s-upi'), payee: val('s-payee'), dueDay: val('s-due'), lateAfter: val('s-lateafter'), lateFee: val('s-late') }),
-    saveAcademy: () => act('academy.save', { name: val('s-name'), place: val('s-place') }),
+    saveAcademy: () => act('academy.save', { name: val('s-name'), place: val('s-place'), sport: val('s-sport') }),
     savePw: async () => { try { const r = await API.changePw(val('ac-old'), val('ac-new')); closeModal(); toast(r.msg || 'Password changed'); } catch (er) { fail(er); } },
     savePhone: () => act('parent.phone', { phone: val('ac-ph') })
   };
@@ -224,7 +224,7 @@ document.addEventListener('submit', async e => {
     btn.disabled = true;
     try {
       if (kind === 'login') { const r = await API.login(em, pw); await afterLogin(r); }
-      else if (kind === 'signup') { const r = await API.signup({ academy: val('f-ac'), name: val('f-nm'), city: val('f-city'), phone: val('f-ph'), email: em, pw }); await afterLogin(Object.assign({ created: true }, r)); toast(`Academy created. Your ${CFG.plans.trial}-day trial has started.`); }
+      else if (kind === 'signup') { const r = await API.signup({ academy: val('f-ac'), sport: val('f-sport'), name: val('f-nm'), city: val('f-city'), phone: val('f-ph'), email: em, pw }); await afterLogin(Object.assign({ created: true }, r)); toast(`Academy created. Your ${CFG.plans.trial}-day trial has started.`); }
       else if (kind === 'forgot') { const r = await API.forgot(em); showAuthErr(''); toast(r.msg || 'If this email has an account, a link is on its way.'); }
       else if (kind === 'reset') { await API.resetPw(f.dataset.token, pw); toast('Password saved. Log in now.'); go('login'); }
     } catch (er) { showAuthErr(er.message); }

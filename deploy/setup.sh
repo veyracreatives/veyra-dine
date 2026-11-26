@@ -24,8 +24,12 @@ fi
 
 # code (data folder is kept)
 id veyra >/dev/null 2>&1 || useradd -r -m -d /opt/veyra-dine-home veyra
-if [ -d $DIR/.git ]; then git -C $DIR fetch --depth 1 origin $BRANCH && git -C $DIR reset --hard FETCH_HEAD
+git config --global --add safe.directory $DIR 2>/dev/null || true   # the folder belongs to the app user; let root update it
+if [ -d $DIR/.git ]; then
+  git -C $DIR fetch --depth 1 origin $BRANCH || { echo "!! Could not download the update from GitHub. Nothing was changed."; exit 1; }
+  git -C $DIR reset --hard FETCH_HEAD
 else git clone --depth 1 --branch $BRANCH $REPO $DIR; fi
+echo "==> Code version: $(grep -m1 '"version"' $DIR/package.json | tr -dc '0-9.')"
 mkdir -p $DIR/data
 (cd $DIR && npm install --omit=dev --no-audit --no-fund nodemailer@6 >/dev/null 2>&1 || true)
 chown -R veyra:veyra $DIR

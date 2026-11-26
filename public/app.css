@@ -406,3 +406,25 @@ a.tick{text-decoration:none}
 @media (max-width:600px){.hero .hstack>.btn{flex:1 1 100%}}
 
 @media (min-width:700px){.pal.pal4{grid-template-columns:repeat(4,44px)}}
+
+/* sports tabs (pure CSS, works without JS) */
+.sp-tabs{display:grid;gap:18px}
+.sp-r{position:absolute;opacity:0;pointer-events:none}
+.sp-chips{display:flex;flex-wrap:wrap;gap:8px}
+.sp-chip{display:inline-flex;align-items:center;height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--line-2);background:var(--surface);font-weight:600;font-size:14px;cursor:pointer;color:var(--ink-2)}
+.sp-chip:hover{border-color:var(--brand)}
+.sp-panel{display:none;gap:18px;border:1px solid var(--line);border-radius:20px;background:var(--surface);padding:24px}
+.sp-intro h3{font-size:20px}.sp-intro p{color:var(--ink-3);margin-top:6px;max-width:680px}
+.sp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.sp-box{display:grid;gap:12px;align-content:start;border:1px solid var(--line);border-radius:14px;padding:16px;background:var(--bg)}
+.sp-skills,.sp-list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.sp-skills li{display:grid;gap:5px;font-size:14px;font-weight:600}
+.sp-skills i{display:block;height:6px;border-radius:6px;background:var(--line);position:relative;overflow:hidden}
+.sp-skills i::after{content:"";position:absolute;inset:0 auto 0 0;width:var(--w);background:var(--brand);border-radius:6px}
+.sp-list li{display:grid;gap:2px;font-size:14px}.sp-list small{color:var(--ink-3);font-size:12.5px}
+.sp-ok li{display:flex;gap:8px;align-items:flex-start}.sp-ok svg{flex:none;width:16px;height:16px;margin-top:2px;color:var(--brand)}
+@media (max-width:900px){.sp-grid{grid-template-columns:1fr}.sp-panel{padding:18px}}
+#sp-football:checked~.sp-football,#sp-cricket:checked~.sp-cricket,#sp-badminton:checked~.sp-badminton,#sp-tennis:checked~.sp-tennis,#sp-basketball:checked~.sp-basketball,#sp-swimming:checked~.sp-swimming,#sp-skating:checked~.sp-skating,#sp-athletics:checked~.sp-athletics,#sp-martial:checked~.sp-martial,#sp-other:checked~.sp-other{display:grid}
+#sp-football:checked~.sp-chips label[for=sp-football],#sp-cricket:checked~.sp-chips label[for=sp-cricket],#sp-badminton:checked~.sp-chips label[for=sp-badminton],#sp-tennis:checked~.sp-chips label[for=sp-tennis],#sp-basketball:checked~.sp-chips label[for=sp-basketball],#sp-swimming:checked~.sp-chips label[for=sp-swimming],#sp-skating:checked~.sp-chips label[for=sp-skating],#sp-athletics:checked~.sp-chips label[for=sp-athletics],#sp-martial:checked~.sp-chips label[for=sp-martial],#sp-other:checked~.sp-chips label[for=sp-other]{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+#sp-football:focus-visible~.sp-chips label[for=sp-football],#sp-cricket:focus-visible~.sp-chips label[for=sp-cricket],#sp-badminton:focus-visible~.sp-chips label[for=sp-badminton],#sp-tennis:focus-visible~.sp-chips label[for=sp-tennis],#sp-basketball:focus-visible~.sp-chips label[for=sp-basketball],#sp-swimming:focus-visible~.sp-chips label[for=sp-swimming],#sp-skating:focus-visible~.sp-chips label[for=sp-skating],#sp-athletics:focus-visible~.sp-chips label[for=sp-athletics],#sp-martial:focus-visible~.sp-chips label[for=sp-martial],#sp-other:focus-visible~.sp-chips label[for=sp-other]{outline:2px solid var(--brand);outline-offset:2px}
+#sports{scroll-margin-top:72px}

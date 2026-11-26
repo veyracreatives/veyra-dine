@@ -1,6 +1,23 @@
 /* Veyra Academy landing page. Plain function so the server can pre-render it for search engines. */
 (function (root) {
 'use strict';
+const SPORT_INTRO = {"football": "Morning and evening batches on the turf. Coaches rate passing, dribbling and shooting, and parents see match results and goals.", "cricket": "Nets, throwdowns and match days. Coaches rate batting, bowling, fielding and catching after each term.", "badminton": "Court slots, shuttle stock and singles or doubles practice. Coaches track footwork, serve, smash and net play.", "tennis": "Court batches from mini tennis to match play. Coaches rate forehand, backhand, serve and volley.", "basketball": "Court sessions, team drills and tournaments. Coaches track shooting, dribbling, passing and defence.", "swimming": "Pool batches by level and time slot. Coaches track each stroke, breathing and endurance as swimmers move up.", "skating": "Rink or road batches for beginners to racers. Coaches track balance, stride, turns and stopping.", "athletics": "Track and field groups for sprints, jumps and throws. Coaches track speed, starts and technique.", "martial": "Karate, taekwondo, judo and more. Coaches track technique, forms and sparring before each belt test.", "other": "Yoga, chess, gymnastics or any coaching class. You get general skills you can use for any activity."};
+const coreC = () => { try { return root.VFC || require('./core.js'); } catch (_) { return null; } };
+const sportsData = () => { const c = coreC(); return c && c.SPORTS ? c.SPORTS : {}; };
+function sportsSection(ic) {
+  const S = sportsData(); const keys = Object.keys(S); if (!keys.length) return '';
+  const same = ['Batches, attendance and coach attendance', 'UPI fees, cash, receipts and reminders', 'Breaks and holidays: no fee while away', 'Coach leave and salaries', 'Tournaments, results and certificates', 'Parent app in English, हिंदी and मराठी'];
+  return `<section class="sec" id="sports" style="padding-top:0"><div class="wrap">
+    <div class="sec-head"><span class="eyebrow" style="justify-self:start">Made for your sport</span><h2 class="disp">One app, <em>every sport</em></h2><p>Pick your sport when you sign up. Progress cards, the drill library and the kit list change to match it. Tap a sport to see what you get.</p></div>
+    <div class="sp-tabs rv">${keys.map((k, i) => `<input class="sp-r" type="radio" name="sp" id="sp-${k}" ${i ? '' : 'checked'}>`).join('')}
+      <div class="sp-chips" role="tablist">${keys.map(k => `<label for="sp-${k}" class="sp-chip">${S[k].name === 'Other' ? 'Any other sport' : S[k].name}</label>`).join('')}</div>
+      ${keys.map(k => { const s = S[k]; const nm = s.name === 'Other' ? 'any coaching class' : s.name.toLowerCase() + ' academies'; return `<div class="sp-panel sp-${k}"><div class="sp-intro"><h3>Veyra Academy for ${nm}</h3><p>${SPORT_INTRO[k] || ''}</p></div>
+        <div class="sp-grid"><div class="sp-box"><span class="label">Progress card skills</span><ul class="sp-skills">${s.skills.map((x, j) => `<li><span>${x}</span><i style="--w:${[82, 68, 74, 60, 88, 70][j % 6]}%"></i></li>`).join('')}</ul></div>
+        <div class="sp-box"><span class="label">Ready-made drills</span><ul class="sp-list">${coreC().drillsFor(k).slice(0, 6).map(d => `<li><b>${d.name}</b><small>${d.cat} · ${d.mins} min</small></li>`).join('')}</ul><small class="faint">Add your own drills any time.</small></div>
+        <div class="sp-box"><span class="label">Same for every sport</span><ul class="sp-list sp-ok">${same.map(x => `<li>${ic('ok')}<span>${x}</span></li>`).join('')}<li>${ic('ok')}<span>Kit stock: ${s.ball.split(",")[0].toLowerCase()} and more</span></li></ul></div></div></div>`; }).join('')}
+    </div>
+  </div></section>`;
+}
 const AREAS = ['Vashi', 'Nerul', 'Seawoods', 'CBD Belapur', 'Kharghar', 'Kamothe', 'Panvel', 'Ulwe', 'Sanpada', 'Airoli', 'Ghansoli', 'Koparkhairane', 'Thane West', 'Ghodbunder Road', 'Majiwada', 'Kalwa', 'Mulund', 'Dombivli', 'Kalyan'];
 function faqs(P) {
   const r = n => '₹' + Math.round(n).toLocaleString('en-IN');
@@ -63,7 +80,7 @@ function render(cfg, IC) {
       <h1 class="disp"><span class="ln">Run your academy</span><span class="ln"><em>like a pro club</em></span></h1>
       <p class="lead">Attendance, fees, coaches and parents in one app. Coaches mark a session in 30 seconds. Parents pay by UPI and see every session. You see everything, live.</p>
       <div class="hstack"><a class="btn btn-primary btn-lg" href="#signup">Start ${P.trial}-day free trial ${ic('arrow')}</a><a class="btn btn-ghost btn-lg" href="${demo}#admin">Try the live demo</a></div>
-      <div class="sports-row">${['Football', 'Cricket', 'Badminton', 'Tennis', 'Basketball', 'Swimming', 'Skating', 'Athletics', 'Martial arts'].map(x => `<span class="pill p-mute plain">${x}</span>`).join('')}<span class="pill p-brand plain">any sport</span></div>
+      <div class="sports-row">${['Football', 'Cricket', 'Badminton', 'Tennis', 'Basketball', 'Swimming', 'Skating', 'Athletics', 'Martial arts'].map(x => `<a class="pill p-mute plain" href="#sports">${x}</a>`).join('')}<a class="pill p-brand plain" href="#sports">any sport</a></div>
       <div class="trust"><span>${ic('ok')}No card needed</span><span>${ic('ok')}Phone, tablet and laptop</span><span>${ic('ok')}Sign in with Google</span></div>
     </div>
     <div class="vis" aria-label="Preview of the admissions board">
@@ -88,21 +105,22 @@ function render(cfg, IC) {
   <section class="sec" id="apps"><div class="wrap">
     <div class="sec-head"><span class="eyebrow" style="justify-self:start">Four apps, one academy</span><h2 class="disp">Everyone gets <em>their own app</em></h2><p>Each person logs in and sees only what they need. The admin can do everything.</p></div>
     <div class="roles rv">
-      ${[['tint-lime', 'Admin', 'shield', 'Owner of the academy', ['Players, batches, coaches', 'Fees, UPI checks, receipts', 'Reminders to parents', 'Reports, salaries and your plan'], 'admin'],
+      ${[['tint-lime', 'Admin', 'shield', 'Owner of the academy', ['Players, batches, coaches', 'Fees, UPI checks, receipts', 'Reminders to parents', 'Breaks, coach leave and salaries'], 'admin'],
         ['tint-blue', 'Manager', 'whistle', 'Runs the day', ['Coach attendance with times', 'Player attendance for any batch', 'Admissions board', 'Tournaments, grounds and kit'], 'manager'],
-        ['tint-green', 'Coach', 'check', 'On the pitch', ['Check in when you arrive', 'Mark a batch in 30 seconds', 'Training plan and match results', 'Rate player skills'], 'coach'],
+        ['tint-green', 'Coach', 'check', 'On the pitch', ['Today’s sessions and batches', 'Mark a batch in 30 seconds', 'Training plan and match results', 'Rate player skills'], 'coach'],
         ['tint-red', 'Parent', 'parent', 'At home', ['Every session, present or absent', 'Pay fees by UPI', 'Progress card and certificates', 'Matches and notices'], 'parent']]
       .map(([t, n, i, s, li, h]) => `<article class="role ${t}" style="--c:${t === 'tint-lime' ? 'var(--brand)' : t === 'tint-blue' ? 'var(--blue)' : t === 'tint-green' ? 'var(--green)' : 'var(--red)'}"><span class="ri">${ic(i)}</span><div><h3>${n}</h3><p>${s}</p></div><ul>${li.map(x => `<li>${ic('ok')}${x}</li>`).join('')}</ul><a class="btn btn-ghost btn-sm" href="${demo}#${h}">Open ${n.toLowerCase()} demo ${ic('arrow')}</a></article>`).join('')}
     </div>
   </div></section>
   <section class="sec" style="padding-top:0"><div class="wrap">
     <div class="feat rv"><div><span class="label">Attendance</span><h3 class="disp" style="margin-top:12px">Mark a batch <em>before the warm-up ends</em></h3><p>Coaches open today's session and tap P, L or A next to each player. Parents see it the same minute. Managers mark coaches in with the time they arrived.</p>
-      <ul><li>${ic('ok')}Mark all present in one tap, then change the few who missed</li><li>${ic('ok')}Coach check-in with arrival time</li><li>${ic('ok')}Low attendance list for players below 65%</li></ul></div>
+      <ul><li>${ic('ok')}Mark all present in one tap, then change the few who missed</li><li>${ic('ok')}Coach attendance with arrival time, marked by you</li><li>${ic('ok')}Low attendance list for players below 65%</li></ul></div>
       <div class="vis">${markMini()}</div></div>
     <div class="feat rev rv"><div><span class="label">Fees</span><h3 class="disp" style="margin-top:12px">Fees by UPI, <em>no chasing</em></h3><p>Parents pay to your own UPI ID, then paste the 12-digit transaction ID in the app. You check it against your bank app and tap Approve. A receipt goes to the parent.</p>
       <ul><li>${ic('ok')}Money goes straight to your bank, no commission</li><li>${ic('ok')}Reminders before, on and after the due date</li><li>${ic('ok')}Late fee added for you after the date you choose</li></ul></div>
       <div class="vis">${upiMini()}</div></div>
   </div></section>
+  ${sportsSection(ic)}
   <section class="sec" id="connected" style="padding-top:0"><div class="wrap">
     <div class="sec-head"><span class="eyebrow" style="justify-self:start">How it connects</span><h2 class="disp">One tap, <em>everyone knows</em></h2><p>Every app reads the same academy. When one person does something, the right people see it straight away, on any phone.</p></div>
     <div class="flows rv">${flows.map(f => `<div class="flow">${[0, 3, 6].map(k => `<div class="fstep"><span class="fi">${ic(f[k + 1])}</span><div><b>${f[k]}</b><small>${f[k + 2]}</small></div></div>`).join(`<span class="farrow" aria-hidden="true">${ic('arrow')}</span>`)}</div>`).join('')}</div>

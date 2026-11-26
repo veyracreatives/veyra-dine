@@ -124,7 +124,9 @@ namespace VeyraNC
         string localDir;
         List<RemoteEntry> remoteItems = new List<RemoteEntry>();
 
-        TextBox ipBox = new TextBox();
+        ComboBox ipBox = new ComboBox();
+        FlatBtn libraryBtn = new FlatBtn("Program library", false);
+        FlatBtn backupNowBtn = new FlatBtn("Back up machine now", false);
         FlatBtn connectBtn = new FlatBtn("Connect", true);
         Label statusDot = new Label();
         Label statusText = new Label();
@@ -196,8 +198,10 @@ namespace VeyraNC
 
             FlowLayoutPanel right = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 560, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Padding = new Padding(0, 18, 0, 0), BackColor = Theme.Ink };
             Label ipLbl = new Label { Text = "Machine IP", ForeColor = Color.FromArgb(170, 176, 188), AutoSize = true, Margin = new Padding(0, 9, 8, 0) };
-            ipBox.Text = S.Host; ipBox.Width = 140; ipBox.Font = new Font("Segoe UI", 11f); ipBox.Margin = new Padding(0, 4, 10, 0);
-            ipBox.BorderStyle = BorderStyle.FixedSingle;
+            ipBox.Width = 230; ipBox.Font = new Font("Segoe UI", 11f); ipBox.Margin = new Padding(0, 4, 10, 0);
+            ipBox.DropDownStyle = ComboBoxStyle.DropDown;
+            foreach (string m in S.MachineList()) ipBox.Items.Add(m);
+            ipBox.Text = S.LabelFor(S.Host);
             connectBtn.Width = 120; connectBtn.Margin = new Padding(0, 1, 16, 0);
             statusDot.Size = new Size(12, 12); statusDot.Margin = new Padding(0, 12, 6, 0);
             statusText.AutoSize = true; statusText.ForeColor = Color.White; statusText.Margin = new Padding(0, 9, 0, 0);
@@ -230,7 +234,7 @@ namespace VeyraNC
             // Bottom: tools + log
             Panel bottom = new Panel { Dock = DockStyle.Bottom, Height = 190, BackColor = Theme.Bg, Padding = new Padding(16, 0, 16, 12) };
             FlowLayoutPanel tools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 46, BackColor = Theme.Bg, Padding = new Padding(0, 2, 0, 0) };
-            foreach (FlatBtn b in new FlatBtn[] { backupsBtn, netBtn, settingsBtn }) { b.AutoSize = true; b.Margin = new Padding(0, 0, 8, 0); tools.Controls.Add(b); }
+            foreach (FlatBtn b in new FlatBtn[] { libraryBtn, backupsBtn, backupNowBtn, netBtn, settingsBtn }) { b.AutoSize = true; b.Margin = new Padding(0, 0, 8, 0); tools.Controls.Add(b); }
             progress.Width = 260; progress.Height = 10; progress.Margin = new Padding(16, 14, 0, 0); progress.Style = ProgressBarStyle.Continuous; progress.Visible = false;
             tools.Controls.Add(progress);
             logBox.Multiline = true; logBox.ReadOnly = true; logBox.ScrollBars = ScrollBars.Vertical;
@@ -265,6 +269,8 @@ namespace VeyraNC
             backupsBtn.Click += delegate { Directory.CreateDirectory(BackupRoot()); Process.Start("explorer.exe", "\"" + BackupRoot() + "\""); };
             netBtn.Click += delegate { RunNetCheck(true); };
             settingsBtn.Click += delegate { ShowSettings(); };
+            libraryBtn.Click += delegate { new LibraryForm(localDir, Path.Combine(S.BackupFolder(), "Daily")).Show(this); };
+            backupNowBtn.Click += delegate { MachineBackup(true); };
 
             // Drag and drop
             machinePane.List.ItemDrag += (s, e) => { if (connected && !busy) machinePane.List.DoDragDrop("veyra:machine", DragDropEffects.Copy); };
@@ -281,7 +287,7 @@ namespace VeyraNC
             };
             pcPane.List.DragEnter += (s, e) => { e.Effect = (e.Data.GetDataPresent(DataFormats.StringFormat) && (e.Data.GetData(DataFormats.StringFormat) as string) == "veyra:machine") ? DragDropEffects.Copy : DragDropEffects.None; };
             pcPane.List.DragDrop += (s, e) => ReadSelected();
-            FormClosing += delegate { S.Host = ipBox.Text.Trim(); S.LocalFolder = localDir; S.Save(); };
+            FormClosing += delegate { S.Host = IpOf(ipBox.Text); S.LocalFolder = localDir; S.Save(); };
         }
 
         // ---------- helpers ----------
@@ -355,7 +361,7 @@ namespace VeyraNC
         void Connect()
         {
             if (busy) return;
-            string ip = ipBox.Text.Trim();
+            string ip = IpOf(ipBox.Text);
             if (ip.Length == 0) return;
             S.Host = ip; S.Save();
             FtpMachine ftp = new FtpMachine { Host = ip, Port = S.Port, User = S.User, Password = S.Password, Passive = S.Passive, Log = Log };
@@ -410,8 +416,11 @@ namespace VeyraNC
                     return;
                 }
                 SetConnected(true, "Connected");
+                S.Remember(ip, M.Host); S.Save();
+                string lbl = S.LabelFor(ip); if (!ipBox.Items.Contains(lbl)) ipBox.Items.Add(lbl); ipBox.Text = lbl;
                 Log(detail + ".");
                 ShowRemote(start, root);
+                if (S.DailyBackup && S.LastDailyBackup != DateTime.Now.ToString("yyyy-MM-dd")) MachineBackup(false);
             });
         }
 
@@ -782,11 +791,67 @@ namespace VeyraNC
             });
         }
 
+        static string IpOf(string t) { t = (t ?? "").Trim(); int i = t.IndexOf(' '); return i > 0 ? t.Substring(0, i) : t; }
+
+        // ---------- Machine backup (daily / on demand): read-only copy of all programs ----------
+        static readonly string[] SkipExt = { ".EXE", ".DMG", ".PDF", ".ZIP", ".JPG", ".PNG", ".MP4", ".MSI", ".DLL", ".SYS" };
+        void MachineBackup(bool manual)
+        {
+            if (!connected || busy) return;
+            string day = DateTime.Now.ToString("yyyy-MM-dd");
+            string root = Path.Combine(S.BackupFolder(), "Daily", day + (manual ? "_" + DateTime.Now.ToString("HHmmss") : ""));
+            int files = 0, failed = 0; string back = remoteDir;
+            Log((manual ? "Backing up" : "Daily backup: backing up") + " machine programs to " + root + " (read only, nothing on the machine changes)…");
+            Run("Backing up machine…", delegate
+            {
+                Walk("/", 0, root, ref files, ref failed);
+            }, delegate
+            {
+                Log("Backup finished: " + files + " file(s)" + (failed > 0 ? ", " + failed + " could not be read" : "") + ".");
+                if (!manual) { S.LastDailyBackup = day; S.Save(); }
+                try
+                {
+                    string daily = Path.Combine(S.BackupFolder(), "Daily");
+                    List<string> dirs = Directory.GetDirectories(daily).OrderByDescending(x => x).ToList();
+                    foreach (string d in dirs.Skip(30)) Directory.Delete(d, true); // keep the last 30 backups
+                }
+                catch { }
+                ListRemote(back);
+            });
+        }
+
+        void Walk(string dir, int depth, string root, ref int files, ref int failed)
+        {
+            if (depth > 4) return;
+            List<RemoteEntry> items;
+            try { items = M.List(dir); } catch { failed++; return; }
+            foreach (RemoteEntry e in items)
+            {
+                string path = FtpMachine.Join(dir, e.Name);
+                if (e.IsFolder)
+                {
+                    if (e.Name.StartsWith("System Volume", StringComparison.OrdinalIgnoreCase)) continue;
+                    Walk(path, depth + 1, root, ref files, ref failed);
+                    continue;
+                }
+                if (Array.IndexOf(SkipExt, Path.GetExtension(e.Name).ToUpperInvariant()) >= 0) continue;
+                if (e.Size > 20000000) continue;
+                try
+                {
+                    string local = Path.Combine(root, dir.Trim('/').Replace('/', Path.DirectorySeparatorChar));
+                    Directory.CreateDirectory(local);
+                    M.Download(path, Path.Combine(local, e.Name));
+                    files++;
+                }
+                catch (Exception ex) { failed++; Log("Backup skipped " + path + ": " + FtpMachine.Describe(ex)); }
+            }
+        }
+
         // ---------- tools ----------
         void RunNetCheck(bool show)
         {
             bool problem;
-            List<string> notes = NetCheck.Check(ipBox.Text.Trim(), out problem);
+            List<string> notes = NetCheck.Check(IpOf(ipBox.Text), out problem);
             foreach (string n in notes) Log("Network: " + n);
             if (show)
                 MessageBox.Show(this, string.Join("\n\n", notes) + (problem ? "" : "\n\nLooks good: the machine cable does not carry your internet traffic."),
@@ -799,7 +864,7 @@ namespace VeyraNC
                 if (f.ShowDialog(this) == DialogResult.OK)
                 {
                     S.Save();
-                    ipBox.Text = S.Host;
+                    ipBox.Text = S.LabelFor(S.Host);
                     Log("Settings saved.");
                     if (connected) Disconnect();
                 }
@@ -855,20 +920,21 @@ namespace VeyraNC
         public SettingsForm(Settings s)
         {
             Text = "Settings"; FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false; MinimizeBox = false;
-            StartPosition = FormStartPosition.CenterParent; ClientSize = new Size(440, 330); BackColor = Color.White; Font = Theme.UI;
-            TableLayoutPanel t = new TableLayoutPanel { Dock = DockStyle.Top, Height = 250, ColumnCount = 2, Padding = new Padding(18) };
+            StartPosition = FormStartPosition.CenterParent; ClientSize = new Size(470, 370); BackColor = Color.White; Font = Theme.UI;
+            TableLayoutPanel t = new TableLayoutPanel { Dock = DockStyle.Top, Height = 290, ColumnCount = 2, Padding = new Padding(18) };
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             TextBox host = new TextBox { Text = s.Host, Dock = DockStyle.Fill };
             NumericUpDown port = new NumericUpDown { Minimum = 1, Maximum = 65535, Value = s.Port, Dock = DockStyle.Fill };
             TextBox user = new TextBox { Text = s.User, Dock = DockStyle.Fill };
             TextBox pass = new TextBox { Text = s.Password, Dock = DockStyle.Fill, UseSystemPasswordChar = true };
             CheckBox pasv = new CheckBox { Text = "Passive mode (leave on)", Checked = s.Passive, Dock = DockStyle.Fill };
+            CheckBox daily = new CheckBox { Text = "Back up machine programs once a day on Connect", Checked = s.DailyBackup, Dock = DockStyle.Fill };
             Label note = new Label { Text = "Leave user and password empty to try the usual Mitsubishi logins automatically.", ForeColor = Theme.Muted, Dock = DockStyle.Fill, Height = 40 };
-            AddRow(t, "Machine IP", host); AddRow(t, "Port", port); AddRow(t, "User", user); AddRow(t, "Password", pass); AddRow(t, "", pasv);
-            t.Controls.Add(note, 0, 5); t.SetColumnSpan(note, 2);
-            FlatBtn ok = new FlatBtn("Save", true) { Width = 100, Location = new Point(220, 274) };
-            FlatBtn cancel = new FlatBtn("Cancel", false) { Width = 100, Location = new Point(326, 274) };
-            ok.Click += delegate { s.Host = host.Text.Trim(); s.Port = (int)port.Value; s.User = user.Text; s.Password = pass.Text; s.Passive = pasv.Checked; DialogResult = DialogResult.OK; };
+            AddRow(t, "Machine IP", host); AddRow(t, "Port", port); AddRow(t, "User", user); AddRow(t, "Password", pass); AddRow(t, "", pasv); AddRow(t, "", daily);
+            t.Controls.Add(note, 0, 6); t.SetColumnSpan(note, 2);
+            FlatBtn ok = new FlatBtn("Save", true) { Width = 100, Location = new Point(250, 314) };
+            FlatBtn cancel = new FlatBtn("Cancel", false) { Width = 100, Location = new Point(356, 314) };
+            ok.Click += delegate { s.Host = host.Text.Trim(); s.Port = (int)port.Value; s.User = user.Text; s.Password = pass.Text; s.Passive = pasv.Checked; s.DailyBackup = daily.Checked; DialogResult = DialogResult.OK; };
             cancel.Click += delegate { DialogResult = DialogResult.Cancel; };
             Controls.Add(t); Controls.Add(ok); Controls.Add(cancel);
             AcceptButton = ok; CancelButton = cancel;
@@ -891,6 +957,28 @@ namespace VeyraNC
         public bool Passive = true;
         public string LocalFolder = "";
         public string LastRemoteDir = "";
+        public string Machines = "";        // ip|name;ip|name
+        public bool DailyBackup = true;
+        public string LastDailyBackup = "";
+
+        public void Remember(string ip, string name)
+        {
+            List<string> parts = Machines.Split(';').Where(x => x.Length > 0 && !x.StartsWith(ip + "|")).ToList();
+            string nm = (name ?? "").Split('(')[0].Trim(); if (nm == ip) nm = ""; parts.Add(ip + "|" + nm.Replace(";", " ").Replace("|", " "));
+            Machines = string.Join(";", parts);
+        }
+        public string LabelFor(string ip)
+        {
+            foreach (string p in Machines.Split(';')) { int i = p.IndexOf('|'); if (i > 0 && p.Substring(0, i) == ip && p.Length > i + 1) return ip + "  (" + p.Substring(i + 1) + ")"; }
+            return ip;
+        }
+        public List<string> MachineList()
+        {
+            List<string> l = new List<string>();
+            foreach (string p in Machines.Split(';')) { int i = p.IndexOf('|'); if (i > 0) l.Add(LabelFor(p.Substring(0, i))); }
+            if (l.Count == 0) l.Add(Host);
+            return l;
+        }
 
         public static string Dir()
         {
@@ -927,6 +1015,9 @@ namespace VeyraNC
                             case "passive": s.Passive = v != "0"; break;
                             case "local": s.LocalFolder = v; break;
                             case "remote": s.LastRemoteDir = v; break;
+                            case "machines": s.Machines = v; break;
+                            case "dailybackup": s.DailyBackup = v != "0"; break;
+                            case "lastbackup": s.LastDailyBackup = v; break;
                         }
                     }
             }
@@ -939,7 +1030,7 @@ namespace VeyraNC
             {
                 File.WriteAllLines(File_(), new string[] {
                     "host=" + Host, "port=" + Port, "user=" + User, "pass=" + Protect(Password),
-                    "passive=" + (Passive ? "1" : "0"), "local=" + LocalFolder, "remote=" + LastRemoteDir });
+                    "passive=" + (Passive ? "1" : "0"), "local=" + LocalFolder, "remote=" + LastRemoteDir, "machines=" + Machines, "dailybackup=" + (DailyBackup ? "1" : "0"), "lastbackup=" + LastDailyBackup });
             }
             catch { }
         }

@@ -2,7 +2,7 @@
 (function(){
 'use strict';
 const { ic, logo } = IC, C = VFC, T = C.T;
-const CFG = Object.assign({ mode: 'demo', plans: { monthly: 999, yearly: 7999, trial: 10 }, googleClientId: '', razorpayKeyId: '', mail: false, demoBase: '' }, window.VF_CFG || {});
+const CFG = Object.assign({ mode: 'demo', plans: { monthly: 1450, yearly: 8500, trial: 10 }, googleClientId: '', razorpayKeyId: '', mail: false, demoBase: '' }, window.VF_CFG || {});
 const LIVE = CFG.mode === 'live';
 if (!LIVE) { try { const d = JSON.parse(localStorage.getItem('vf-demo-v3')); if (d && d.hq && d.hq.plans) CFG.plans = d.hq.plans; } catch (_) {} }
 const $ = s => document.querySelector(s);
@@ -63,12 +63,12 @@ const DemoAPI = (() => {
     mail() { return false; }
   });
   function reset() {
-    db = { users: {}, mem: [], ac: {}, ses: null, hq: { plans: { monthly: 999, yearly: 7999, trial: 10 }, sales: [], keys: [], activity: [], seq: 41 } };
+    db = { users: {}, mem: [], ac: {}, ses: null, hq: { plans: { monthly: 1450, yearly: 8500, trial: 10 }, sales: [], keys: [], activity: [], seq: 41 } };
     const ac = C.demo(env(), Date.now()); db.ac[ac.id] = ac; db.demoAid = ac.id;
     const now = Date.now(), D = 864e5;
-    db.hq.sales = [['Thane Tigers Football School', 'yearly', 7999, 'Razorpay', 2], ['Vashi United Juniors', 'monthly', 999, 'Razorpay', 6], ['Belapur Ballers', 'yearly', 7999, 'Licence key', 12], ['Panvel Footie Kids', 'monthly', 999, 'Razorpay', 27]].map(([academy, plan, amt, via, d], i) => ({ id: 'VFR-' + new Date().getFullYear() + '-00' + (38 + i), at: now - d * D, academy, plan, amt, via }));
+    db.hq.sales = [['Thane Tigers Football School', 'yearly', 8500, 'Razorpay', 2], ['Vashi United Juniors', 'monthly', 1450, 'Razorpay', 6], ['Belapur Ballers', 'yearly', 8500, 'Licence key', 12], ['Panvel Footie Kids', 'monthly', 1450, 'Razorpay', 27]].map(([academy, plan, amt, via, d], i) => ({ id: 'VFR-' + new Date().getFullYear() + '-00' + (38 + i), at: now - d * D, academy, plan, amt, via }));
     db.hq.others = [['Thane Tigers Football School', 'Ghodbunder Rd, Thane', 'yearly', 142, 300], ['Vashi United Juniors', 'Vashi, Navi Mumbai', 'monthly', 68, 24], ['Belapur Ballers', 'CBD Belapur', 'yearly', 91, 200], ['Panvel Footie Kids', 'New Panvel', 'monthly', 37, 3], ['Airoli Strikers Academy', 'Airoli', 'monthly', 44, -9]].map(([name, place, type, players, days]) => ({ name, place, type, players, until: now + days * D }));
-    db.hq.activity = [['Thane Tigers Football School paid ₹7,999 for yearly (Razorpay)', 2], ['Vashi United Juniors paid ₹999 for monthly (Razorpay)', 6], ['Licence key made for Belapur Ballers (yearly)', 12], ['Airoli Strikers Academy plan ended', 16], ['Kickstart FC Academy started a trial', 1]].map(([text, d]) => ({ at: now - d * D, text })).sort((a, b) => b.at - a.at);
+    db.hq.activity = [['Thane Tigers Football School paid ₹8,500 for yearly (Razorpay)', 2], ['Vashi United Juniors paid ₹1,450 for monthly (Razorpay)', 6], ['Licence key made for Belapur Ballers (yearly)', 12], ['Airoli Strikers Academy plan ended', 16], ['Kickstart FC Academy started a trial', 1]].map(([text, d]) => ({ at: now - d * D, text })).sort((a, b) => b.at - a.at);
     save();
   }
   function save() { store.set(db); }

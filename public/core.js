@@ -58,6 +58,8 @@ C.SPORTS = {
   other: { name: 'Other', skills: ['Technique', 'Fitness', 'Focus', 'Teamwork', 'Discipline', 'Progress'], ball: 'Equipment', drills: [D_('Warm-up', 'Warm-up', 10), D_('Skill practice', 'Technique', 20), D_('Fitness circuit', 'Fitness', 12), D_('Game or performance', 'Game', 20), D_('Cool-down', 'Cool-down', 5)] }
 };
 C.sportOf = ac => C.SPORTS[(ac && ac.sport) || 'football'] || C.SPORTS.football;
+C.PLAN_POINTS = { monthly: ['Admin, manager, coach and parent apps', 'Attendance for players and coaches', 'UPI fee collection and receipts', 'Player breaks, coach leave and salaries', 'Tournaments, training and kit', 'Fee reminders', 'Excel / CSV player import', 'Hindi and Marathi for parents and coaches', 'Free setup call for your batches'], yearly: ['Everything in Monthly', 'Priority help by email', 'One payment for the whole year'] };
+C.cleanPoints = a => (Array.isArray(a) ? a : String(a || '').split('\n')).map(x => String(x).trim().slice(0, 90)).filter(Boolean).slice(0, 12);
 C.drillsFor = sport => (C.SPORTS[sport] || C.SPORTS.football).drills.map((d, i) => ({ id: 'd' + (i + 1), name: d[0], cat: d[1], mins: d[2] }));
 C.newAcademy = ({ name, place, now, trialDays, sport }) => {
   sport = C.SPORTS[sport] ? sport : 'football';
@@ -452,7 +454,7 @@ def('fee.reject', AD, (ac, ctx, p) => {
 });
 def('fee.record', AD, (ac, ctx, p, env) => {
   const pl = playerOf(ac, p.pid) || err('Pick a player'); const today = T.date(ctx.now);
-  const m = p.m || (C.openBills(ac, pl, today)[0] || {}).m || err('Nothing due for this player');
+  const m = p.m || (C.openBills(ac, pl, today)[0] || {}).m || err('Nothing due for this player'); if (!/^\d{4}-\d\d$/.test(m)) err('Pick a month');
   const bill = C.billFor(ac, pl, m, today); if (bill.st === 'paid') err('Already paid'); if (bill.st === 'break') err(`${pl.name} is on a break in ${T.monthOnly(m)}. Remove the break first.`);
   const amt = num(p.amt, 0) || bill.amt;
   ac.queue = ac.queue.filter(x => !(x.pid === pl.id && x.m === m));
@@ -460,7 +462,7 @@ def('fee.record', AD, (ac, ctx, p, env) => {
   return { msg: `Saved. Receipt ${no} sent.` };
 });
 def('fee.waive', AD, (ac, ctx, p) => {
-  const pl = playerOf(ac, p.pid) || err('Player not found'); const f = pl.fees[p.m] || {};
+  if (!/^\d{4}-\d\d$/.test(String(p.m || ''))) err('Pick a month'); const pl = playerOf(ac, p.pid) || err('Player not found'); const f = pl.fees[p.m] || {};
   if (f.st === 'paid') err('Already paid');
   if (f.st === 'waived') { delete pl.fees[p.m]; return { msg: 'Fee is due again' }; }
   pl.fees[p.m] = { st: 'waived' }; ac.queue = ac.queue.filter(x => !(x.pid === pl.id && x.m === p.m));

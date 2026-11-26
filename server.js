@@ -16,8 +16,10 @@ fs.mkdirSync(path.join(DATA, 'backups'), { recursive: true }); fs.mkdirSync(path
 /* ---------------- storage ---------------- */
 const DBF = path.join(DATA, 'db.json');
 let db;
-function fresh() { return { users: {}, mem: [], academies: {}, sessions: {}, resets: {}, files: {}, payments: {}, hq: { pw: null, plans: { monthly: 999, yearly: 7999, trial: 10 }, sales: [], keys: [], activity: [], seq: 0, settings: { razorpay: { keyId: '', keySecret: '', webhookSecret: '' }, googleClientId: '', smtp: { host: '', port: 465, user: '', pass: '', from: '' }, seo: { gsc: { sa: '', site: '' }, bing: { key: '' }, psi: { key: '' }, verify: { google: '', bing: '' } } }, hqSessions: {} } }; }
+function fresh() { return { users: {}, mem: [], academies: {}, sessions: {}, resets: {}, files: {}, payments: {}, hq: { pw: null, plans: { monthly: 1450, yearly: 8500, trial: 10 }, sales: [], keys: [], activity: [], seq: 0, settings: { razorpay: { keyId: '', keySecret: '', webhookSecret: '' }, googleClientId: '', smtp: { host: '', port: 465, user: '', pass: '', from: '' }, seo: { gsc: { sa: '', site: '' }, bing: { key: '' }, psi: { key: '' }, verify: { google: '', bing: '' } } }, hqSessions: {} } }; }
 try { db = JSON.parse(fs.readFileSync(DBF, 'utf8')); } catch (e) { if (fs.existsSync(DBF)) { console.error('db.json could not be read. Not starting, so nothing is overwritten. Restore from data/backups.'); process.exit(1); } db = fresh(); }
+// 2026-11-26: Veyra set new prices (₹1,450 a month, ₹8,500 a year). Applied once; later changes in HQ are kept.
+if (db.hq && !db.hq.priceV) { db.hq.plans = Object.assign({}, db.hq.plans, { monthly: 1450, yearly: 8500 }); db.hq.priceV = 2; }
 const F0 = fresh(); for (const k of Object.keys(F0)) if (db[k] == null) db[k] = F0[k]; for (const k of Object.keys(F0.hq)) if (db.hq[k] == null) db.hq[k] = F0.hq[k];
 for (const k of Object.keys(F0.hq.settings)) if (db.hq.settings[k] == null) db.hq.settings[k] = F0.hq.settings[k];
 for (const k of Object.keys(F0.hq.settings.seo)) if (db.hq.settings.seo[k] == null) db.hq.settings.seo[k] = F0.hq.settings.seo[k];
@@ -42,7 +44,11 @@ const lc = s => String(s || '').trim().toLowerCase();
 const userByEmail = e => Object.values(db.users).find(u => u.email === lc(e));
 function cookies(req) { const o = {}; (req.headers.cookie || '').split(';').forEach(p => { const i = p.indexOf('='); if (i > 0) o[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim()); }); return o; }
 const setCookie = (res, name, v, maxAge) => res.setHeader('Set-Cookie', `${name}=${v}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${SECURE ? '; Secure' : ''}`);
-function send(res, code, body, type, extra) { res.writeHead(code, Object.assign({ 'content-type': type || 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'same-origin' }, extra || {})); res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body)); }
+// only real keys: blocks __proto__ / constructor tricks on lookups by a value the browser sent
+const GPEND = new Map(); // Google sign-ups waiting for their academy details (30 min)
+const own = (o, k) => typeof k === 'string' && k && o && Object.prototype.hasOwnProperty.call(o, k) ? o[k] : undefined;
+const safeEq = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b || '')); return x.length === y.length && crypto.timingSafeEqual(x, y); };
+function send(res, code, body, type, extra) { res.writeHead(code, Object.assign({ 'content-type': type || 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'same-origin', 'x-frame-options': 'DENY', 'content-security-policy': "frame-ancestors 'none'; object-src 'none'; base-uri 'self'", 'permissions-policy': 'camera=(self), microphone=(), geolocation=()' }, SECURE ? { 'strict-transport-security': 'max-age=31536000' } : {}, extra || {})); res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body)); }
 const bad = (res, msg, code) => send(res, code || 400, { error: msg });
 function body(req, limit) { return new Promise((ok, no) => { let n = 0; const ch = []; req.on('data', c => { n += c.length; if (n > (limit || 1e6)) { no(Object.assign(new Error('Too big'), { code: 413 })); req.destroy(); } else ch.push(c); }); req.on('end', () => { const raw = Buffer.concat(ch); req.raw = raw; try { ok(raw.length ? JSON.parse(raw) : {}); } catch (e) { no(Object.assign(new Error('Bad JSON'), { code: 400 })); } }); req.on('error', no); }); }
 const hits = new Map();
@@ -79,7 +85,7 @@ const env = {
   resetPw(uid) { const t = tempPw(); db.users[uid].pw = hashPw(t); Object.entries(db.sessions).forEach(([k, s]) => { if (s.uid === uid) delete db.sessions[k]; }); return t; },
   mail
 };
-function session(req) { const t = cookies(req).vfs; const s = t && db.sessions[t]; if (!s || s.exp < Date.now()) return null; const ok = db.mem.some(m => m.uid === s.uid && m.aid === s.aid && m.role === s.role); if (!ok || !db.users[s.uid] || !db.academies[s.aid]) return null; s.t = t; return s; }
+function session(req) { const t = cookies(req).vfs; const s = own(db.sessions, t); if (!s || s.exp < Date.now()) return null; const ok = db.mem.some(m => m.uid === s.uid && m.aid === s.aid && m.role === s.role); if (!ok || !db.users[s.uid] || !db.academies[s.aid]) return null; s.t = t; return s; }
 function startSession(res, uid, pick) {
   const ms = db.mem.filter(m => m.uid === uid); if (!ms.length) return null;
   const order = { admin: 0, manager: 1, coach: 2, parent: 3 };
@@ -108,7 +114,7 @@ function recordSale(ac, plan, amt, via, ref) {
   db.hq.sales.unshift(sale); return sale;
 }
 function applyPaid(aid, plan, amt, paymentId, orderId) {
-  if (db.payments[paymentId]) return db.payments[paymentId];
+  if (own(db.payments, paymentId)) return db.payments[paymentId];
   const ac = db.academies[aid]; if (!ac) return null;
   C.applyPlan(ac, plan, Date.now());
   const sale = recordSale(ac, plan, amt, 'Razorpay', paymentId);
@@ -150,7 +156,7 @@ function page(mode) {
 }
 function staticFile(res, rel) {
   if (/^(hq\.html|hq\.js|index\.html)$/.test(rel)) return false;
-  const f = path.normalize(path.join(PUB, rel)); if (!f.startsWith(PUB) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) return false;
+  const f = path.normalize(path.join(PUB, rel)); if (!f.startsWith(PUB + path.sep) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) return false;
   const ext = path.extname(f); const long = /\.(png|svg|css|js)$/.test(ext) && rel !== 'sw.js';
   send(res, 200, fs.readFileSync(f), MIME[ext] || 'application/octet-stream', { 'cache-control': long ? 'public, max-age=86400' : 'no-cache' }); return true;
 }
@@ -182,18 +188,18 @@ setInterval(daily, 30 * 60 * 1000); setTimeout(daily, 5000);
 
 /* ---------------- HQ ---------------- */
 function hqToken(req) { return String(req.headers['x-hq-token'] || '') || cookies(req).vfhq; }
-function hqSession(req) { const t = hqToken(req); const s = t && db.hq.hqSessions[t]; if (!s || s.exp < Date.now()) return null; s.exp = Date.now() + 30 * 60 * 1000; return s; }
+function hqSession(req) { const t = hqToken(req); const s = own(db.hq.hqSessions, t); if (!s || s.exp < Date.now()) return null; s.exp = Date.now() + 30 * 60 * 1000; return s; }
 function hqState() {
   const now = Date.now();
-  const acs = Object.values(db.academies).map(ac => { const owner = db.users[(ac.admins || [])[0]] || {}; return { id: ac.id, name: ac.name, place: ac.place, plan: ac.plan.type, until: ac.plan.until, active: C.planActive(ac, now), suspended: !!ac.suspended, players: ac.players.filter(p => !p.left).length, staff: ac.staff.length, batches: ac.batches.length, createdAt: ac.createdAt, owner: owner.name || '', email: owner.email || '', lastActive: ac.updatedAt || ac.createdAt }; }).sort((a, b) => b.createdAt - a.createdAt);
+  const acs = Object.values(db.academies).map(ac => { const owner = db.users[(ac.admins || [])[0]] || {}; return { id: ac.id, name: ac.name, place: ac.place, sport: C.sportOf(ac).name, plan: ac.plan.type, until: ac.plan.until, active: C.planActive(ac, now), suspended: !!ac.suspended, players: ac.players.filter(p => !p.left).length, staff: ac.staff.length, batches: ac.batches.length, createdAt: ac.createdAt, owner: owner.name || '', email: owner.email || '', lastActive: ac.updatedAt || ac.createdAt }; }).sort((a, b) => b.createdAt - a.createdAt);
   const s = db.hq.settings;
   return { academies: acs, sales: db.hq.sales.slice(0, 500), keys: db.hq.keys, plans: db.hq.plans, activity: db.hq.activity.slice(0, 100), users: Object.keys(db.users).length,
     settings: { razorpay: { keyId: s.razorpay.keyId, hasSecret: !!s.razorpay.keySecret, hasWebhook: !!s.razorpay.webhookSecret, webhookUrl: BASE + '/api/razorpay/webhook' }, googleClientId: s.googleClientId, smtp: { host: s.smtp.host, port: s.smtp.port, user: s.smtp.user, from: s.smtp.from, hasPass: !!s.smtp.pass }, seo: { google: !!s.seo.gsc.sa, bing: !!s.seo.bing.key } }, base: BASE, version: VERSION, features: ['visitors', 'users', 'seo'] };
 }
 function hqAct(p) {
-  const T = C.T; const ac = p.aid && db.academies[p.aid];
+  const T = C.T; const ac = p.aid && own(db.academies, p.aid);
   switch (p.type) {
-    case 'plans.save': { const m = +p.monthly, y = +p.yearly, t = +p.trial; if (!(m > 0 && y > 0 && t >= 1 && t <= 60)) throw new Error('Check the prices'); db.hq.plans = { monthly: Math.round(m), yearly: Math.round(y), trial: Math.round(t) }; hqLog(`Prices changed: ₹${m}/month, ₹${y}/year, ${t}-day trial`); return 'Prices saved. The website shows them now.'; }
+    case 'plans.save': { const m = +p.monthly, y = +p.yearly, t = +p.trial; if (!(m > 0 && y > 0 && t >= 1 && t <= 60)) throw new Error('Check the prices'); const pts = Object.assign({}, (db.hq.plans || {}).points || {}); if (p.mPoints != null) pts.monthly = C.cleanPoints(p.mPoints); if (p.yPoints != null) pts.yearly = C.cleanPoints(p.yPoints); db.hq.plans = { monthly: Math.round(m), yearly: Math.round(y), trial: Math.round(t), points: pts }; hqLog(`Prices changed: ₹${m}/month, ₹${y}/year, ${t}-day trial`); return 'Prices saved. The website shows them now.'; }
     case 'key.make': { if (!C.PLAN_DAYS[p.plan]) throw new Error('Pick a plan'); const code = C.mkKey(); db.hq.keys.unshift({ code, plan: p.plan, made: Date.now(), note: String(p.note || '').slice(0, 120), forName: String(p.forName || '').slice(0, 80), paidBy: p.paidBy || '' });
       if (p.paidBy && p.paidBy !== 'Free') recordSale(null, p.plan, Math.round(+p.amount || db.hq.plans[p.plan]), 'Licence key · ' + p.paidBy, code), db.hq.sales[0].academy = String(p.forName || 'Key ' + code);
       hqLog(`Licence key ${code} made (${p.plan})`); return { msg: 'Key made', code }; }
@@ -224,6 +230,7 @@ function hqUsers() {
     const ft = u.vid ? A.first(u.vid) : null;
     out.push({ id: u.id, name: u.name, email: u.email, phone: u.phone || '', createdAt: u.createdAt, lastLogin: u.lastLogin || 0, seen: Math.max(u.seen || 0, u.lastLogin || 0), logins: u.logins || 0, signIn: u.google ? (u.lastVia === 'email' ? 'Google + email' : 'Google') : 'Email', roles, source: ft ? { src: ft.src, ref: ft.ref, utm: ft.utm, city: ft.ct, device: ft.dv, page: ft.p, first: ft.f } : null });
   }
+  (db.hq.leads || []).forEach(l => { if (!userByEmail(l.email)) out.push({ id: 'lead-' + l.email, name: l.name, email: l.email, phone: '', createdAt: l.at, lastLogin: 0, seen: l.at, logins: 0, signIn: 'Google · sign-up not finished', roles: [], lead: true, source: null }); });
   return { users: out.sort((a, b) => b.createdAt - a.createdAt) };
 }
 function seoState() {
@@ -285,7 +292,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/events') { const s = session(req); if (!s) return bad(res, 'Log in', 401); res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive', 'x-accel-buffering': 'no' }); res.write(': hi\n\n'); sub(s.aid, res); req.on('close', () => subs.get(s.aid) && subs.get(s.aid).delete(res)); return; }
       if (p === '/api/boot' && M === 'GET') { const s = session(req); if (!s) return bad(res, 'Log in', 401); const U = db.users[s.uid]; if (!U.seen || Date.now() - U.seen > 600e3) { U.seen = Date.now(); save(); } return send(res, 200, { boot: bootFor(s) }); }
       if (p.startsWith('/api/file/') && M === 'GET') {
-        const s = session(req); const f = db.files[p.slice(10)]; if (!s || !f) return bad(res, 'Not found', 404);
+        const s = session(req); const f = own(db.files, p.slice(10)); if (!s || !f) return bad(res, 'Not found', 404);
         const ac = db.academies[f.aid]; const pl = ac && ac.players.find(x => x.id === f.pid);
         if (f.aid !== s.aid || (s.role === 'parent' && (!pl || pl.parentUid !== s.uid))) return bad(res, 'Not allowed', 403);
         return send(res, 200, fs.readFileSync(path.join(DATA, 'files', f.id)), f.type, { 'content-disposition': `inline; filename="${f.name.replace(/[^\w. -]/g, '')}"`, 'cache-control': 'private, max-age=3600' });
@@ -293,7 +300,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/export' && M === 'GET') { const s = session(req); if (!s || s.role !== 'admin') return bad(res, 'Only the academy admin can download all data', 403); const ac = db.academies[s.aid]; return send(res, 200, JSON.stringify(ac, null, 2), 'application/json', { 'content-disposition': `attachment; filename="veyra-academy-${C.T.date()}.json"` }); }
       if (p === '/api/razorpay/webhook' && M === 'POST') {
         await body(req, 2e5); const sec = db.hq.settings.razorpay.webhookSecret; const sig = req.headers['x-razorpay-signature'];
-        if (!sec || !sig || crypto.createHmac('sha256', sec).update(req.raw).digest('hex') !== sig) return bad(res, 'Bad signature', 400);
+        if (!sec || !sig || !safeEq(crypto.createHmac('sha256', sec).update(req.raw).digest('hex'), sig)) return bad(res, 'Bad signature', 400);
         const ev = JSON.parse(req.raw.toString()); const pay = ev.payload && ev.payload.payment && ev.payload.payment.entity;
         if ((ev.event === 'payment.captured' || ev.event === 'order.paid') && pay && pay.notes && pay.notes.aid && pay.notes.plan) applyPaid(pay.notes.aid, pay.notes.plan, Math.round(pay.amount / 100), pay.id, pay.order_id);
         return send(res, 200, { ok: true });
@@ -304,12 +311,14 @@ const server = http.createServer(async (req, res) => {
 
       if (p === '/api/signup') {
         if (limited(req, 'su', 8, 3600e3)) return bad(res, 'Too many tries. Wait a bit.', 429);
-        const email = lc(b.email); if (!/^\S+@\S+\.\S+$/.test(email)) return bad(res, 'Enter your email');
-        if (String(b.pw || '').length < 8) return bad(res, 'Use at least 8 characters for the password');
+        const gp = b.gtoken ? GPEND.get(String(b.gtoken)) : null; if (b.gtoken && (!gp || gp.exp < Date.now())) return bad(res, 'Google sign-in timed out. Tap Continue with Google again.');
+        const email = gp ? gp.email : lc(b.email); if (!/^\S+@\S+\.\S+$/.test(email)) return bad(res, 'Enter your email');
+        if (!gp && String(b.pw || '').length < 8) return bad(res, 'Use at least 8 characters for the password');
         if (!String(b.academy || '').trim() || !String(b.name || '').trim()) return bad(res, 'Add the academy name and your name');
         if (userByEmail(email)) return bad(res, 'This email already has an account. Log in instead.');
-        const usr = env.ensureUser({ email, name: b.name, pw: b.pw }); const U = db.users[usr.uid]; const vid = String(b.vid || '').replace(/[^\w-]/g, '').slice(0, 24);
-        Object.assign(U, { phone: String(b.phone || '').replace(/[^\d+ -]/g, '').slice(0, 20), via: 'email', vid, lastLogin: Date.now(), logins: 1 });
+        const usr = env.ensureUser({ email, name: b.name, pw: gp ? tok() : b.pw }); const U = db.users[usr.uid]; const vid = String(b.vid || '').replace(/[^\w-]/g, '').slice(0, 24);
+        Object.assign(U, { phone: String(b.phone || '').replace(/[^\d+ -]/g, '').slice(0, 20), via: gp ? 'google' : 'email', vid, lastLogin: Date.now(), logins: 1 }); if (gp) { U.google = true; U.lastVia = 'google'; GPEND.delete(String(b.gtoken)); }
+        if (db.hq.leads) db.hq.leads = db.hq.leads.filter(x => x.email !== email);
         const ac = C.newAcademy({ name: String(b.academy).slice(0, 80), place: String(b.city || '').slice(0, 80), sport: String(b.sport || ''), now: Date.now(), trialDays: db.hq.plans.trial });
         ac.admins.push(usr.uid); ac.vid = vid; db.academies[ac.id] = ac; env.link(usr.uid, ac.id, 'admin'); A.server(vid, 'signup', { n: ac.name, x: email, id: ac.id });
         hqLog(`New trial: ${ac.name} (${email})`); startSession(res, usr.uid);
@@ -325,7 +334,14 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/google') {
         if (!db.hq.settings.googleClientId) return bad(res, 'Google sign-in is not set up yet');
         const g = await googleCheck(b.credential); const usr = userByEmail(g.email);
-        if (!usr) return bad(res, `No account for ${g.email}. Ask your academy to add this email, or start a free trial.`, 404);
+        if (!usr) {
+          // new person: remember them (so HQ sees the lead) and send them to the 'finish sign-up' page
+          const t = tok(); GPEND.set(t, { email: lc(g.email), name: String(g.name || '').slice(0, 80), exp: Date.now() + 30 * 60e3 });
+          for (const [k, v] of GPEND) if (v.exp < Date.now()) GPEND.delete(k);
+          db.hq.leads = db.hq.leads || []; const ld = db.hq.leads.find(x => x.email === lc(g.email));
+          if (ld) ld.at = Date.now(); else { db.hq.leads.unshift({ email: lc(g.email), name: String(g.name || '').slice(0, 80), at: Date.now(), via: 'Google', vid: String(b.vid || '').replace(/[^\w-]/g, '').slice(0, 24) }); db.hq.leads.length = Math.min(db.hq.leads.length, 2000); hqLog(`Google sign-up started: ${String(g.name || '').slice(0, 80)} (${lc(g.email)})`); }
+          save(); return send(res, 200, { needSignup: true, gtoken: t, email: lc(g.email), name: String(g.name || '').slice(0, 80) });
+        }
         if (!startSession(res, usr.id)) return bad(res, 'Your academy has not added you yet.', 403);
         loggedIn(usr, 'google', b.vid); return send(res, 200, { ok: true });
       }
@@ -336,7 +352,7 @@ const server = http.createServer(async (req, res) => {
         if (usr && mailOn()) { const t = tok(); db.resets[t] = { uid: usr.id, exp: Date.now() + 3600e3 }; save(); mail(usr.email, 'Reset your Veyra Academy password', `Hi ${usr.name},\n\nMake a new password here (works for 1 hour):\n${BASE}/#reset-${t}\n\nIf you did not ask for this, ignore this email.\n`); }
         return send(res, 200, { ok: true, msg });
       }
-      if (p === '/api/reset') { const r = db.resets[b.token]; if (!r || r.exp < Date.now()) return bad(res, 'This link has expired. Ask for a new one.'); if (String(b.pw || '').length < 8) return bad(res, 'Use at least 8 characters'); db.users[r.uid].pw = hashPw(b.pw); delete db.resets[b.token]; save(); return send(res, 200, { ok: true }); }
+      if (p === '/api/reset') { const r = own(db.resets, b.token); if (!r || r.exp < Date.now()) return bad(res, 'This link has expired. Ask for a new one.'); if (String(b.pw || '').length < 8) return bad(res, 'Use at least 8 characters'); db.users[r.uid].pw = hashPw(b.pw); delete db.resets[b.token]; save(); return send(res, 200, { ok: true }); }
 
       if (p.startsWith('/api/hq/')) {
         if (p === '/api/hq/login') {
@@ -374,7 +390,7 @@ const server = http.createServer(async (req, res) => {
         if (!/^(image\/(png|jpe?g|webp|heic)|application\/pdf)$/.test(b.type || '')) return bad(res, 'Use a photo or a PDF');
         const buf = Buffer.from(String(b.data || ''), 'base64'); if (!buf.length || buf.length > 5 * 1024 * 1024) return bad(res, 'Please pick a file under 4 MB');
         const id = crypto.randomBytes(12).toString('hex'); fs.writeFileSync(path.join(DATA, 'files', id), buf);
-        db.files[id] = { id, aid: ac.id, pid: pl.id, key: b.key, name: String(b.name || 'file').slice(0, 80), type: b.type, size: buf.length, at: Date.now() }; save();
+        db.files[id] = { id, aid: ac.id, pid: pl.id, key: String(b.key || '').slice(0, 40), name: String(b.name || 'file').slice(0, 80), type: b.type, size: buf.length, at: Date.now() }; save();
         return send(res, 200, { id });
       }
       if (p === '/api/plan/key') {
@@ -393,7 +409,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (p === '/api/plan/verify') {
         const R = db.hq.settings.razorpay; const exp = crypto.createHmac('sha256', R.keySecret).update(b.razorpay_order_id + '|' + b.razorpay_payment_id).digest('hex');
-        if (exp !== b.razorpay_signature) return bad(res, 'Payment could not be checked. If money left your account, email marketing@veyracreatives.com.');
+        if (!safeEq(exp, b.razorpay_signature)) return bad(res, 'Payment could not be checked. If money left your account, email marketing@veyracreatives.com.');
         const o = await rzp('GET', '/orders/' + encodeURIComponent(b.razorpay_order_id));
         if (o.notes.aid !== ac.id) return bad(res, 'This payment is for another academy');
         applyPaid(ac.id, o.notes.plan, Math.round(o.amount / 100), b.razorpay_payment_id, o.id);

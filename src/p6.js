@@ -41,6 +41,7 @@ document.addEventListener('click', async e => {
     clearLeave: () => act('staff.leave', { sid: U.modal.s, from: val('lv-f'), to: val('lv-t'), clear: true }),
     salModal: () => openModal({ t: 'sal', s: d.s }),
     checkin: () => act('coach.checkin', {}),
+    gReset: () => { U.gsign = null; render(); },
     approve: () => act('fee.approve', { id: d.id }),
     reject: () => openModal({ t: 'reject', id: d.id }),
     saveReject: () => act('fee.reject', { id: M.id, why: val('rj-w') }),
@@ -227,12 +228,12 @@ document.addEventListener('submit', async e => {
     const kind = f.dataset.kind, em = val('f-em').toLowerCase(), pw = $('#f-pw') ? $('#f-pw').value : '';
     const btn = f.querySelector('[type=submit]'); showAuthErr('');
     if (kind !== 'reset' && !/^\S+@\S+\.\S+$/.test(em)) { showAuthErr('Enter your email'); $('#f-em').focus(); return; }
-    if ((kind === 'signup' || kind === 'reset') && pw.length < 8) { showAuthErr('Use at least 8 characters for the password'); return; }
+    if (((kind === 'signup' && !U.gsign) || kind === 'reset') && pw.length < 8) { showAuthErr('Use at least 8 characters for the password'); return; }
     if (kind === 'signup' && (!val('f-ac') || !val('f-nm'))) { showAuthErr('Add the academy name and your name'); return; }
     btn.disabled = true;
     try {
       if (kind === 'login') { const r = await API.login(em, pw); await afterLogin(r); }
-      else if (kind === 'signup') { const r = await API.signup({ academy: val('f-ac'), sport: val('f-sport'), name: val('f-nm'), city: val('f-city'), phone: val('f-ph'), email: em, pw }); await afterLogin(Object.assign({ created: true }, r)); toast(`Academy created. Your ${CFG.plans.trial}-day trial has started.`); }
+      else if (kind === 'signup') { const r = await API.signup({ academy: val('f-ac'), sport: val('f-sport'), name: val('f-nm'), city: val('f-city'), phone: val('f-ph'), email: em, pw, gtoken: U.gsign ? U.gsign.gtoken : undefined }); U.gsign = null; await afterLogin(Object.assign({ created: true }, r)); toast(`Academy created. Your ${CFG.plans.trial}-day trial has started.`); }
       else if (kind === 'forgot') { const r = await API.forgot(em); showAuthErr(''); toast(r.msg || 'If this email has an account, a link is on its way.'); }
       else if (kind === 'reset') { await API.resetPw(f.dataset.token, pw); toast('Password saved. Log in now.'); go('login'); }
     } catch (er) { showAuthErr(er.message); }

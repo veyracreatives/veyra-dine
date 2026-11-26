@@ -32,9 +32,9 @@ const go = h => { if (location.hash === '#' + h) render(); else location.hash = 
 /* ---------- auth ---------- */
 function pitchSVG() { return `<svg class="pitch-lines" viewBox="0 0 600 400" fill="none" style="stroke:var(--brand)" stroke-opacity=".3" stroke-width="2" aria-hidden="true"><rect x="20" y="20" width="560" height="360" rx="6"/><path d="M300 20v360"/><circle cx="300" cy="200" r="60"/><rect x="20" y="110" width="80" height="180"/><rect x="500" y="110" width="80" height="180"/><rect x="20" y="160" width="30" height="80"/><rect x="550" y="160" width="30" height="80"/></svg>`; }
 function auth(kind, token) {
-  const up = kind === 'signup', fg = kind === 'forgot', rs = kind === 'reset';
-  const head = up ? ['Start your academy', `Free for ${CFG.plans.trial} days. Then ${inr(CFG.plans.monthly)} a month or ${inr(CFG.plans.yearly)} a year.`] : fg ? ['Forgot password', 'We email you a link to make a new one.'] : rs ? ['Make a new password', 'Use at least 8 characters.'] : ['Log in', 'Use the email your academy added, or Google.'];
-  const google = !fg && !rs && (LIVE ? CFG.googleClientId : true);
+  const up = kind === 'signup', fg = kind === 'forgot', rs = kind === 'reset'; const gs = up && U.gsign;
+  const head = gs ? ['Finish setting up', `Signed in with Google as ${U.gsign.email}. Tell us about your academy to start your ${CFG.plans.trial}-day free trial.`] : up ? ['Start your academy', `Free for ${CFG.plans.trial} days. Then ${inr(CFG.plans.monthly)} a month or ${inr(CFG.plans.yearly)} a year.`] : fg ? ['Forgot password', 'We email you a link to make a new one.'] : rs ? ['Make a new password', 'Use at least 8 characters.'] : ['Log in', 'Use the email your academy added, or Google.'];
+  const google = !gs && !fg && !rs && (LIVE ? CFG.googleClientId : true);
   return `<div class="auth">
   <aside class="auth-art"><a class="brand" href="#">${logo()}<div><b>VEYRA ACADEMY</b><small>Academy app</small></div></a>
     <div style="display:grid;gap:18px;position:relative"><h2 class="disp">${up ? `${['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen'][CFG.plans.trial] || CFG.plans.trial} days free.<br><em>No card.</em>` : 'Back on<br><em>the pitch</em>'}</h2><p class="muted" style="max-width:420px">${up ? 'Set up your batches, invite coaches and send parents the app link today.' : 'Admins, managers, coaches and parents all log in here. You land in your own app.'}</p></div>
@@ -42,15 +42,15 @@ function auth(kind, token) {
   <main class="auth-form"><form class="auth-box" id="authForm" data-track-form="${kind}" data-kind="${kind}" data-token="${esc(token || '')}" novalidate>
     <a href="#" class="faint" style="font-size:14px;font-weight:600;text-decoration:none">← Back to home</a>
     <a class="brand auth-brand" href="#" style="padding:0">${logo()}<div><b>VEYRA ACADEMY</b><small>Academy app</small></div></a>
-    <div><h1>${head[0]}</h1><p class="muted" style="margin-top:6px">${head[1]}</p></div>
+    <div><h1>${head[0]}</h1><p class="muted" style="margin-top:6px">${head[1]}${gs ? ' <a href="#signup" data-act="gReset" style="color:var(--brand);font-weight:600">Use another account</a>' : ''}</p></div>
     ${B && !up && !rs ? `<div class="banner">${ic('ok')}<span class="grow">You are logged in as <b>${esc(B.me.name)}</b>.</span><a class="btn btn-primary btn-sm" href="#${B.me.role}">Open my app</a></div>` : ''}
     ${google ? `<div id="gbtn" class="gwrap"><button class="btn btn-google btn-lg btn-block" type="button" data-act="google">${ic('google')}Continue with Google</button>${LIVE ? '<div class="glayer" aria-hidden="false"></div>' : ''}</div><div class="or">or with email</div>` : ''}
     ${up ? `<label class="field" for="f-ac"><span>Academy name</span><input class="input" id="f-ac" placeholder="e.g. Kickstart Sports Academy" autocomplete="organization" required></label>
     <label class="field" for="f-sport"><span>Sport</span><select class="select" id="f-sport">${[['football', 'Football'], ['cricket', 'Cricket'], ['badminton', 'Badminton'], ['tennis', 'Tennis'], ['basketball', 'Basketball'], ['swimming', 'Swimming'], ['skating', 'Skating'], ['athletics', 'Athletics'], ['martial', 'Martial arts'], ['other', 'Other sport']].map(([k, n]) => `<option value="${k}" ${k === (new URLSearchParams(location.search).get('sport') || '') ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
-    <div class="grid g2"><label class="field" for="f-nm"><span>Your name</span><input class="input" id="f-nm" autocomplete="name" required></label><label class="field" for="f-city"><span>Area or city</span><input class="input" id="f-city" placeholder="Kharghar, Navi Mumbai"></label></div>
+    <div class="grid g2"><label class="field" for="f-nm"><span>Your name</span><input class="input" id="f-nm" autocomplete="name" value="${gs ? esc(U.gsign.name || '') : ''}" required></label><label class="field" for="f-city"><span>Area or city</span><input class="input" id="f-city" placeholder="Kharghar, Navi Mumbai"></label></div>
     <label class="field" for="f-ph"><span>Phone or WhatsApp <span class="faint" style="font-weight:500">(optional)</span></span><input class="input" id="f-ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="So we can help you set up"></label>` : ''}
-    ${rs ? '' : `<label class="field" for="f-em"><span>Email</span><input class="input" id="f-em" type="email" autocomplete="email" placeholder="you@academy.in" required></label>`}
-    ${fg ? '' : `<label class="field" for="f-pw"><span class="between" style="width:100%"><span>${rs ? 'New password' : 'Password'}</span>${up || rs ? '' : '<a href="#forgot" class="faint" style="font-weight:500">Forgot password?</a>'}</span><input class="input" id="f-pw" type="password" autocomplete="${up || rs ? 'new-password' : 'current-password'}" placeholder="${up || rs ? 'At least 8 characters' : ''}" required></label>`}
+    ${rs ? '' : `<label class="field" for="f-em"><span>Email</span><input class="input" id="f-em" type="email" autocomplete="email" placeholder="you@academy.in" ${gs ? `value="${esc(U.gsign.email)}" readonly style="opacity:.75"` : ''} required></label>`}
+    ${fg || gs ? '' : `<label class="field" for="f-pw"><span class="between" style="width:100%"><span>${rs ? 'New password' : 'Password'}</span>${up || rs ? '' : '<a href="#forgot" class="faint" style="font-weight:500">Forgot password?</a>'}</span><input class="input" id="f-pw" type="password" autocomplete="${up || rs ? 'new-password' : 'current-password'}" placeholder="${up || rs ? 'At least 8 characters' : ''}" required></label>`}
     <p class="faint" id="authErr" role="alert" style="font-size:13.5px;color:var(--bad);min-height:0"></p>
     <button class="btn btn-primary btn-lg btn-block" type="submit">${up ? 'Create academy' : fg ? 'Email me a link' : rs ? 'Save password' : 'Log in'}</button>
     <p class="muted" style="text-align:center;font-size:14px">${up ? 'Already have an account? <a href="#login" style="color:var(--brand);font-weight:600">Log in</a>' : 'New academy? <a href="#signup" style="color:var(--brand);font-weight:600">Start free trial</a>'}</p>
@@ -60,13 +60,14 @@ function auth(kind, token) {
 }
 function mountGoogle() {
   if (!LIVE || !CFG.googleClientId || !$('#gbtn')) return;
-  const draw = () => { if (!window.google || !google.accounts) return; google.accounts.id.initialize({ client_id: CFG.googleClientId, callback: r => API.google(r.credential).then(afterLogin).catch(e => showAuthErr(e.message)) }); const L = $('#gbtn .glayer'); if (!L) return; L.innerHTML = ''; google.accounts.id.renderButton(L, { theme: 'outline', size: 'large', text: 'continue_with', width: 400 }); fitG(); setTimeout(fitG, 600); };
+  const draw = () => { if (!window.google || !google.accounts) return; google.accounts.id.initialize({ client_id: CFG.googleClientId, callback: r => API.google(r.credential).then(x => x && x.needSignup ? gFinish(x) : afterLogin(x)).catch(e => showAuthErr(e.message)) }); const L = $('#gbtn .glayer'); if (!L) return; L.innerHTML = ''; google.accounts.id.renderButton(L, { theme: 'outline', size: 'large', text: 'continue_with', width: 400 }); fitG(); setTimeout(fitG, 600); };
   if (!mountGoogle.rs) { mountGoogle.rs = 1; addEventListener('resize', fitG); }
   if (window.google && google.accounts) draw(); else { const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.onload = draw; document.head.appendChild(s); }
 }
 /* Google's own button can't be wider than 400px, so our full-width button shows and Google's sits on top, invisible, stretched to the same size */
 function fitG() { const w = $('#gbtn'), L = w && w.querySelector('.glayer'); if (!L || !L.firstElementChild) return; L.style.transform = ''; const r = L.firstElementChild.getBoundingClientRect(); if (!r.width || !r.height) return; L.style.transform = `scale(${w.clientWidth / r.width},${w.clientHeight / r.height})`; w.classList.add('g-ready'); }
 const showAuthErr = m => { const e = $('#authErr'); if (e) e.textContent = m; else toast(m); };
+function gFinish(x) { U.gsign = { gtoken: x.gtoken, email: x.email, name: x.name }; showAuthErr(''); if (location.hash === '#signup') render(); else go('signup'); }
 async function afterLogin(r) { await refresh(); if (!B) return showAuthErr('Could not open your academy. Try again.'); toast(r && r.msg ? r.msg : `Welcome, ${first(B.me.name)}`); go(B.me.role + (r && r.created ? '-setup' : '')); }
 
 /* ---------- app frame ---------- */

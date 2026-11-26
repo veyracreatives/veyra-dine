@@ -39,7 +39,7 @@ function faqs(P) {
 }
 /* Schema for Google: organisation, the app with prices and areas served, and the FAQ shown on the page */
 function ld(cfg, base) {
-  const P = cfg.plans || { monthly: 999, yearly: 7999, trial: 10 };
+  const P = cfg.plans || { monthly: 1450, yearly: 8500, trial: 10 };
   const area = [{ '@type': 'City', name: 'Navi Mumbai' }, { '@type': 'City', name: 'Thane' }, { '@type': 'City', name: 'Mumbai' }, { '@type': 'Country', name: 'India' }];
   const org = { '@type': 'Organization', '@id': 'https://veyracreatives.com/#org', name: 'Veyra Creatives', url: 'https://veyracreatives.com', email: 'marketing@veyracreatives.com', logo: base + '/icon-512.png', sameAs: ['https://www.instagram.com/veyralab.in/'], areaServed: area };
   const app = { '@type': 'SoftwareApplication', '@id': base + '/#app', name: 'Veyra Academy', alternateName: 'Veyra Academy sports academy app', applicationCategory: 'BusinessApplication', applicationSubCategory: 'Sports academy management', operatingSystem: 'Android, iOS, Windows, macOS, Web', url: base + '/', image: base + '/og.png', inLanguage: 'en-IN', description: 'Sports academy management software for India (football, cricket, badminton, swimming and more): player and coach attendance, UPI fee collection with reminders, admissions, tournaments, training plans and a parent app.', featureList: 'Player attendance, Coach attendance, UPI fee collection, Fee reminders, Receipts and late fees, Admissions board, Tournaments, Training planner, Parent app, Reports', areaServed: area, publisher: { '@id': 'https://veyracreatives.com/#org' },
@@ -50,7 +50,7 @@ function ld(cfg, base) {
 }
 function render(cfg, IC) {
   const { ic, logo } = IC;
-  const P = cfg.plans || { monthly: 999, yearly: 7999, trial: 10 };
+  const P = cfg.plans || { monthly: 1450, yearly: 8500, trial: 10 };
   const r = n => '₹' + Math.round(n).toLocaleString('en-IN');
   const save = P.monthly * 12 - P.yearly, perMo = Math.round(P.yearly / 12), free = Math.max(0, Math.round(save / P.monthly));
   const demo = cfg.demoBase || '';
@@ -145,9 +145,9 @@ function render(cfg, IC) {
     <div class="sec-head"><span class="eyebrow" style="justify-self:start">Pricing</span><h2 class="disp">One plan. <em>Everything in it.</em></h2><p>Unlimited players, coaches and parents. Start with ${P.trial} days free, then pay securely with Razorpay.</p></div>
     <div class="price-wrap rv">
       <div class="price"><span class="label">Monthly</span><div class="amt">${r(P.monthly)}<small>per month</small></div><p class="muted">Cancel any time.</p><a class="btn btn-ghost btn-lg btn-block" href="#signup">Start free trial</a>
-        <ul>${['Admin, manager, coach and parent apps', 'Attendance for players and coaches', 'UPI fee collection and receipts', 'Tournaments, training and kit', 'Fee reminders', 'Excel / CSV player import', 'Hindi and Marathi for parents and coaches', 'Free setup call for your batches'].map(x => `<li>${ic('ok')}${x}</li>`).join('')}</ul></div>
+        <ul>${((P.points && P.points.monthly && P.points.monthly.length) ? P.points.monthly : coreC().PLAN_POINTS.monthly).map(x => `<li>${ic('ok')}${x}</li>`).join('')}</ul></div>
       <div class="price best"><div class="between"><span class="label" style="color:var(--brand)">Yearly</span>${save > 0 ? `<span class="pill p-brand plain">Save ₹${save.toLocaleString('en-IN')}</span>` : ''}</div><div class="amt">${r(P.yearly)}<small>per year</small></div><p class="muted">Works out to ${r(perMo)} a month.</p><a class="btn btn-primary btn-lg btn-block" href="#signup">Start free trial</a>
-        <ul>${['Everything in Monthly', save > 0 ? `Saves ${r(save)} a year` : 'Best value', 'Priority help by email', 'One payment for the whole year'].map(x => `<li>${ic('ok')}${x}</li>`).join('')}</ul></div>
+        <ul>${(() => { const y = (P.points && P.points.yearly && P.points.yearly.length) ? P.points.yearly : coreC().PLAN_POINTS.yearly; return [y[0], save > 0 ? `Saves ${r(save)} a year` : 'Best value', ...y.slice(1)]; })().map(x => `<li>${ic('ok')}${x}</li>`).join('')}</ul></div>
     </div>
     <div class="rzp-strip rv">${ic('shield')}<div><b>Pay for your plan with Razorpay</b><small>UPI, debit and credit cards, net banking and wallets. Your plan turns on the moment the payment goes through. No GST added.</small></div><div class="hstack rzp-tags"><span class="pill p-mute plain">UPI</span><span class="pill p-mute plain">Cards</span><span class="pill p-mute plain">Net banking</span><span class="pill p-mute plain">Wallets</span></div></div>
   </div></section>

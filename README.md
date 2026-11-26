@@ -2,7 +2,7 @@
 
 Football academy management: landing page, sign-up/login (email + Google), admin, manager, coach and parent apps, and the private Veyra HQ. Every app reads one academy record on the server and updates live (server-sent events). Works in a browser and installs as an app (PWA).
 
-Prices: ₹999/month, ₹7,999/year, 10-day trial, no GST (changeable in HQ → Plans & prices).
+Prices: ₹1,450/month, ₹8,500/year, 10-day trial, no GST (changeable in HQ → Plans & prices).
 Razorpay is used only when an academy buys a plan. Parents pay fees to the academy's own UPI ID and paste the 12-digit transaction ID.
 
 ## Run locally

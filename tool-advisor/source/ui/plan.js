@@ -113,7 +113,7 @@ export function makePlan(an, lib, settings, opts = {}) {
     if (fm) {
       use(fm);
       const d = millData(fm, 'rough');
-      s.ops.push({ op: isMain ? 'Face the top flat' : 'Face to final thickness', tool: fm, ...d, ap: isMain ? `${settings.allowTop} mm total (2 passes: ${r1(settings.allowTop - 0.2)} + 0.2)` : `${r1(settings.allowTop + grip)} mm total, max 1.5 mm per pass, last pass 0.2`, ae: `${r0(fm.dia * 0.7)} mm (70% of tool)`, note: isMain ? 'Set Z0 on the finished top after this.' : `Measure the part height. Final height = ${r1(H)} mm.` });
+      s.ops.push({ mc: { tp: 'Facing', style: 'Zigzag (climb)', z: 0, top: isMain ? settings.allowTop : r1(settings.allowTop + grip), cuts: isMain ? `Max rough step ${r1(settings.allowTop - 0.2)}, 1 finish pass 0.2` : 'Max rough step 1.5, 1 finish pass 0.2', step: '70%' }, op: isMain ? 'Face the top flat' : 'Face to final thickness', tool: fm, ...d, ap: isMain ? `${settings.allowTop} mm total (2 passes: ${r1(settings.allowTop - 0.2)} + 0.2)` : `${r1(settings.allowTop + grip)} mm total, max 1.5 mm per pass, last pass 0.2`, ae: `${r0(fm.dia * 0.7)} mm (70% of tool)`, note: isMain ? 'Set Z0 on the finished top after this.' : `Measure the part height. Final height = ${r1(H)} mm.` });
     } else s.ops.push({ op: 'Face top', tool: need('Face mill Ø40–63 or end mill Ø16+'), note: '' });
 
     // 2 outside profile (main side only, all the way down)
@@ -124,8 +124,8 @@ export function makePlan(an, lib, settings, opts = {}) {
         const d = millData(t, 'rough'); const df = millData(t, 'finish');
         const short = (t.reach || t.fluteLen) < reach;
         if (short) warnings.push(`${toolLabel(t)} reach ${t.reach} mm is shorter than profile depth ${r1(reach)} mm. Use a longer tool or profile from both sides.`);
-        s.ops.push({ op: `Rough outside profile, leave ${finish} mm`, tool: t, ...d, ap: `${r1(Math.min(depthAll, t.dia * mat.ap))} mm per pass, down to ${r1(depthAll)} mm`, ae: `${r1(t.dia * mat.ae)} mm`, note: hold === 'clamps' ? `Cut ${r1(depthAll)} mm deep, into the sacrificial plate under the part. Leave 4 small tabs (or bolt through the part's own holes) so it cannot move when cut free.` : `Cut ${r1(depthAll)} mm deep (0.5 mm into the extra stock). The bottom ${grip} mm stays in the vise.` });
-        s.ops.push({ op: 'Finish outside profile', tool: t, ...df, ap: `full depth ${r1(depthAll)} mm (or 2 steps)`, ae: `${finish} mm`, note: 'Climb milling. Check size with a micrometer before removing.', finish: true });
+        s.ops.push({ mc: { tp: '2D Dynamic Mill', mode: 'Outside (chain the part outline)', z: -r1(depthAll), stw: finish, stf: 0, step: r0(mat.ae * 100) + '%', cuts: 'Full depth in one level (Dynamic)' }, op: `Rough outside profile, leave ${finish} mm`, tool: t, ...d, ap: `${r1(Math.min(depthAll, t.dia * mat.ap))} mm per pass, down to ${r1(depthAll)} mm`, ae: `${r1(t.dia * mat.ae)} mm`, note: hold === 'clamps' ? `Cut ${r1(depthAll)} mm deep, into the sacrificial plate under the part. Leave 4 small tabs (or bolt through the part's own holes) so it cannot move when cut free.` : `Cut ${r1(depthAll)} mm deep (0.5 mm into the extra stock). The bottom ${grip} mm stays in the vise.` });
+        s.ops.push({ mc: { tp: 'Contour (2D)', mode: 'Compensation: Computer, Left (climb). Lead in/out arc 50%', z: -r1(depthAll), stw: 0, stf: 0, cuts: '1 finish pass, spring pass ON' }, op: 'Finish outside profile', tool: t, ...df, ap: `full depth ${r1(depthAll)} mm (or 2 steps)`, ae: `${finish} mm`, note: 'Climb milling. Check size with a micrometer before removing.', finish: true });
       } else s.ops.push({ op: 'Outside profile', tool: need(`End mill with reach ≥ ${r1(H + 2)} mm`) });
     }
     if (round && isMain) s.ops.push({ op: 'Outside diameter', tool: { label: 'Lathe / turning', type: 'note' }, note: `Round part Ø${r1(Math.max(L, W))}: turn the outside diameter on a lathe first, or mill it with a helical contour.` });
@@ -137,7 +137,7 @@ export function makePlan(an, lib, settings, opts = {}) {
       if (!t) { s.ops.push({ op: `Rough ${p.kind.toLowerCase()} ${p.id}`, tool: need(`End mill ≤ Ø${r1(maxRough)} with reach ≥ ${r1(p.depth + 1)} mm`), pocket: p.id }); continue; }
       const d = millData(t, 'rough');
       const entry = p.kind === 'Step / open shoulder' ? 'Enter from outside the part.' : 'Ramp or helix in (2–3°), do not plunge straight.';
-      s.ops.push({ op: `Rough ${p.kind.toLowerCase()} ${p.id} (${r1(p.length)} x ${r1(p.width)}, ${r1(p.depth)} deep)`, tool: t, ...d, ap: `${r1(Math.min(p.depth, t.dia * mat.ap * 0.8))} mm per pass`, ae: `${r1(t.dia * mat.ae)} mm`, note: `${entry} Leave ${finish} mm on walls and floor.`, pocket: p.id });
+      s.ops.push({ mc: { tp: '2D Dynamic Mill', mode: p.kind === 'Step / open shoulder' ? 'Open pocket: start from outside' : 'Entry: Helix, radius ' + r1(t.dia * 0.4) + ', ramp 2°', z: -r1(p.depth), stw: finish, stf: finish, step: r0(mat.ae * 100) + '%', cuts: `Max rough step ${r1(Math.min(p.depth, t.dia * mat.ap * 0.8))}` }, op: `Rough ${p.kind.toLowerCase()} ${p.id} (${r1(p.length)} x ${r1(p.width)}, ${r1(p.depth)} deep)`, tool: t, ...d, ap: `${r1(Math.min(p.depth, t.dia * mat.ap * 0.8))} mm per pass`, ae: `${r1(t.dia * mat.ae)} mm`, note: `${entry} Leave ${finish} mm on walls and floor.`, pocket: p.id });
     }
 
     // 4 holes: spot, drill, peck, ream / helical
@@ -147,7 +147,7 @@ export function makePlan(an, lib, settings, opts = {}) {
       if (sp) {
         use(sp);
         const d = drillData(sp);
-        s.ops.push({ op: `Spot drill ${hs.length} hole${hs.length > 1 ? 's' : ''} (${hs.map(h => h.id).join(', ')})`, tool: sp, ...d, ap: 'Depth = hole Ø/2 + 0.2 (90° spot also makes a small chamfer)', ae: '', note: 'G81 drilling cycle.' });
+        s.ops.push({ mc: { tp: 'Drill', cycle: 'Drill/Counterbore (G81)', z: -r1(Math.max(...hs.map(h => h.tap ? h.tap.d : h.dia)) / 2 + 0.2), cuts: 'Tip comp OFF (depth = chamfer size)', dwell: '0' }, op: `Spot drill ${hs.length} hole${hs.length > 1 ? 's' : ''} (${hs.map(h => h.id).join(', ')})`, tool: sp, ...d, ap: 'Depth = hole Ø/2 + 0.2 (90° spot also makes a small chamfer)', ae: '', note: 'G81 drilling cycle.' });
       } else s.ops.push({ op: 'Spot drill holes', tool: need('Spot drill Ø6–10 90°') });
 
       // group by drill size
@@ -168,19 +168,19 @@ export function makePlan(an, lib, settings, opts = {}) {
         if (exact && !reamer) {
           use(exact); const d = drillData(exact);
           if (exact.fluteLen < depth) warnings.push(`${toolLabel(exact)} flute length ${exact.fluteLen} mm is shorter than hole depth ${depth} mm (${ids}).`);
-          s.ops.push({ op: `Drill Ø${g.target} x ${depth} ${g.through ? '(through)' : 'deep'} — ${ids}`, tool: exact, ...d, ap: peck ? `Peck ${r1(g.target)} mm (G83)` : 'G81 / G73 chip break', ae: '', note: g.through ? (hold === 'clamps' ? 'Through hole: put a sacrificial plate under the part.' : 'Through hole: goes 1 mm into the extra stock under the part, safe for the vise.') : '' });
+          s.ops.push({ mc: { tp: 'Drill', cycle: peck ? 'Peck drill (G83)' : 'Chip break (G73)', peck: r1(peck ? g.target : g.target * 1.5), z: -r1(g.depth), tip: true, brk: g.through ? 1 : 0 }, op: `Drill Ø${g.target} x ${depth} ${g.through ? '(through)' : 'deep'} — ${ids}`, tool: exact, ...d, ap: peck ? `Peck ${r1(g.target)} mm (G83)` : 'G81 / G73 chip break', ae: '', note: g.through ? (hold === 'clamps' ? 'Through hole: put a sacrificial plate under the part.' : 'Through hole: goes 1 mm into the extra stock under the part, safe for the vise.') : '' });
         } else if (reamer) {
           const pre = drills.filter(t => t.dia <= g.target - 0.15 && t.dia >= g.target - 0.5)[0] || drills.filter(t => t.dia < g.target - 0.1)[0];
-          if (pre) { use(pre); const d = drillData(pre); s.ops.push({ op: `Pre-drill Ø${pre.dia} for reaming — ${ids}`, tool: pre, ...d, ap: peck ? `Peck ${r1(pre.dia)} mm (G83)` : 'G81', ae: '', note: '' }); }
+          if (pre) { use(pre); const d = drillData(pre); s.ops.push({ mc: { tp: 'Drill', cycle: peck ? 'Peck drill (G83)' : 'Drill/Counterbore (G81)', peck: peck ? r1(pre.dia) : null, z: -r1(g.depth), tip: true, brk: g.through ? 1 : 0 }, op: `Pre-drill Ø${pre.dia} for reaming — ${ids}`, tool: pre, ...d, ap: peck ? `Peck ${r1(pre.dia)} mm (G83)` : 'G81', ae: '', note: '' }); }
           else s.ops.push({ op: `Pre-drill for Ø${g.target} ream`, tool: need(`Drill Ø${r1(g.target - 0.2)}`) });
           use(reamer); const rr = rpmFor(mat.vdH / 3, reamer.dia);
-          s.ops.push({ op: `Ream Ø${g.target} H7 — ${ids}`, tool: reamer, rpm: rr, feed: feedCap(rr * reamer.dia * 0.04), ap: 'G85 (feed in, feed out)', ae: '', note: 'Only if this is a fit hole (dowel/bearing). Else drill only.', finish: true });
+          s.ops.push({ mc: { tp: 'Drill', cycle: 'Bore #1 feed-feed (G85)', z: -r1(g.depth), tip: false, brk: g.through ? 0.5 : 0 }, op: `Ream Ø${g.target} H7 — ${ids}`, tool: reamer, rpm: rr, feed: feedCap(rr * reamer.dia * 0.04), ap: 'G85 (feed in, feed out)', ae: '', note: 'Only if this is a fit hole (dowel/bearing). Else drill only.', finish: true });
         } else {
           // no exact drill: drill under and helical-mill / bore
           const pre = drills.filter(t => t.dia <= g.target - 0.3)[0];
-          if (pre) { use(pre); const d = drillData(pre); s.ops.push({ op: `Pre-drill Ø${pre.dia} — ${ids}`, tool: pre, ...d, ap: peck ? `Peck ${r1(pre.dia)} mm (G83)` : 'G81', ae: '', note: '' }); }
+          if (pre) { use(pre); const d = drillData(pre); s.ops.push({ mc: { tp: 'Drill', cycle: peck ? 'Peck drill (G83)' : 'Drill/Counterbore (G81)', peck: peck ? r1(pre.dia) : null, z: -r1(g.depth), tip: true, brk: g.through ? 1 : 0 }, op: `Pre-drill Ø${pre.dia} — ${ids}`, tool: pre, ...d, ap: peck ? `Peck ${r1(pre.dia)} mm (G83)` : 'G81', ae: '', note: '' }); }
           const em = endmill({ maxDia: g.target * 0.75, minReach: depth, minDia: g.target * 0.3 });
-          if (em) { const d = millData(em, 'finish'); s.ops.push({ op: `Helical interpolate Ø${g.target} — ${ids}`, tool: em, ...d, ap: `Helix pitch ${r1(Math.min(1, em.dia * 0.1))} mm`, ae: '', note: `No Ø${g.target} drill in your library. Mill it to size (or buy a Ø${g.target} drill).`, finish: true }); }
+          if (em) { const d = millData(em, 'finish'); s.ops.push({ mc: { tp: 'Helix Bore', mode: 'Rough + finish, finish 0.1', z: -r1(g.depth), stw: 0, stf: 0, cuts: `Helix pitch ${r1(Math.min(1, em.dia * 0.1))}` }, op: `Helical interpolate Ø${g.target} — ${ids}`, tool: em, ...d, ap: `Helix pitch ${r1(Math.min(1, em.dia * 0.1))} mm`, ae: '', note: `No Ø${g.target} drill in your library. Mill it to size (or buy a Ø${g.target} drill).`, finish: true }); }
           else s.ops.push({ op: `Make Ø${g.target} hole — ${ids}`, tool: need(`Drill Ø${g.target}`) });
           if (!exact && g.target <= 20) need(`Drill Ø${g.target} (optional, faster than milling)`);
         }
@@ -190,7 +190,7 @@ export function makePlan(an, lib, settings, opts = {}) {
       for (const list of cbg.values()) {
         const cb = list[0].cbore, h = list[0], ids = list.map(x => x.id).join(', ');
         const em = endmill({ maxDia: cb.dia * 0.8, minReach: cb.depth + 1, minDia: Math.min(cb.dia * 0.4, h.dia * 0.9) });
-        if (em) { const d = millData(em, 'finish'); s.ops.push({ op: `Counterbore Ø${cb.dia} x ${cb.depth} deep — ${ids}`, tool: em, ...d, ap: `${r1(Math.min(cb.depth, em.dia * 0.5))} mm per pass`, ae: 'circular pocket', note: 'Mill as a circular pocket / helix after drilling.', finish: true }); }
+        if (em) { const d = millData(em, 'finish'); s.ops.push({ mc: { tp: 'Helix Bore', mode: 'Counterbore, finish 0.1', z: -r1(cb.depth), stw: 0, stf: 0, cuts: `Helix pitch ${r1(Math.min(1, em.dia * 0.1))}` }, op: `Counterbore Ø${cb.dia} x ${cb.depth} deep — ${ids}`, tool: em, ...d, ap: `${r1(Math.min(cb.depth, em.dia * 0.5))} mm per pass`, ae: 'circular pocket', note: 'Mill as a circular pocket / helix after drilling.', finish: true }); }
         else s.ops.push({ op: `Counterbore Ø${cb.dia} — ${ids}`, tool: need(`End mill ≤ Ø${r1(cb.dia * 0.8)} or counterbore tool Ø${cb.dia}`) });
       }
     }
@@ -202,10 +202,10 @@ export function makePlan(an, lib, settings, opts = {}) {
       const t = endmill({ maxDia: maxD, minReach: p.depth + 1 });
       if (!t) { s.ops.push({ op: `Finish ${p.id} walls and floor`, tool: need(`End mill ≤ Ø${r1(maxD)} reach ≥ ${r1(p.depth + 1)}`), note }); continue; }
       const d = millData(t, 'finish');
-      s.ops.push({ op: `Finish ${p.id} walls and floor`, tool: t, ...d, ap: `full depth ${r1(p.depth)} mm walls, floor 0.2 mm`, ae: `${finish} mm`, note, finish: true, pocket: p.id });
+      s.ops.push({ mc: { tp: 'Pocket (Standard) – finish only', mode: 'Finish walls + floor, spring pass ON', z: -r1(p.depth), stw: 0, stf: 0, cuts: 'Walls full depth, floor 1 pass 0.2' }, op: `Finish ${p.id} walls and floor`, tool: t, ...d, ap: `full depth ${r1(p.depth)} mm walls, floor 0.2 mm`, ae: `${finish} mm`, note, finish: true, pocket: p.id });
       if (p.floorR) {
         const bn = ofType('bullnose').find(b => Math.abs(b.cornerR - p.floorR) < 0.05) || ofType('ballnose').find(b => b.dia <= 2 * p.floorR + 0.01);
-        if (bn) { use(bn); const d2 = millData(bn, 'finish'); s.ops.push({ op: `Floor corner radius R${p.floorR} — ${p.id}`, tool: bn, ...d2, ap: '', ae: `stepover ${r1(bn.dia * 0.08)} mm`, note: 'Bottom fillet where wall meets floor.', finish: true }); }
+        if (bn) { use(bn); const d2 = millData(bn, 'finish'); s.ops.push({ mc: { tp: 'Contour (2D)', mode: 'Floor fillet: or use Surface Finish Scallop', z: -r1(p.depth), stw: 0, stf: 0 }, op: `Floor corner radius R${p.floorR} — ${p.id}`, tool: bn, ...d2, ap: '', ae: `stepover ${r1(bn.dia * 0.08)} mm`, note: 'Bottom fillet where wall meets floor.', finish: true }); }
         else s.ops.push({ op: `Floor corner radius R${p.floorR} — ${p.id}`, tool: need(`Bull nose R${p.floorR} or ball nose Ø${r1(2 * p.floorR)}`), note: 'Or leave sharp if drawing allows.' });
       }
     }
@@ -214,7 +214,7 @@ export function makePlan(an, lib, settings, opts = {}) {
     if (f.surf.length) {
       const rmin = Math.min(...f.surf.map(x => x.rmin || 99));
       const b = ofType('ballnose').filter(t => t.dia / 2 <= rmin + 0.01)[0] || null;
-      if (b) { use(b); const d = millData(b, 'finish'); s.ops.push({ op: `3D finish curved surfaces (${f.surf.length})`, tool: b, ...d, ap: '', ae: `stepover ${r1(b.dia * 0.08)} mm (smaller = smoother)`, note: `Smallest concave radius ≈ R${r1(rmin)}. Rough first with an end mill, leave 0.3 mm.`, finish: true }); }
+      if (b) { use(b); const d = millData(b, 'finish'); s.ops.push({ mc: { tp: 'Surface High Speed – Scallop', mode: 'Rough first with Optirough, leave 0.3', z: null, stw: 0, stf: 0, step: r1(b.dia * 0.08) + ' mm' }, op: `3D finish curved surfaces (${f.surf.length})`, tool: b, ...d, ap: '', ae: `stepover ${r1(b.dia * 0.08)} mm (smaller = smoother)`, note: `Smallest concave radius ≈ R${r1(rmin)}. Rough first with an end mill, leave 0.3 mm.`, finish: true }); }
       else s.ops.push({ op: '3D finish curved surfaces', tool: need(`Ball nose ≤ Ø${r1(2 * rmin)}`) });
     }
 
@@ -222,7 +222,7 @@ export function makePlan(an, lib, settings, opts = {}) {
     const holeCh = f.holes.filter(h => h.csk);
     if (f.cham.length || holeCh.length || isMain) {
       const c = ofType('chamfer')[0];
-      if (c) { use(c); const d = millData(c, 'finish'); const sz = Math.max(0.3, ...f.cham.map(x => x.size || 0), ...holeCh.map(h => (h.csk.dia - h.dia) / 2)); s.ops.push({ op: f.cham.length || holeCh.length ? `Chamfer edges (≈${r1(sz)} mm)` : 'Deburr edges (0.3 mm chamfer)', tool: c, ...d, ap: 'Z depth = chamfer size + 0.5 mm tip offset', ae: '', note: holeCh.length ? `Includes hole chamfers/countersinks: ${holeCh.map(h => h.id).join(', ')}.` : '' }); }
+      if (c) { use(c); const d = millData(c, 'finish'); const sz = Math.max(0.3, ...f.cham.map(x => x.size || 0), ...holeCh.map(h => (h.csk.dia - h.dia) / 2)); s.ops.push({ mc: { tp: 'Contour (2D)', mode: 'Contour type: 2D chamfer, width ' + r1(sz) + ', tip offset 0.5', z: 0, stw: 0, stf: 0 }, op: f.cham.length || holeCh.length ? `Chamfer edges (≈${r1(sz)} mm)` : 'Deburr edges (0.3 mm chamfer)', tool: c, ...d, ap: 'Z depth = chamfer size + 0.5 mm tip offset', ae: '', note: holeCh.length ? `Includes hole chamfers/countersinks: ${holeCh.map(h => h.id).join(', ')}.` : '' }); }
       else s.ops.push({ op: 'Chamfer / deburr edges', tool: need('Chamfer mill 90° Ø6–12'), note: 'Or deburr by hand.' });
     }
 
@@ -232,7 +232,7 @@ export function makePlan(an, lib, settings, opts = {}) {
     for (const [, list] of tg) { const m = list[0].tap.m;
       const tp = ofType('tap').find(t => Math.abs(t.dia - m) < 0.01);
       const tap = list[0].tap; const depth = r1(Math.max(...list.map(h => h.depth)) - (list[0].through ? 0 : 2 * tap.p));
-      if (tp) { use(tp); const s1 = Math.min(r0(mat.vt * 1000 / (Math.PI * m)), 1500, settings.maxRpm); s.ops.push({ op: `Tap M${m}x${tap.p} x ${depth} deep — ${list.map(h => h.id).join(', ')}`, tool: tp, rpm: s1, feed: r1(s1 * tap.p), ap: 'G84 rigid tapping, feed = RPM x pitch', ae: '', note: `Tap drill Ø${tap.d}. Use tapping oil. Check thread with a plug gauge.` }); }
+      if (tp) { use(tp); const s1 = Math.min(r0(mat.vt * 1000 / (Math.PI * m)), 1500, settings.maxRpm); s.ops.push({ mc: { tp: 'Drill', cycle: 'Tap (G84) rigid', z: -depth, tip: false, brk: 0 }, op: `Tap M${m}x${tap.p} x ${depth} deep — ${list.map(h => h.id).join(', ')}`, tool: tp, rpm: s1, feed: r1(s1 * tap.p), ap: 'G84 rigid tapping, feed = RPM x pitch', ae: '', note: `Tap drill Ø${tap.d}. Use tapping oil. Check thread with a plug gauge.` }); }
       else s.ops.push({ op: `Tap M${m} — ${list.map(h => h.id).join(', ')}`, tool: need(`Tap M${m}x${tap.p}`) });
     }
     // angled

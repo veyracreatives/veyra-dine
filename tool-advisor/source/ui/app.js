@@ -3,6 +3,7 @@ import { OrbitControls } from './vendor/OrbitControls.js';
 import { STLLoader } from './vendor/STLLoader.js';
 import { analyzePart, rotateGeo, segmentMesh, SIDE_NAME } from './analyze.js';
 import { makePlan, toolLabel } from './plan.js';
+import { mcTool, mcPage, WCS, PLANE } from './mcam.js';
 import { MATERIALS, TOOL_TYPES, DEFAULT_SETTINGS, defaultLibrary } from './data.js';
 
 const $ = s => document.querySelector(s);
@@ -274,9 +275,10 @@ function renderAll() {
 
   // plan
   let ph = `<div class="kv" style="margin-bottom:12px"><b>Material</b><span>${esc(plan.mat.name)}</span><b>Coolant</b><span>${esc(plan.mat.coolant)}</span></div>`;
+  ph += `<div class="mgroup">Machine Group-1 · Mill 3-axis VMC (Mitsubishi M80) · MM</div>`;
   plan.setups.forEach((s, i) => {
-    ph += `<div class="setup"><h4>${esc(s.title)}</h4><ul class="clamp">${s.clamp.map(c => `<li>${esc(c)}</li>`).join('')}</ul>`;
-    for (const o of s.ops) ph += opHtml(o);
+    ph += `<div class="setup"><h4>Toolpath Group-${i + 1} · ${esc(s.title.replace(/^Setup \d+ — /, ''))}</h4><div class="wcs">WCS: ${PLANE[s.side] || 'TOP'} · Tplane: ${PLANE[s.side] || 'TOP'} · Work offset ${WCS[i] || 'G54'} (Setup ${i + 1})</div><ul class="clamp">${s.clamp.map(c => `<li>${esc(c)}</li>`).join('')}</ul>`;
+    for (const o of s.ops) ph += opHtml(o, i);
     ph += `</div>`;
   });
   ph += `<div class="setup"><h4>Last: check the part</h4><ul class="clamp"><li>Deburr all edges by hand.</li><li>Measure: overall size, hole sizes (pin gauge), thread (plug gauge), pocket depths.</li><li>Compare with the drawing before making the next part.</li></ul></div>`;
@@ -312,18 +314,11 @@ function renderAll() {
   paint(); drawClamps();
 }
 
-function opHtml(o) {
-  const t = o.tool || {};
-  const tl = t.missing ? t.label : t.type === 'note' ? t.label : toolLabel(t);
-  const nums = [];
-  if (o.rpm) nums.push(`S <b>${o.rpm}</b> rpm`);
-  if (o.feed) nums.push(`F <b>${o.feed}</b> mm/min`);
-  if (o.ap) nums.push(`Depth: <b>${esc(o.ap)}</b>`);
-  if (o.ae) nums.push(`Width: <b>${esc(o.ae)}</b>`);
-  if (o.stickout) nums.push(`Stick-out ≥ <b>${o.stickout}</b> mm`);
-  return `<div class="op"><div class="h"><span class="n">${o.no}</span><span class="t">${esc(o.op)}</span></div>
-    <div class="tool ${t.missing ? 'miss' : ''}">${esc(tl)}</div>
-    ${nums.length ? `<div class="nums">${nums.map(n => `<span>${n}</span>`).join('')}</div>` : ''}
+function opHtml(o, si) {
+  const pg = mcPage(o, si, state.plan.mat);
+  return `<div class="op"><div class="h"><span class="n">${o.no}</span><span class="t">${esc(pg.title)}</span></div>
+    <div class="opname">${esc(o.op)}</div>
+    ${pg.sections.map(([h, rows]) => `<div class="pg"><div class="pgh">${esc(h)}</div>${rows.map(([k, v]) => `<div class="pr"><span>${esc(k)}</span><b class="${k === 'Tool' && o.tool?.missing ? 'miss' : ''}">${esc(v)}</b></div>`).join('')}</div>`).join('')}
     ${o.note ? `<div class="note">${esc(o.note)}</div>` : ''}</div>`;
 }
 
@@ -340,21 +335,38 @@ function jobSheetHtml(clampImgs = []) {
   const d = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   let ops = '';
   plan.setups.forEach((st, si) => {
-    ops += `<h2>${esc(st.title)}</h2><div class="sc">${clampImgs[si] ? `<img src="${clampImgs[si]}">` : ''}<ul class="cl">${st.clamp.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>
-      <table><thead><tr><th>#</th><th>Operation</th><th>Tool</th><th>S rpm</th><th>F mm/min</th><th>Depth / width</th><th>Notes</th><th>✓</th></tr></thead>
-      ${st.ops.map(o => `<tr><td>${o.no}</td><td>${esc(o.op)}</td><td>${esc(o.tool?.missing || o.tool?.type === 'note' ? o.tool.label : toolLabel(o.tool))}${o.stickout ? `<br><small>stick-out ≥ ${o.stickout}</small>` : ''}</td><td>${o.rpm ?? ''}</td><td>${o.feed ?? ''}</td><td>${esc([o.ap, o.ae].filter(Boolean).join(' / '))}</td><td>${esc(o.note || '')}</td><td class="box"></td></tr>`).join('')}</table>`;
+    ops += `<section class="setup"><h2>Toolpath Group-${si + 1} · ${esc(st.title)}</h2><div class="wcs">WCS / Tplane: ${PLANE[st.side] || 'TOP'} · Work offset ${WCS[si] || 'G54'}</div>
+      <div class="sc">${clampImgs[si] ? `<img src="${clampImgs[si]}">` : ''}<div><b>Clamping</b><ol>${st.clamp.map(c => `<li>${esc(c)}</li>`).join('')}</ol></div></div></section>`;
+    for (const o of st.ops) {
+      const pg = mcPage(o, si, plan.mat);
+      ops += `<div class="op"><div class="oh"><span class="no">${o.no}</span><b>${esc(pg.title)}</b><span class="on">${esc(o.op)}</span><span class="ck">☐ done</span></div>
+        <div class="pgs">${pg.sections.map(([h, rows]) => `<div class="pg"><div class="pgh">${esc(h)}</div><table>${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table></div>`).join('')}</div>
+        ${o.note ? `<div class="nt">Note: ${esc(o.note)}</div>` : ''}</div>`;
+    }
   });
-  const tools = plan.tools.map(t => `<tr><td>${t.T ?? ''}</td><td>${esc(toolLabel({ ...t, T: 0 }))}</td><td>${t.fluteLen}</td><td>${t.reach}</td></tr>`).join('');
+  const tools = plan.tools.map(t => `<tr><td>${t.T ?? ''}</td><td>${esc(mcTool(t))}</td><td>${t.fluteLen}</td><td>${t.reach}</td></tr>`).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Job sheet ${esc(state.name)}</title><style>
-  @page { size: A4; margin: 12mm; } body { font: 10.5px/1.35 "Segoe UI", Arial, sans-serif; color: #111; margin: 0; }
-  header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #ff7a1a; padding-bottom: 6px; margin-bottom: 8px; }
-  h1 { font-size: 18px; margin: 0; } h2 { font-size: 13px; margin: 14px 0 4px; color: #b44c00; page-break-after: avoid; }
-  .top { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; } .sc { display: grid; grid-template-columns: 62mm 1fr; gap: 8px; align-items: start; page-break-inside: avoid; } .sc img { width: 100%; max-height: 62mm; object-fit: cover; border-radius: 4px; background: #1a2030; } .top img { width: 100%; max-height: 75mm; object-fit: contain; border: 1px solid #ccc; border-radius: 4px; background: #1a2030; }
-  table { width: 100%; border-collapse: collapse; margin-top: 4px; } th, td { border: 1px solid #bbb; padding: 3px 4px; text-align: left; vertical-align: top; } th { background: #f1f1f1; }
-  tr { page-break-inside: avoid; } td.box { width: 14px; } .cl { margin: 2px 0 4px 16px; padding: 0; } .kv td:first-child { font-weight: 600; width: 34%; }
-  .warn { background: #fff7e6; border: 1px solid #f0b35a; padding: 6px 8px; border-radius: 4px; margin-top: 8px; } small { color: #555; }
-  footer { margin-top: 12px; font-size: 9px; color: #666; border-top: 1px solid #ccc; padding-top: 4px; }</style></head><body>
-  <header><div><h1>CNC Job Sheet — ${esc(state.name)}</h1><div>3-axis VMC · ${plan.setups.length} setup(s) · ${plan.setups.reduce((a, s) => a + s.ops.length, 0)} steps</div></div><div>Date: ${d}<br>Operator: ____________</div></header>
+  @page { size: A4; margin: 10mm; } * { box-sizing: border-box; }
+  body { font: 11.5px/1.4 "Segoe UI", Arial, sans-serif; color: #111; margin: 0; word-wrap: break-word; overflow-wrap: anywhere; }
+  header { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; border-bottom: 3px solid #ff7a1a; padding-bottom: 6px; margin-bottom: 10px; }
+  h1 { font-size: 19px; margin: 0; } h2 { font-size: 15px; margin: 0 0 2px; color: #b44c00; }
+  .top { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+  .top img { width: 100%; max-height: 80mm; object-fit: contain; border-radius: 4px; background: #1a2030; }
+  table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #c8c8c8; padding: 4px 6px; text-align: left; vertical-align: top; } th { background: #f1f1f1; }
+  .kv td:first-child { font-weight: 600; width: 38%; background: #fafafa; }
+  .setup { page-break-before: always; margin-bottom: 8px; } .wcs { color: #555; margin-bottom: 6px; }
+  .sc { display: grid; grid-template-columns: 80mm 1fr; gap: 10px; align-items: start; } .sc img { width: 100%; max-height: 62mm; object-fit: cover; border-radius: 4px; background: #1a2030; } .sc ol { margin: 4px 0 0 18px; padding: 0; } .sc li { margin-bottom: 3px; }
+  .op { border: 1px solid #bdbdbd; border-radius: 6px; margin: 8px 0; page-break-inside: avoid; overflow: hidden; }
+  .oh { display: flex; align-items: center; gap: 8px; background: #fff1e6; padding: 6px 8px; border-bottom: 1px solid #e3c4a8; flex-wrap: wrap; }
+  .oh .no { background: #ff7a1a; color: #fff; border-radius: 4px; padding: 0 7px; font-weight: 700; } .oh b { font-size: 13px; } .oh .on { color: #444; flex: 1; min-width: 40%; } .oh .ck { color: #777; }
+  .pgs { display: grid; grid-template-columns: 1.15fr 1fr 0.85fr; gap: 0; } .pg { padding: 5px 6px; border-right: 1px solid #e0e0e0; } .pg:last-child { border-right: 0; }
+  .pgh { font-weight: 700; font-size: 10.5px; text-transform: uppercase; color: #8a3a00; margin-bottom: 3px; letter-spacing: .03em; }
+  .pg table td { border: 0; border-bottom: 1px dotted #ddd; padding: 2px 3px; font-size: 11px; } .pg table td:first-child { color: #555; width: 46%; } .pg table td:last-child { font-weight: 600; }
+  .nt { padding: 5px 8px; background: #fafafa; border-top: 1px solid #e0e0e0; font-size: 11px; }
+  .warn { background: #fff7e6; border: 1px solid #f0b35a; padding: 6px 8px; border-radius: 4px; margin-top: 10px; } .warn ul { margin: 4px 0 0 18px; padding: 0; }
+  h3 { font-size: 14px; margin: 14px 0 4px; color: #b44c00; }
+  footer { margin-top: 12px; font-size: 9.5px; color: #666; border-top: 1px solid #ccc; padding-top: 4px; }</style></head><body>
+  <header><div><h1>Setup Sheet — ${esc(state.name)}</h1><div>3-axis VMC · ${plan.setups.length} setup(s) · ${plan.setups.reduce((a, s) => a + s.ops.length, 0)} steps</div></div><div>Date: ${d}<br>Operator: ____________</div></header>
   <div class="top"><img src="${img}"><table class="kv">
   <tr><td>Part size</td><td>${fx(s[0])} × ${fx(s[1])} × ${fx(s[2])} mm</td></tr>
   <tr><td>Material</td><td>${esc(plan.mat.name)}</td></tr>
@@ -364,11 +376,11 @@ function jobSheetHtml(clampImgs = []) {
   <tr><td>Holes</td><td>${plan.holes.length} (${plan.holes.filter(h => h.tap).length} tapped)</td></tr>
   <tr><td>Pockets / steps</td><td>${an.pockets.length}</td></tr>
   <tr><td>Smallest inside radius</td><td>${an.minCorner ? 'R' + fx(an.minCorner) : 'sharp / none'}</td></tr></table></div>
-  ${plan.warnings.length ? `<div class="warn"><b>Check before cutting:</b><ul class="cl">${plan.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
-  <h2>Tool list</h2><table><tr><th>T</th><th>Tool</th><th>Flute length</th><th>Reach</th></tr>${tools}</table>
+  ${plan.warnings.length ? `<div class="warn"><b>Check before cutting:</b><ul>${plan.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
+  <h3>Tool list</h3><table><tr><th>T</th><th>Tool</th><th>Flute length</th><th>Reach</th></tr>${tools}</table>
   ${plan.missing.length ? `<div class="warn"><b>Tools not in library:</b> ${plan.missing.map(esc).join('; ')}</div>` : ''}
   ${ops}
-  <h2>Final check</h2><ul class="cl"><li>Deburr all edges.</li><li>Measure size, holes (pin gauge), threads (plug gauge), depths.</li><li>Compare with drawing.</li></ul>
+  <h3>Final check</h3><ul><li>Deburr all edges.</li><li>Measure size, holes (pin gauge), threads (plug gauge), depths.</li><li>Compare with drawing.</li></ul>
   <footer>Made with Veyra Tool Advisor. Suggested values only: the operator must check every tool, clamp and value before cutting. Start with 70% feed override.</footer></body></html>`;
 }
 
@@ -381,7 +393,7 @@ async function savePdf() {
   $('#selClampView').value = ''; drawClamps(); setView('iso');
   const html = jobSheetHtml(imgs);
   $('#selClampView').value = prevClamp; drawClamps();
-  const base = state.name.replace(/\.[^.]+$/, '') + ' - job sheet.pdf';
+  const base = state.name.replace(/\.[^.]+$/, '') + ' - setup sheet.pdf';
   if (window.veyra?.savePdf) { const p = await window.veyra.savePdf(html, base); if (p) toast('Saved: ' + p); }
   else { const w = window.open('', '_blank'); w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400); }
 }

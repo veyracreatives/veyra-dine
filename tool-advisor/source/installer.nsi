@@ -2,7 +2,7 @@ Unicode true
 SetCompressor /SOLID lzma
 !include "MUI2.nsh"
 !define APP "Veyra Tool Advisor"
-!define VER "1.0.0"
+!define VER "1.1.0"
 Name "${APP}"
 OutFile "dist\VeyraToolAdvisor-Setup-${VER}.exe"
 InstallDir "$LOCALAPPDATA\Programs\${APP}"

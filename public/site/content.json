@@ -8,13 +8,6 @@
    "section": "Top of page"
   },
   {
-   "k": "if7b11bb8",
-   "type": "img",
-   "src": "img/phone-status.jpg",
-   "alt": "Live order status",
-   "section": "A menu they'll enjoy ordering from"
-  },
-  {
    "k": "te3eb71fe",
    "type": "text",
    "tag": "small",
@@ -162,13 +155,6 @@
    "section": "Top of page"
   },
   {
-   "k": "t566dbc22",
-   "type": "text",
-   "tag": "p",
-   "text": "Put a QR code on every table. Guests order and pay from their own phone, and the KOT reaches your kitchen by itself, even when the internet is down.",
-   "section": "Top of page"
-  },
-  {
    "k": "t4ca03e0d",
    "type": "text",
    "tag": "a",
@@ -194,13 +180,6 @@
    "type": "text",
    "tag": "a",
    "text": "Install on Windows",
-   "section": "Top of page"
-  },
-  {
-   "k": "tf7b38f07",
-   "type": "text",
-   "tag": "a",
-   "text": "See how it works",
    "section": "Top of page"
   },
   {
@@ -533,24 +512,10 @@
    "section": "No waiter needed. Never stops, even without internet."
   },
   {
-   "k": "tdcbb47de",
-   "type": "text",
-   "tag": "span",
-   "text": "No waiter",
-   "section": "No waiter needed. Never stops, even without internet."
-  },
-  {
    "k": "tb34260ff",
    "type": "text",
    "tag": "h3",
    "text": "Scan, order and pay at the table",
-   "section": "No waiter needed. Never stops, even without internet."
-  },
-  {
-   "k": "t9537fade",
-   "type": "text",
-   "tag": "p",
-   "text": "Turn on auto-accept and every order goes straight to the kitchen with its KOT. Turn on pay-first and guests pay by UPI before the food is made. Nobody has to walk to the table to take an order.",
    "section": "No waiter needed. Never stops, even without internet."
   },
   {
@@ -2680,6 +2645,258 @@
    "tag": "p",
    "text": "The ticket moves to Ready, and the counter, waiters and guests see it at once.",
    "section": "Step-by-step guides"
+  },
+  {
+   "k": "ief58fac7",
+   "type": "img",
+   "src": "img/gamezone.jpg",
+   "alt": "Game Zone on the guest menu, open while the food is being made",
+   "section": "A menu they'll enjoy ordering from"
+  },
+  {
+   "k": "t8763cd78",
+   "type": "text",
+   "tag": "p",
+   "text": "Games for guests",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t6043b626",
+   "type": "text",
+   "tag": "p",
+   "text": "Three free games with a weekly leaderboard and a prize you choose.",
+   "section": "Built for Indian restaurants"
+  },
+  {
+   "k": "t3abcd263",
+   "type": "text",
+   "tag": "p",
+   "text": "Sign up on your phone and use every feature free for 10 days. No Windows computer needed.",
+   "section": "Start taking orders from the table"
+  },
+  {
+   "k": "tc47ae153",
+   "type": "text",
+   "tag": "a",
+   "text": "Help",
+   "section": "Top of page"
+  },
+  {
+   "k": "t38cfaf72",
+   "type": "text",
+   "tag": "a",
+   "text": "Try the demo",
+   "section": "Top of page"
+  },
+  {
+   "k": "t6364e247",
+   "type": "text",
+   "tag": "span",
+   "text": "Waiter app + QR ordering",
+   "section": "Top of page"
+  },
+  {
+   "k": "t7d41f1d2",
+   "type": "text",
+   "tag": "p",
+   "text": "Your waiters take orders on their phones, guests can scan the table QR and order themselves, and the KOT reaches your kitchen by itself, even when the internet is down.",
+   "section": "Top of page"
+  },
+  {
+   "k": "tf1ea188c",
+   "type": "text",
+   "tag": "h1",
+   "text": "Everything Veyra Dine In does",
+   "section": "Top of page"
+  },
+  {
+   "k": "t8456f8fc",
+   "type": "text",
+   "tag": "p",
+   "text": "The waiter app, QR ordering, kitchen and counter screens, split bills, games and more. Every plan includes all of it.",
+   "section": "Top of page"
+  },
+  {
+   "k": "t237b9993",
+   "type": "text",
+   "tag": "a",
+   "text": "Start free for 10 days",
+   "section": "Top of page"
+  },
+  {
+   "k": "t8ac7aa17",
+   "type": "text",
+   "tag": "div",
+   "text": "What you get",
+   "section": "Six things owners use every day"
+  },
+  {
+   "k": "t041b9002",
+   "type": "text",
+   "tag": "h2",
+   "text": "Six things owners use every day",
+   "section": "Six things owners use every day"
+  },
+  {
+   "k": "te6b6e6e7",
+   "type": "text",
+   "tag": "p",
+   "text": "Waiters take orders on their own phones with a PIN. They see every table, hear calls and know when food is ready.",
+   "section": "Six things owners use every day"
+  },
+  {
+   "k": "t3a32ddff",
+   "type": "text",
+   "tag": "p",
+   "text": "QR ordering and UPI bills",
+   "section": "Six things owners use every day"
+  },
+  {
+   "k": "tfcb9110f",
+   "type": "text",
+   "tag": "p",
+   "text": "Guests scan, order and split the bill from their phone, and pay their share by UPI to your account.",
+   "section": "Six things owners use every day"
+  },
+  {
+   "k": "t4eaaab53",
+   "type": "text",
+   "tag": "p",
+   "text": "Kitchen screen and KOT",
+   "section": "Six things owners use every day"
+  },
+  {
+   "k": "t7f7dc9ea",
+   "type": "text",
+   "tag": "p",
+   "text": "Orders reach the kitchen as KOTs on a thermal printer or as big tickets on a screen, with timers.",
+   "section": "Six things owners use every day"
+  },
+  {
+   "k": "t084d83cd",
+   "type": "text",
+   "tag": "p",
+   "text": "Keep taking orders, printing KOTs and bills when the internet drops. Everything syncs later.",
+   "section": "Six things owners use every day"
+  },
+  {
+   "k": "t741602d0",
+   "type": "text",
+   "tag": "p",
+   "text": "English, Hindi and Marathi",
+   "section": "Six things owners use every day"
+  },
+  {
+   "k": "t5f8aa6ec",
+   "type": "text",
+   "tag": "p",
+   "text": "Guests, waiters and the owner can switch the app to Hindi or Marathi with one tap.",
+   "section": "Six things owners use every day"
+  },
+  {
+   "k": "t14d76bc1",
+   "type": "text",
+   "tag": "p",
+   "text": "Swiggy, Zomato and sales",
+   "section": "Six things owners use every day"
+  },
+  {
+   "k": "t33962f2e",
+   "type": "text",
+   "tag": "p",
+   "text": "Type in Swiggy and Zomato orders, and see sales by day, dish and channel after commission.",
+   "section": "Six things owners use every day"
+  },
+  {
+   "k": "t88ae7e18",
+   "type": "text",
+   "tag": "a",
+   "text": "See all features",
+   "section": "Six things owners use every day"
+  },
+  {
+   "k": "t0b11b69f",
+   "type": "text",
+   "tag": "span",
+   "text": "Fewer trips for your waiters.",
+   "section": "Fewer trips for your waiters. Never stops, even without internet."
+  },
+  {
+   "k": "tb77d74d4",
+   "type": "text",
+   "tag": "span",
+   "text": "Self-order",
+   "section": "Fewer trips for your waiters. Never stops, even without internet."
+  },
+  {
+   "k": "tdd39a212",
+   "type": "text",
+   "tag": "p",
+   "text": "Turn on auto-accept and table orders go straight to the kitchen with their KOT. Turn on pay-first and guests pay by UPI before the food is made. Your waiters spend their time serving, not writing orders.",
+   "section": "Fewer trips for your waiters. Never stops, even without internet."
+  },
+  {
+   "k": "tf32d5a3b",
+   "type": "text",
+   "tag": "div",
+   "text": "Support",
+   "section": "Help when you need it"
+  },
+  {
+   "k": "td51636da",
+   "type": "text",
+   "tag": "h2",
+   "text": "Help when you need it",
+   "section": "Help when you need it"
+  },
+  {
+   "k": "td99b8227",
+   "type": "text",
+   "tag": "p",
+   "text": "Write to us any time. We reply within 2 hours, 10 AM to 7 PM, Monday to Saturday.",
+   "section": "Help when you need it"
+  },
+  {
+   "k": "te5efb051",
+   "type": "text",
+   "tag": "p",
+   "text": "Email support",
+   "section": "Help when you need it"
+  },
+  {
+   "k": "t54678d22",
+   "type": "text",
+   "tag": "p",
+   "text": "marketing@veyracreatives.com for setup, menus, printers and billing. No call centre, no waiting on hold.",
+   "section": "Help when you need it"
+  },
+  {
+   "k": "t3f847090",
+   "type": "text",
+   "tag": "p",
+   "text": "Free setup visit",
+   "section": "Help when you need it"
+  },
+  {
+   "k": "t312785a3",
+   "type": "text",
+   "tag": "p",
+   "text": "Restaurants in Navi Mumbai and Thane get a free visit: we add your menu, set up the printer and train your staff.",
+   "section": "Help when you need it"
+  },
+  {
+   "k": "t8a452551",
+   "type": "text",
+   "tag": "p",
+   "text": "Help inside the app",
+   "section": "Help when you need it"
+  },
+  {
+   "k": "t138fc08b",
+   "type": "text",
+   "tag": "p",
+   "text": "Tap Help in the admin or the waiter app to read short how-to guides or email us from where you are.",
+   "section": "Help when you need it"
   }
  ],
  "prices": {

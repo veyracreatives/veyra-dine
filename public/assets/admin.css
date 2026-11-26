@@ -549,3 +549,8 @@ button.buy small { margin-bottom: 14px; }
 @media (max-width: 400px) { .range-bar .pick { grid-template-columns: 32px minmax(0, 1fr) minmax(0, 1fr) 32px; gap: 4px; } .range-bar .pick .input { font-size: 13px; padding: 6px 4px; } .range-bar .icon-only { width: 32px; } }
 .ch-tbl .ch-n { display: none; }
 @media (max-width: 640px) { .ch-tbl .ch-n { display: block; font-size: 11px; } .ch-tbl th, .ch-tbl td { padding-left: 8px; padding-right: 8px; } }
+.top-lang { height: 38px; }
+.demo-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 28px; background: #FFF4E5; border-bottom: 1px solid #F5D9B0; color: #7A4A0E; font-weight: 600; font-size: 14.5px; }
+.demo-bar span { flex: 1; min-width: 200px; }
+@media (max-width: 760px) { .demo-bar { padding: 10px 16px; } }
+@media (max-width: 600px) { .topbar .top-lang { display: none; } }

@@ -440,3 +440,6 @@ body.has-gnav .cartbar { bottom: calc(74px + env(safe-area-inset-bottom, 0px)); 
 .add-wrap .custom { font-size: 11px; color: var(--ink-3); margin-top: 4px; font-weight: 600; }
 .line-info small.opt { display: block; color: var(--ink-2); font-weight: 600; font-size: 13px; line-height: 1.35; }
 .dish-tags { flex-wrap: wrap; }
+.ta-left { display: inline-flex; gap: 8px; align-items: center; min-width: 0; }
+.pill-lang { height: 36px; background: rgba(255,255,255,.94); border-color: transparent; box-shadow: 0 2px 10px rgba(0,0,0,.12); font-size: 13.5px; }
+.pill-lang .vd-lang { height: 34px; }

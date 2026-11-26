@@ -168,8 +168,8 @@ function publicRestaurant(r) {
     id: r.id, slug: r.slug, name: r.name, tagline: r.tagline, logo: r.logo, cover: r.cover,
     brandColor: r.brandColor, currency: r.currency, phone: r.phone, address: r.address,
     socials: r.socials || {}, acceptingOrders: r.acceptingOrders !== false && access(r).active, footerNote: r.footerNote || '',
-    poweredBy: r.poweredBy !== false,
-    guestLogin: !HUB && r.guestLogin !== false,
+    poweredBy: r.poweredBy !== false, demo: !!r.demo,
+    guestLogin: !HUB && !r.demo && r.guestLogin !== false,
     upi: r.upiId ? { id: r.upiId, name: r.upiName || r.name } : null,
     payFirst: !!(r.service && r.service.payFirst && r.upiId),
     wifi: r.wifi && r.wifi.on && r.wifi.ssid ? { ssid: r.wifi.ssid, pass: r.wifi.pass || '', open: !r.wifi.pass } : null,
@@ -291,7 +291,8 @@ async function claimShort(code, r, req) {
 }
 // Is this restaurant allowed to take orders? (trial running, or paid)
 // Search engines only list menus that are live and have a real menu (at least 5 dishes), so test and empty accounts stay out of Google
-function menuIndexable(r) { return access(r).active && !r.suspended && db.items.filter(i => i.restaurantId === r.id && !i.hidden).length >= 5; }
+// A menu is listed on Google only when the owner turns on "Show my menu on Google" (test menus stay hidden).
+function menuIndexable(r) { return r.listed === true && !r.demo && access(r).active && !r.suspended && db.items.filter(i => i.restaurantId === r.id && !i.hidden).length >= 5; }
 function access(r) {
   if (r.suspended) return { plan: 'suspended', active: false, daysLeft: 0 };
   const plan = r.plan || 'lifetime'; // restaurants made before plans existed keep working
@@ -452,7 +453,7 @@ async function seoRun(b) {
 }
 function seoState() {
   const S = seo && (seo.site(), db.config.seo); let html = '';
-  try { html = siteCache || fs.readFileSync(path.join(PUBLIC_DIR, 'site', 'index.html'), 'utf8'); } catch {}
+  try { html = (siteCache && siteCache.home) || fs.readFileSync(path.join(PUBLIC_DIR, 'site', 'index.html'), 'utf8'); } catch {}
   return { connected: { google: !!S.gsc.sa, bing: !!S.bing.key, psiKey: !!S.psi.key }, clientEmail: seo.clientEmail(), site: S.gsc.sa ? seo.site() : '', base: SITE_URL, host: SEO_HOST, verify: S.verify, check: seo.check(html, SEO_WORDS), last: seo.last(), geo: VA.geoReady() };
 }
 function hqUsers() {
@@ -462,7 +463,7 @@ function hqUsers() {
       source: ft ? { src: ft.src, ref: ft.ref, utm: ft.utm, city: ft.ct, device: ft.dv, page: ft.p, first: ft.f } : null }; }).sort((x, y) => y.createdAt - x.createdAt) };
 }
 function reminderDue(r) {
-  if (r.suspended || !r.email) return null;
+  if (r.suspended || r.demo || !r.email) return null;
   const a = access(r);
   let until, stages, kind;
   if (a.plan === 'lifetime') { until = r.updatesUntil ? r.updatesUntil + 'T23:59:59Z' : null; stages = [7, 0]; kind = 'updates'; }
@@ -527,7 +528,7 @@ function updatesUntilOf(pl) {
   const d = new Date((pl.iat || new Date().toISOString().slice(0, 10)) + 'T00:00:00Z'); d.setUTCFullYear(d.getUTCFullYear() + 1); return d.toISOString().slice(0, 10);
 }
 const BILL_DEFAULT = { width: '80', gstin: '', fssai: '', footer: 'Thank you! Please visit again.', autoKot: false, showUpi: true };
-function adminRestaurant(r) { return { ...publicRestaurant(r), platforms: platformsOf(r), hasWaiterPin: !!r.waiterPin, upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null) } : r.paidVia === 'razorpay' && r.plan !== 'trial' ? { code: null, key: '', online: true, to: r.name, at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.plan === 'lifetime' ? null : r.paidUntil ? r.paidUntil.slice(0, 10) : null) } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}), service: Object.assign({ autoAccept: false, payFirst: false }, r.service || {}), loyaltyCfg: Object.assign({}, LOYALTY_DEFAULT, r.loyalty || {}), wifiCfg: Object.assign({ on: false, ssid: '', pass: '' }, r.wifi || {}), gamesCfg: Object.assign({}, GAMES_DEFAULT, r.games || {}), displayCfg: displayCfg(r), kitchenCfg: kitchenCfg(r) }; }
+function adminRestaurant(r) { return { ...publicRestaurant(r), listed: r.listed === true, platforms: platformsOf(r), hasWaiterPin: !!r.waiterPin, upiId: r.upiId || '', upiName: r.upiName || '', email: r.email || '', ownerName: r.ownerName || '', access: access(r), license: r.licenseKey ? { code: r.licenseCode || null, key: r.licenseKey, to: r.licensedTo || '', at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.licenseKey && verifyKey(r.licenseKey).ok ? updatesUntilOf(verifyKey(r.licenseKey).payload) : null) } : r.paidVia === 'razorpay' && r.plan !== 'trial' ? { code: null, key: '', online: true, to: r.name, at: r.activatedAt || null, updatesUntil: r.updatesUntil || (r.plan === 'lifetime' ? null : r.paidUntil ? r.paidUntil.slice(0, 10) : null) } : null, bill: Object.assign({}, BILL_DEFAULT, r.bill || {}), service: Object.assign({ autoAccept: false, payFirst: false }, r.service || {}), loyaltyCfg: Object.assign({}, LOYALTY_DEFAULT, r.loyalty || {}), wifiCfg: Object.assign({ on: false, ssid: '', pass: '' }, r.wifi || {}), gamesCfg: Object.assign({}, GAMES_DEFAULT, r.games || {}), displayCfg: displayCfg(r), kitchenCfg: kitchenCfg(r) }; }
 function newRestaurant({ name, slug, password, email, ownerName, phone, plan = 'trial' }) {
   let s = slugify(slug || name), n = 2;
   while (db.restaurants.some(r => r.slug === s)) s = slugify(slug || name) + '-' + n++;
@@ -552,7 +553,7 @@ function emit(rid, type, data) {
 }
 // Kitchen online: the admin (counter laptop or phone) pings every 30 s while it is open. Guests see this on the menu.
 const adminSeen = new Map(); // restaurantId -> last admin request time
-const kitchenOnline = r => Date.now() - (adminSeen.get(r.id) || 0) < 90000 || !!(streams.get(r.id) && streams.get(r.id).size && Date.now() - (adminSeen.get(r.id) || 0) < 180000);
+const kitchenOnline = r => !!r.demo || Date.now() - (adminSeen.get(r.id) || 0) < 90000 || !!(streams.get(r.id) && streams.get(r.id).size && Date.now() - (adminSeen.get(r.id) || 0) < 180000);
 const orderStreams = new Map(); // orderId -> Set(res)
 function emitOrder(order) {
   const set = orderStreams.get(order.id); if (!set) return;
@@ -915,6 +916,74 @@ function saveImage(dataUrl) {
   return '/uploads/' + name;
 }
 
+
+// ---------- public demo (/demo) ----------
+// "The Masala Table": anyone can order from its menu, open its admin (view only), the waiter app and the kitchen screen.
+// It is rebuilt every day, so orders people place there are cleared. Not made in the Windows app or WiFi backup.
+const { fillDemo } = require('./lib/demo');
+const DEMO_ON = !HUB && !process.versions.electron && process.env.PUBLIC_DEMO !== '0';
+const demoR = () => db.restaurants.find(r => r.demo);
+function ensureDemo(force) {
+  if (!DEMO_ON) return null;
+  let r = demoR();
+  if (!r) {
+    r = newRestaurant({ name: 'The Masala Table', slug: 'demo', password: id(24), email: '', ownerName: 'Demo', plan: 'lifetime' });
+    Object.assign(r, { demo: true, tagline: 'Demo restaurant · try ordering, nothing is cooked', brandColor: '#C2410C', address: 'Vashi, Navi Mumbai',
+      footerNote: 'This is a demo of Veyra Dine In. Orders here are not real and are cleared every day.', guestLogin: false, socials: {},
+      games: { on: true, reward: 'Free dessert (demo)' }, kitchen: { ...KITCHEN_DEFAULT, on: true, key: crypto.randomBytes(12).toString('base64url') } });
+  }
+  const tooBusy = db.orders.filter(o => o.restaurantId === r.id && ['new', 'preparing', 'ready'].includes(o.status)).length > 60;
+  if (force || tooBusy || !r.demoBuilt || Date.now() - Date.parse(r.demoBuilt) > DAY) {
+    fillDemo(r, { db, id, uploadDir: UPLOAD_DIR });
+    r.waiterPin = hashPassword('1234'); r.demoBuilt = now(); r.acceptingOrders = true; save();
+    console.log('[demo] public demo rebuilt');
+  }
+  return r;
+}
+if (DEMO_ON) { setTimeout(() => { try { ensureDemo(); } catch (e) { console.log('[demo]', e.message); } }, 3000).unref(); setInterval(() => { try { ensureDemo(); } catch (e) {} }, 60 * 60 * 1000).unref(); }
+// The demo admin is view only. These still work, so people can see an order go from the table to the kitchen:
+const DEMO_OK = [['POST', /^\/api\/admin\/ping$/], ['POST', /^\/api\/admin\/orders$/], ['PATCH', /^\/api\/admin\/orders\/[A-Za-z0-9]+$/], ['PATCH', /^\/api\/admin\/requests\/[A-Za-z0-9]+$/], ['POST', /^\/api\/admin\/tables\/[A-Za-z0-9]+\/(settle|payment)$/], ['PUT', /^\/api\/admin\/settings$/]];
+const DEMO_SETTINGS = ['lang']; // in the demo, Settings can only change the language
+function demoPage(r, base) {
+  const t = db.tables.filter(x => x.restaurantId === r.id).sort((a, b) => a.sort - b.sort)[2];
+  const card = (href, ic, title, text, cta) => `<a class="c" href="${href}"><span class="i">${ic}</span><b>${title}</b><span>${text}</span><em>${cta} →</em></a>`;
+  return `<!doctype html><html lang="en-IN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Try the demo · Veyra Dine In</title><meta name="description" content="Try Veyra Dine In free, no sign-up: order from a demo restaurant's QR menu, then see the order on the owner's screen, the waiter app and the kitchen screen."><link rel="canonical" href="${base}/demo">
+<meta property="og:title" content="Try the demo · Veyra Dine In"><meta property="og:image" content="${base}/og.jpg">
+<link rel="icon" href="/favicon-32.png"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap"><style>
+:root{--cream:#FBF6EE;--ink:#1B1714;--ink-2:#5B524A;--line:#E6DCCB;--brand:#E4572E}
+*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font:16px/1.6 "Plus Jakarta Sans",system-ui,sans-serif}
+header,main,footer{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:20px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;color:var(--ink);text-decoration:none}.logo img{width:34px;height:34px;border-radius:9px}
+header nav{display:flex;gap:16px;flex-wrap:wrap}header nav a{color:var(--ink-2);font-weight:600;text-decoration:none;font-size:15px}
+h1{font-family:Fraunces,Georgia,serif;font-size:clamp(34px,6vw,54px);line-height:1.08;margin:28px 0 10px}
+.lead{color:var(--ink-2);font-size:18px;max-width:640px;margin:0 0 30px}
+.g{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.c{display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;color:inherit;text-decoration:none;transition:transform .2s,box-shadow .2s}
+.c:hover{transform:translateY(-3px);box-shadow:0 18px 36px -18px rgba(27,23,20,.3)}
+.c .i{width:46px;height:46px;border-radius:14px;background:var(--ink);color:#fff;display:grid;place-items:center;margin-bottom:6px}
+.c:first-child .i{background:var(--brand)}.c b{font-size:19px}.c span:not(.i){color:var(--ink-2)}.c em{font-style:normal;font-weight:700;color:#C2410C;margin-top:auto;padding-top:8px}
+.tip{background:#fff;border:1px dashed var(--line);border-radius:16px;padding:14px 18px;margin:22px 0 0;color:var(--ink-2);font-size:15px}
+.cta{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:34px 0 0}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 24px;border-radius:999px;font-weight:700;text-decoration:none;background:var(--brand);color:#fff}
+.btn.l{background:transparent;color:var(--ink);border:1.5px solid var(--ink)}
+footer{border-top:1px solid var(--line);margin-top:50px;padding-block:24px 40px;color:var(--ink-2);font-size:14px}footer a{color:var(--ink-2);margin-right:16px}
+@media (max-width:700px){.g{grid-template-columns:1fr}header nav a.h{display:none}.lead{font-size:16.5px}.btn{width:100%}}
+</style></head><body>
+<header><a class="logo" href="/"><img src="/icon-180.png" alt="">Veyra Dine In</a><nav><a class="h" href="/features">Features</a><a class="h" href="/#pricing">Pricing</a><a href="/signup">Start free</a></nav></header>
+<main><h1>Try Veyra Dine In</h1><p class="lead">A demo restaurant, The Masala Table, is open for you. Place an order from a table, then watch it arrive on the owner's screen, the waiter app and the kitchen screen. No sign-up needed.</p>
+<div class="g">
+${card(`/m/${r.slug}?t=${t ? t.token : ''}`, '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4"/></svg>', '1. Order as a guest', 'Open the menu of Table 3, like a guest who scanned the QR. Pick a dish, choose the spice level and send the order.', 'Open the menu')}
+${card('/demo/admin', '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>', "2. See the owner's screen", 'Live orders, tables, menu, bills and sales reports. You can accept orders and mark them ready. Other changes are off in the demo.', 'Open the admin')}
+${card('/demo/waiter', '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>', '3. Try the waiter app', 'What your waiters see on their phones: every table, calls from guests, and taking an order in a few taps.', 'Open the waiter app')}
+${card('/demo/kitchen', '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 13.9A4 4 0 0 1 7 6a5 5 0 0 1 10 0 4 4 0 0 1 1 7.9V20H6z"/><path d="M6 17h12"/></svg>', '4. Open the kitchen screen', 'Orders as big tickets with timers and a bell, for a TV or tablet in the kitchen. Tap Ready when food is done.', 'Open the kitchen screen')}
+</div>
+<p class="tip">Tip: open the menu on your phone and the admin on a computer to see orders arrive live. The app is also in Hindi and Marathi: tap the language button. Demo orders are cleared every day.</p>
+<div class="cta"><a class="btn" href="/signup">Start free for 10 days</a><a class="btn l" href="mailto:marketing@veyracreatives.com?subject=Free%20setup%20visit%20for%20my%20restaurant">Ask for a free setup visit</a></div>
+</main><footer><a href="/">Home</a><a href="/features">Features</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><br><br>© 2026 Veyra Creative &amp; Digital Lab</footer><script src="/assets/t.js" defer></script></body></html>`;
+}
+
 // ---------- auth guards ----------
 function adminOf(req) {
   const v = unsign(cookies(req).vd_admin);
@@ -942,12 +1011,27 @@ async function handle(req, res) {
   // ---- pages ----
   // product website (landing page) at the root; restaurants use /admin and /signup
   const SITE_DIR = path.join(PUBLIC_DIR, 'site');
-  if (m === 'GET' && (p === '/' || p === '/index.html')) {
-    // picture links carry ?v=<file time>, so browsers fetch a picture again as soon as it changes on an update
-    if (!siteCache) { const stockFile = path.join(SITE_DIR, 'content.json'), raw = fs.readFileSync(path.join(SITE_DIR, 'index.html'), 'utf8'); siteCache = withTracking(db.siteContent ? siteContent.render(raw, db.siteContent, fs.existsSync(stockFile) ? JSON.parse(fs.readFileSync(stockFile, 'utf8')) : null) : raw); siteCache = siteCache.replace(/(src|content|href)="((?:https:\/\/[^"\/]+)?\/?(?:img\/[A-Za-z0-9._-]+|og\.jpg))"/g, (m, a, u) => { try { const f = path.join(SITE_DIR, u.replace(/^https:\/\/[^\/]+/, '').replace(/^\//, '')); return a + '="' + u + '?v=' + Math.round(fs.statSync(f).mtimeMs).toString(36) + '"'; } catch (e) { return m; } }); }
-    const etag = '"' + crypto.createHash('sha1').update(siteCache).digest('base64url').slice(0, 20) + '"';
+  // The home page is short (hero, 3 steps, 6 key features, pricing, help, FAQ); /features has the long sections.
+  // Both come from the same index.html, so HQ edits apply to both: <!--HOME-->, <!--MORE--> and <!--FEAT--> mark the parts.
+  if (m === 'GET' && (p === '/' || p === '/index.html' || p === '/features' || p === '/features/')) {
+    const page = p.startsWith('/features') ? 'features' : 'home';
+    siteCache = siteCache || {};
+    if (!siteCache[page]) {
+      const stockFile = path.join(SITE_DIR, 'content.json'); let raw = fs.readFileSync(path.join(SITE_DIR, 'index.html'), 'utf8');
+      raw = page === 'home' ? raw.replace(/<!--(MORE|FEAT)-->[\s\S]*?<!--\/\1-->\n?/g, '') : raw.replace(/<!--HOME-->[\s\S]*?<!--\/HOME-->\n?/g, '');
+      if (page === 'features') {
+        const t = 'All features: waiter app, QR ordering, kitchen screen | Veyra Dine In', d = 'Everything in Veyra Dine In: waiter app, QR code ordering, KOT and kitchen screen, counter display, split bills by UPI, offline mode, loyalty, games and Hindi and Marathi.';
+        raw = raw.replace(/<title>[^<]*<\/title>/, `<title>${t}</title>`).replace(/(<meta (?:name|property)="(?:og:|twitter:)?title" content=")[^"]*"/g, `$1${t}"`).replace(/(<meta (?:name|property)="(?:og:|twitter:)?description" content=")[^"]*"/g, `$1${d}"`)
+          .replace('<link rel="canonical" href="https://dinein.veyracreatives.com/">', '<link rel="canonical" href="https://dinein.veyracreatives.com/features">').replace('<meta property="og:url" content="https://dinein.veyracreatives.com/">', '<meta property="og:url" content="https://dinein.veyracreatives.com/features">')
+          .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>\n?/, '');
+      }
+      let html = withTracking(db.siteContent ? siteContent.render(raw, db.siteContent, fs.existsSync(stockFile) ? JSON.parse(fs.readFileSync(stockFile, 'utf8')) : null) : raw);
+      // picture links carry ?v=<file time>, so browsers fetch a picture again as soon as it changes on an update
+      siteCache[page] = html.replace(/(src|content|href)="((?:https:\/\/[^"\/]+)?\/?(?:img\/[A-Za-z0-9._-]+|og\.jpg))"/g, (m, a, u) => { try { const f = path.join(SITE_DIR, u.replace(/^https:\/\/[^\/]+/, '').replace(/^\//, '')); return a + '="' + u + '?v=' + Math.round(fs.statSync(f).mtimeMs).toString(36) + '"'; } catch (e) { return m; } });
+    }
+    const body = siteCache[page], etag = '"' + crypto.createHash('sha1').update(body).digest('base64url').slice(0, 20) + '"';
     if (req.headers['if-none-match'] === etag) { res.writeHead(304, { ETag: etag, 'Cache-Control': 'no-cache' }); return res.end(); } // browsers and crawlers that already have the page get a tiny 304
-    return send(res, 200, siteCache, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', ETag: etag });
+    return send(res, 200, body, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', ETag: etag });
   }
   if (m === 'GET' && /^\/(privacy|terms|refund|contact)\/?$/.test(p)) return send(res, 200, withTracking(fs.readFileSync(path.join(SITE_DIR, p.replace(/\//g, ''), 'index.html'), 'utf8')), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
   if (m === 'POST' && p === '/api/va') { if (TRACK) { try { VA.track(req, await readBody(req, 30000)); } catch {} } res.writeHead(204, { 'Cache-Control': 'no-store' }); return res.end(); }
@@ -972,7 +1056,7 @@ async function handle(req, res) {
     icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }],
   }), { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'no-cache' });
   if (m === 'GET' && p === '/admin-sw.js') return send(res, 200, `// Veyra Dine In admin: shows order pop-ups and an offline page. It never stores orders or menus.
-const C = 'vd-admin-v3', SHELL = ['/admin', '/assets/base.css', '/assets/admin.css', '/assets/shell.css', '/assets/admin.js', '/assets/icons.js', '/assets/opts.js', '/assets/google.js', '/icon-192.png', '/favicon-32.png'];
+const C = 'vd-admin-v4', SHELL = ['/admin', '/assets/base.css', '/assets/admin.css', '/assets/shell.css', '/assets/admin.js', '/assets/icons.js', '/assets/opts.js', '/assets/i18n.js', '/assets/google.js', '/icon-192.png', '/favicon-32.png'];
 self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(C).then(c => Promise.all(SHELL.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => {}))))); });
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x.startsWith('vd-admin') && x !== C).map(x => caches.delete(x)))).then(() => self.clients.claim())));
 // Network first, so updates show straight away. Without internet the admin still opens from the saved copy.
@@ -995,7 +1079,7 @@ self.addEventListener('notificationclick', e => {
   if (m === 'GET' && /^\/m\/[a-z0-9-]+\/?$/.test(p)) return serveMenuPage(req, res, url, p.split('/')[2]);
   if (m === 'GET' && p === '/robots.txt') return send(res, 200, `User-agent: *\nDisallow: /admin\nDisallow: /platform\nDisallow: /api/\nDisallow: /print-qr\nDisallow: /display/\nDisallow: /kitchen/\nAllow: /m/\n\nSitemap: ${baseUrl(req)}/sitemap.xml\n`, { 'Content-Type': 'text/plain; charset=utf-8' });
   if (m === 'GET' && p === '/sitemap.xml') { const b = baseUrl(req), d = new Date().toISOString().slice(0, 10), u = (loc, freq, pri) => `  <url><loc>${b}${loc}</loc><lastmod>${d}</lastmod><changefreq>${freq}</changefreq><priority>${pri}</priority></url>`;
-    return send(res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[u('/', 'weekly', '1.0'), u('/signup', 'monthly', '0.8'), ...['contact', 'privacy', 'terms', 'refund'].map(x => u('/' + x, 'yearly', '0.3')), ...db.restaurants.filter(menuIndexable).map(r => u('/m/' + r.slug, 'weekly', '0.6'))].join('\n')}\n</urlset>\n`, { 'Content-Type': 'application/xml; charset=utf-8' }); }
+    return send(res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[u('/', 'weekly', '1.0'), u('/features', 'weekly', '0.9'), u('/demo', 'monthly', '0.8'), u('/signup', 'monthly', '0.8'), ...['contact', 'privacy', 'terms', 'refund'].map(x => u('/' + x, 'yearly', '0.3')), ...db.restaurants.filter(menuIndexable).map(r => u('/m/' + r.slug, 'weekly', '0.6'))].join('\n')}\n</urlset>\n`, { 'Content-Type': 'application/xml; charset=utf-8' }); }
   if (m === 'GET' && p === '/admin/google-link') {
     const cid = googleClientId(req);
     return send(res, 200, `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in to Veyra Dine In</title>
@@ -1020,6 +1104,14 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     return send(res, 200, withTracking(h), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
   }
   if (m === 'GET' && p !== '/admin/google-link' && /^\/admin(\/[a-z0-9-]+)?\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'admin.html'));
+  if (m === 'GET' && /^\/demo(\/(admin|waiter|kitchen))?\/?$/.test(p)) {
+    const r = ensureDemo(); if (!r) return fail(res, 404, 'Not found');
+    const part = p.split('/')[2];
+    if (!part) return send(res, 200, withTracking(demoPage(r, baseUrl(req))), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+    if (part === 'admin') { setCookie(res, 'vd_admin', sign(r.id + '|' + (r.sessionVer || 0))); res.writeHead(302, { Location: '/admin' }); return res.end(); }
+    if (part === 'waiter') { setCookie(res, 'vd_waiter', sign(['w', r.id, r.waiterVer || 0, 'Demo waiter'].join('|'))); res.writeHead(302, { Location: '/waiter/' + r.slug }); return res.end(); }
+    res.writeHead(302, { Location: '/kitchen/' + r.slug + '?k=' + ((r.kitchen && r.kitchen.key) || '') }); return res.end();
+  }
   if (m === 'GET' && /^\/waiter(\/[a-z0-9-]+)?\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'waiter.html'));
   if (m === 'GET' && /^\/display\/[a-z0-9-]+\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'display.html'));
   if (m === 'GET' && /^\/kitchen\/[a-z0-9-]+\/?$/.test(p)) return serveFile(res, path.join(PUBLIC_DIR, 'kitchen.html'));
@@ -1249,7 +1341,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     return fail(res, 404, 'Not found');
   }
   if (m === 'GET' && p === '/api/public/top-scores') { // live "Top players" on the Veyra Dine In website: names, restaurant and score only
-    const on = new Map(db.restaurants.filter(gamesOn).map(r => [r.id, r]));
+    const on = new Map(db.restaurants.filter(r => gamesOn(r) && !r.demo).map(r => [r.id, r]));
     const wk = weekKey(); let list = (db.scores || []).filter(x => on.has(x.restaurantId) && !x.hidden);
     const week = list.filter(x => x.week === wk);
     const pick = l => { const best = new Map(); for (const x of l) { const k = x.restaurantId + '|' + x.game + '|' + x.name.toLowerCase(); const b = best.get(k); if (!b || x.score > b.score) best.set(k, x); } return [...best.values()].sort((a, b) => b.score / GAME_RULES[b.game].max - a.score / GAME_RULES[a.game].max).slice(0, 10); };
@@ -1647,6 +1739,8 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
     if (r && want && r.slug !== want) r = null;
     if (!r) { waiter = waiterOf(req); if (waiter && want && waiter.r.slug !== want) waiter = null; if (waiter && WAITER_OK.some(([mm, rx]) => mm === m && rx.test(p))) r = waiter.r; }
     if (!r) return fail(res, 401, 'Please log in');
+    if (r.demo && m !== 'GET' && (!DEMO_OK.some(([mm, rx]) => mm === m && rx.test(p)) || (m === 'PUT' && Object.keys(body || {}).some(k => !DEMO_SETTINGS.includes(k)))))
+      return fail(res, 403, 'This is the demo, so changes are turned off. Start your free trial to set up your own restaurant.');
     adminSeen.set(r.id, Date.now()); // any staff request means someone is at work, so guests see "Kitchen online"
     if (m === 'GET' && p === '/api/admin/waiter/me') {
       const tables = db.tables.filter(t => t.restaurantId === r.id && t.active !== false).sort((a, b) => a.sort - b.sort).map(t => ({ id: t.id, name: t.name }));
@@ -2115,6 +2209,7 @@ google.accounts.id.renderButton(document.getElementById('g'),{theme:'outline',si
         if (body.brandColor && /^#[0-9a-fA-F]{6}$/.test(body.brandColor)) r.brandColor = body.brandColor;
         if (body.acceptingOrders != null) r.acceptingOrders = !!body.acceptingOrders;
         if (body.guestLogin != null) r.guestLogin = !!body.guestLogin;
+        if (body.listed != null) r.listed = !!body.listed;
         if (body.logo !== undefined) r.logo = body.logo && body.logo.startsWith('data:') ? saveImage(body.logo) : str(body.logo, 300);
         if (body.cover !== undefined) r.cover = body.cover && body.cover.startsWith('data:') ? saveImage(body.cover) : str(body.cover, 300);
         if (body.upiId !== undefined) {

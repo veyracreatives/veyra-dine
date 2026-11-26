@@ -114,3 +114,4 @@ body { background: var(--bg); }
 .w-vs { flex-basis: 100%; display: grid; gap: 8px; padding-left: 26px; }
 .w-v { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--brand-soft); border-radius: 12px; padding: 6px 6px 6px 12px; }
 .w-v span { min-width: 0; font-weight: 700; font-size: 14px; overflow-wrap: anywhere; } .w-v small { display: block; color: var(--ink-3); font-weight: 600; font-size: 12px; }
+.w-brand .login-lang { margin-left: auto; }

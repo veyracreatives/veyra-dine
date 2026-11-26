@@ -100,7 +100,7 @@
         <h1>Orders from every table, <em>right here.</em></h1><p>Guests scan the QR on their table and order from their phone. You see it here with the table number and a sound.</p>
         <ul class="ticks"><li>${icon('check', 20)} 10 days free, every feature</li><li>${icon('check', 20)} No card needed</li><li>${icon('check', 20)} Your menu stays saved when you buy</li></ul>
         <div class="foot">Made by Veyra Creative &amp; Digital Lab · Navi Mumbai</div></div>
-      <div class="form-side"><div class="form-card">
+      <div class="form-side"><div class="form-card">${window.VDI18n ? `<div class="auth-lang">${VDI18n.picker()}</div>` : ''}
         <div class="tabs2"><button class="${mode === 'signup' ? 'on' : ''}" data-mode="signup">Start free trial</button><button class="${mode === 'login' ? 'on' : ''}" data-mode="login">Log in</button></div>
         ${mode === 'signup' ? `<form id="sf">
           <span class="trial-chip">${icon('check', 15)} 10-day free trial</span><h2>Create your restaurant</h2><p class="muted">Takes one minute. You can change everything later.</p>
@@ -423,11 +423,12 @@
         <div class="brand-row"><div class="lg">${r.logo ? `<img src="${esc(r.logo)}" alt="">` : esc(r.name[0])}</div><div><b>${esc(r.name)}</b><small>Admin panel</small></div></div>
         ${TABS.map(([k, l, ic]) => `<button class="nav ${S.tab === k ? 'on' : ''}" data-tab="${k}">${icon(ic, 20)} ${l}${k === 'orders' && n ? `<span class="count">${n}</span>` : ''}</button>`).join('')}
         <div class="spacer"></div>
+        <button class="nav" type="button" onclick="VDHelp.open('admin')">${icon('info', 20)} Help</button>
         <a class="nav" href="/m/${r.slug}" target="_blank">${icon('eye', 20)} View customer menu</a>
         <button class="nav" id="logout">${icon('logout', 20)} Log out</button>
         <div class="foot">Veyra Dine In</div>
       </aside>
-      <div class="main">${trialBar()}
+      <div class="main">${r.demo ? `<div class="demo-bar">${icon('eye', 18)}<span>Demo restaurant: view only. Orders here are not real.</span><a class="btn btn-primary btn-sm" href="/signup">Start your free trial</a></div>` : trialBar()}
         <div class="topbar">
           <h1>${TABS.find(t => t[0] === S.tab)[1]}</h1>
           ${S.tab === 'orders' ? '' : `<button class="btn btn-primary btn-sm top-take" id="takeTop" title="Take an order for a table or the counter">${icon('plus', 18)}<span>Take order</span></button>`}
@@ -435,6 +436,7 @@
           <label class="live-pill switch" title="When off, customers can still see the menu but can't order">
             <input type="checkbox" id="accepting" ${r.acceptingOrders ? 'checked' : ''}><span class="track"></span><span id="accLabel">${r.acceptingOrders ? 'Taking orders' : 'Orders paused'}</span>
           </label>
+          ${window.VDI18n ? VDI18n.picker('top-lang') : ''}<button class="icon-btn top-help" type="button" title="Help" onclick="VDHelp.open('admin')">${icon('info', 20)}</button>
           <button class="icon-btn" id="soundBtn" title="${S.sound ? 'Sound alerts on' : 'Sound alerts off'}">${icon(S.sound ? 'sound' : 'mute', 20)}</button>
         </div>
         <div class="content" id="content"></div>
@@ -1369,6 +1371,9 @@
         <label class="field"><span>Name shown in the UPI app</span><input class="input" name="upiName" placeholder="${esc(r.name)}" value="${esc(r.upiName || '')}"></label>
         <button class="btn btn-primary" style="justify-self:start">Save UPI details</button>
       </div></form>
+      <div class="panel" id="lpan"><div class="panel-head"><div><h2>Show my menu on Google</h2><span class="muted" style="font-size:14px">When on, your menu page can appear in Google search, so people find your dishes and prices. Turn it on once your menu has real dishes and photos.</span></div></div><div class="panel-body form">
+        <label class="switch"><input type="checkbox" id="listed" ${r.listed ? 'checked' : ''}><span class="track"></span>List my menu on Google</label>
+      </div></div>
       <div class="panel" id="gpan"><div class="panel-head"><div><h2>Guest log in</h2><span class="muted" style="font-size:14px">Guests log in with their mobile number or email and a password before they send an order. You get a list of your regular customers.</span></div></div><div class="panel-body form">
         <label class="switch"><input type="checkbox" id="glog" ${r.guestLogin !== false ? 'checked' : ''}><span class="track"></span>Guests must log in before ordering</label>
         <div id="glist"><div class="muted">Loading guests…</div></div>
@@ -1453,6 +1458,7 @@
       bf.onsubmit = async e => { e.preventDefault(); try { await saveBill(); toast(`${icon('check', 18)} Printer settings saved`, 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
       document.getElementById('testp').onclick = async () => { try { await saveBill(); await printTestBill(); } catch (err) { toast(esc(err.message), 'error'); } };
     }
+    document.getElementById('listed').onchange = async e => { try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { listed: e.target.checked } }); toast(e.target.checked ? 'Your menu can now show up on Google' : 'Your menu is hidden from Google', 'ok'); } catch (err) { e.target.checked = !e.target.checked; toast(err.message, 'err'); } };
     document.getElementById('glog').onchange = async e => { try { S.me.restaurant = await api('/api/admin/settings', { method: 'PUT', body: { guestLogin: e.target.checked } }); toast(e.target.checked ? 'Guests now log in before ordering' : 'Guests can order without logging in', 'ok'); } catch (err) { toast(esc(err.message), 'error'); } };
     loadGuests();
     document.getElementById('lo').onclick = async () => { await api('/api/admin/logout', { method: 'POST' }); renderLogin(); };

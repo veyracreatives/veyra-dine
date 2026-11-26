@@ -811,6 +811,9 @@ C.demo = (env, now) => {
   post(ac, ctxOf('Farhan Shaikh'), { ico: 'check', title: 'U-10 Kickers marked', sub: 'This morning · by Farhan Shaikh', aud: { roles: ['admin', 'manager'] }, href: { admin: 'attendance', manager: 'attendance' } });
   ac.queue.forEach(q => { const p = pm_(q.pid); ac.feed.unshift({ id: C.id('f'), at: q.at, by: p.parentName, ico: 'upi', title: `UPI payment from ${p.parentName}`, sub: `₹${q.amt.toLocaleString('en-IN')} for ${p.name} · ID ${q.utr}`, href: { admin: 'fees' }, aud: { roles: ['admin'] } }); });
   ac.feed.unshift({ id: C.id('f'), at: now - 2 * 3600e3, by: 'Arjun Nair', ico: 'star', title: 'New progress card for Aarav Patil', sub: 'From Farhan Shaikh', href: { parent: 'progress' }, aud: { pids: ['p1'] } });
+  // one player on a break this month and one paid leave day, so the demo shows both
+  { const m = today.slice(0, 7); const pb = ac.players.find(p => !(p.fees[m] && p.fees[m].st === 'paid') && !ac.queue.some(q => q.pid === p.id)); if (pb) { pb.breaks = [{ from: m, to: m, why: 'School exams', by: 'Kickstart admin', at: now }]; delete pb.fees[m]; }
+    const lv = T.add(today, -3); const co = ac.staff.find(s => s.role === 'coach' && s.pay && s.pay.type === 'month'); if (co && lv.slice(0, 7) === m) { (ac.staffAtt[lv] = ac.staffAtt[lv] || {})[co.id] = { s: 'H', paid: true, why: 'Family function', by: 'Kickstart admin' }; } }
   ac.feed.sort((a, b) => b.at - a.at);
   return ac;
 };

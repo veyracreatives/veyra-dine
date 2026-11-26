@@ -52,3 +52,30 @@
   const logo = (cls) => '<svg viewBox="0 0 40 40" class="'+(cls||'mk')+'" aria-hidden="true"><rect width="40" height="40" rx="11" style="fill:var(--brand)"/><path d="M20 8.5 29.6 15.3 26 26.6H14L10.4 15.3z" fill="none" style="stroke:var(--brand-ink)" stroke-width="2.4" stroke-linejoin="round"/><path d="m15.6 15.4 4.4 9.6 4.4-9.6" fill="none" style="stroke:var(--brand-ink)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 26.6V31.5M29.6 15.3l3.4-1.4M10.4 15.3 7 13.9" style="stroke:var(--brand-ink)" stroke-width="2.4" stroke-linecap="round"/></svg>';
   return { ic, logo };
 })();
+
+/* PW-EYE: adds a show/hide eye button to every password box, including ones drawn later. */
+(function () {
+  if (typeof document === 'undefined' || window.__pwEye) return; window.__pwEye = 1;
+  var EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.9 8.4 2 12 2 12s3.6 7 10 7c1.8 0 3.4-.5 4.8-1.3"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+  var st = document.createElement('style');
+  st.textContent = '.pw-wrap{position:relative;display:block;min-width:0}.pw-wrap>input{width:100%;padding-right:48px!important;box-sizing:border-box}.pw-wrap>input::-ms-reveal{display:none}'
+    + '.pw-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;max-height:calc(100% - 4px);display:flex;align-items:center;justify-content:center;border:0;margin:0;padding:0;background:transparent;color:inherit;opacity:.6;cursor:pointer;border-radius:8px;-webkit-tap-highlight-color:transparent}'
+    + '.pw-eye:hover,.pw-eye[aria-pressed=true]{opacity:1}.pw-eye:focus-visible{outline:2px solid currentColor;outline-offset:-2px;opacity:1}.pw-eye svg{width:20px;height:20px;pointer-events:none}';
+  (document.head || document.documentElement).appendChild(st);
+  function mark(b, shown) { b.innerHTML = shown ? OFF : EYE; var t = shown ? 'Hide password' : 'Show password'; b.setAttribute('aria-label', t); b.title = t; b.setAttribute('aria-pressed', shown ? 'true' : 'false'); }
+  function add(i) {
+    if (i.__pwEye || !i.parentNode || (i.parentNode.classList && i.parentNode.classList.contains('pw-wrap'))) return; i.__pwEye = 1;
+    var cs = getComputedStyle(i), w = document.createElement('span'); w.className = 'pw-wrap';
+    if (cs.flexGrow !== '0') w.style.flex = cs.flex; if (i.style.width) { w.style.width = i.style.width; i.style.width = '100%'; } if (i.style.maxWidth) w.style.maxWidth = i.style.maxWidth;
+    if (cs.gridColumn && cs.gridColumn !== 'auto' && cs.gridColumn !== 'auto / auto') w.style.gridColumn = cs.gridColumn;
+    i.parentNode.insertBefore(w, i); w.appendChild(i);
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'pw-eye'; b.setAttribute('aria-controls', i.id || ''); if (!i.id) b.removeAttribute('aria-controls'); mark(b, false);
+    b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    b.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); var show = i.type === 'password'; var a = i.selectionStart, z = i.selectionEnd; i.type = show ? 'text' : 'password'; mark(b, show); try { i.focus({ preventScroll: true }); if (a != null) i.setSelectionRange(a, z); } catch (_) {} });
+    w.appendChild(b);
+  }
+  function scan(root) { if (!root || !root.querySelectorAll) return; if (root.matches && root.matches('input[type=password]')) add(root); var l = root.querySelectorAll('input[type=password]'); for (var k = 0; k < l.length; k++) add(l[k]); }
+  function start() { scan(document.body); new MutationObserver(function (ms) { for (var m = 0; m < ms.length; m++) for (var n = 0; n < ms[m].addedNodes.length; n++) scan(ms[m].addedNodes[n]); }).observe(document.body, { childList: true, subtree: true }); }
+  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+})();

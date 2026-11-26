@@ -137,18 +137,20 @@ namespace VeyraNC
             {
                 dynamic sh = Shell();
                 dynamic f = Resolve(sh, folder);
-                // NC Explorer leaves FolderItem.Size empty, so read the Details columns instead.
+                // The driver can fill folders lazily: retry a few times if it comes back empty.
+                dynamic items = f.Items();
+                for (int r = 0; r < 4 && items.Count == 0; r++) { Pump(700); f = Resolve(Shell(), folder); items = f.Items(); }
+                // Sizes: FolderItem.Size is empty with this driver, so use the Details columns (read AFTER listing).
                 int sizeCol = -1, dateCol = -1;
-                for (int c = 0; c < 40; c++)
+                for (int c = 0; c < 20 && items.Count > 0; c++)
                 {
                     string h = "";
-                    try { h = (string)f.GetDetailsOf(null, c); } catch { }
+                    try { h = (string)f.GetDetailsOf(null, c); } catch { break; }
                     if (string.IsNullOrEmpty(h)) continue;
                     string hl = h.ToLowerInvariant();
                     if (sizeCol < 0 && hl.Contains("size")) sizeCol = c;
                     if (dateCol < 0 && (hl.Contains("modified") || hl.Contains("update") || hl == "date")) dateCol = c;
                 }
-                dynamic items = f.Items();
                 for (int i = 0; i < items.Count; i++)
                 {
                     dynamic it = items.Item(i);

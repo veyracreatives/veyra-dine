@@ -185,7 +185,7 @@
         card.querySelector('#gback').onclick = e => { e.preventDefault(); renderLogin(mode); };
         card.querySelector('#gsf').onsubmit = async e => {
           e.preventDefault(); const f = new FormData(e.target), btn = e.submitter; if (btn) btn.disabled = true;
-          try { afterLogin(await api('/api/admin/google', { method: 'POST', body: { credential, name: f.get('name'), phone: f.get('phone') } }), true); }
+          try { afterLogin(await api('/api/admin/google', { method: 'POST', body: { vid: (window.VA && VA.vid ? VA.vid() : ''), credential, name: f.get('name'), phone: f.get('phone') } }), true); }
           catch (err) { toast(esc(err.message), 'error'); if (btn) btn.disabled = false; }
         };
       } catch (err) { toast(esc(err.message), 'error'); }
@@ -193,13 +193,13 @@
     const lf = document.getElementById('lf');
     if (lf) lf.onsubmit = async e => {
       e.preventDefault(); const f = new FormData(e.target);
-      try { const r = await api('/api/admin/login', { method: 'POST', body: { slug: f.get('slug'), password: f.get('password') } }); localStorage.setItem('vd_slug', r.slug); history.replaceState(null, '', '/admin/' + r.slug + location.search); boot(); }
+      try { const r = await api('/api/admin/login', { method: 'POST', body: { vid: (window.VA && VA.vid ? VA.vid() : ''), slug: f.get('slug'), password: f.get('password') } }); localStorage.setItem('vd_slug', r.slug); history.replaceState(null, '', '/admin/' + r.slug + location.search); boot(); }
       catch (err) { toast(esc(err.message), 'error'); }
     };
     const sf = document.getElementById('sf');
     if (sf) sf.onsubmit = async e => {
       e.preventDefault(); const btn = e.submitter; if (btn) btn.disabled = true;
-      try { const r = await api('/api/signup', { method: 'POST', body: Object.fromEntries(new FormData(e.target)) }); localStorage.setItem('vd_slug', r.slug); history.replaceState(null, '', '/admin/' + r.slug + location.search); S.tab = 'menu'; await boot(); toast(`${icon('check', 18)} Your free trial has started. Add your menu first.`, 'ok'); }
+      try { const r = await api('/api/signup', { method: 'POST', body: Object.assign({ vid: (window.VA && VA.vid ? VA.vid() : '') }, Object.fromEntries(new FormData(e.target))) }); localStorage.setItem('vd_slug', r.slug); history.replaceState(null, '', '/admin/' + r.slug + location.search); S.tab = 'menu'; await boot(); toast(`${icon('check', 18)} Your free trial has started. Add your menu first.`, 'ok'); }
       catch (err) { toast(esc(err.message), 'error'); if (btn) btn.disabled = false; }
     };
   }

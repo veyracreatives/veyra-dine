@@ -404,3 +404,5 @@ a.tick{text-decoration:none}
 @media (max-width:600px){.lang-pick{padding-left:4px}.lang-pick svg{display:none}.lang-pick select{padding:0 8px}}
 .sports-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
 @media (max-width:600px){.hero .hstack>.btn{flex:1 1 100%}}
+
+@media (min-width:700px){.pal.pal4{grid-template-columns:repeat(4,44px)}}

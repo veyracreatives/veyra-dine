@@ -32,6 +32,10 @@ Parent|पेरेंट|पालक
 Head coach|मुख्य कोच|मुख्य कोच
 Hi|नमस्ते|नमस्कार
 Check in|चेक इन|चेक इन
+On break|ब्रेक पर|ब्रेकवर
+The academy marks your attendance.|आपकी हाज़िरी अकादमी लगाती है।|तुमची हजेरी अकॅडमी लावते.
+You are on leave today.|आज आप छुट्टी पर हैं।|आज तुम्ही रजेवर आहात.
+On leave|छुट्टी पर|रजेवर
 Checked in|चेक इन हो गया|चेक इन झाले
 My sessions today|आज के मेरे सेशन|आजचे माझे सेशन
 Injured players|घायल खिलाड़ी|जखमी खेळाडू

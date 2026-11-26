@@ -85,12 +85,15 @@ C.isOn = (b, iso) => b && (b.days || []).includes(T.dow(iso)) && !(b.off || []).
 C.sessionsOn = (ac, iso) => ac.batches.filter(b => C.isOn(b, iso)).sort((a, b) => a.time.localeCompare(b.time));
 const feeOf = (ac, p) => p.fee != null && p.fee !== '' ? +p.fee : ((batch(ac, p.batch) || {}).fee || 0);
 
+/* ---------- breaks (player on holiday / break: no fee, not on the attendance list) ---------- */
+C.breakIn = (p, m) => (p.breaks || []).find(b => b.from <= m && (!b.to || b.to >= m)) || null;
 /* ---------- fees ---------- */
 C.billFor = (ac, p, m, today) => {
   const f = (p.fees || {})[m] || {};
   const base = f.amt0 != null ? f.amt0 : feeOf(ac, p);
   if (f.st === 'paid') return { m, st: 'paid', amt: f.amt, at: f.at, via: f.via, receipt: f.receipt };
   if (f.st === 'waived') return { m, st: 'waived', amt: 0 };
+  const br = C.breakIn(p, m); if (br) return { m, st: 'break', amt: 0, why: br.why || '' };
   let due = `${m}-${pad(Math.min(ac.dueDay, T.days(m)))}`, late = `${m}-${pad(Math.min(ac.lateAfter, T.days(m)))}`;
   // a player who joins after the due date: their first bill is due the day they join, and the late fee only starts after the same grace period
   if (p.joined && p.joined.slice(0, 7) === m && p.joined > due) { late = T.add(p.joined, Math.max(0, late < due ? 0 : (Date.parse(late) - Date.parse(due)) / 864e5)); due = p.joined; }
@@ -117,22 +120,26 @@ C.playerMonth = (ac, p, m, today) => {
   return { P, L, A, n, pct: n ? Math.round((P + L) / n * 100) : null, cal };
 };
 C.staffMonth = (ac, s, m, today) => {
-  let worked = 0, late = 0, absent = 0, expected = 0; const cal = {}, list = [];
+  let worked = 0, late = 0, absent = 0, expected = 0, leave = 0, paidLeave = 0; const cal = {}, list = [];
   const end = m === today.slice(0, 7) ? +today.slice(8) : T.days(m);
+  for (let d = 1; d <= T.days(m); d++) { const iso = `${m}-${pad(d)}`; const r = (ac.staffAtt[iso] || {})[s.id]; if (r && r.s === 'H') { leave++; if (r.paid) paidLeave++; cal[iso] = 'H'; } }
   for (let d = 1; d <= end; d++) {
-    const iso = `${m}-${pad(d)}`; const r = (ac.staffAtt[iso] || {})[s.id];
+    const iso = `${m}-${pad(d)}`; const r = (ac.staffAtt[iso] || {})[s.id]; if (r && r.s === 'H') continue;
     const has = s.role === 'manager' ? T.dow(iso) !== 0 : ac.batches.some(b => b.coach === s.id && C.isOn(b, iso));
     if (has && (!r || r.s !== 'off')) expected++;
     if (r && r.s !== 'off') { cal[iso] = r.s; list.push([iso, r]); if (r.s === 'P') worked++; else if (r.s === 'L') { worked++; late++; } else absent++; }
   }
-  return { worked, late, absent, expected: Math.max(expected, worked + absent), cal, list: list.reverse() };
+  return { worked, late, absent, leave, paidLeave, expected: Math.max(expected, worked + absent), cal, list: list.reverse() };
 };
 C.salaryFor = (ac, s, m, today) => {
   const pay = s.pay || { type: 'month', amt: 0 };
   const st = C.staffMonth(ac, s, m, today);
-  const amt = pay.type === 'session' ? st.worked * (+pay.amt || 0) : (+pay.amt || 0);
+  const rate = +pay.amt || 0, unpaid = st.leave - st.paidLeave;
+  // per day: days worked + paid leave days. Monthly: full pay minus one day's pay for each unpaid leave day
+  const cut = pay.type === 'session' ? 0 : Math.round(rate / T.days(m) * unpaid);
+  const amt = pay.type === 'session' ? (st.worked + st.paidLeave) * rate : Math.max(0, rate - cut);
   const paid = ((ac.salaries[m] || {})[s.id]) || null;
-  return { amt, how: pay.type === 'session' ? `Per day · ₹${(+pay.amt || 0).toLocaleString('en-IN')}` : 'Monthly', paid, days: st.worked, of: st.expected };
+  return { amt, cut, how: pay.type === 'session' ? `Per day · ₹${rate.toLocaleString('en-IN')}` : 'Monthly', paid, days: st.worked, of: st.expected, leave: st.leave, paidLeave: st.paidLeave };
 };
 
 /* ---------- feed ---------- */
@@ -175,6 +182,7 @@ def('academy.save', AD, (ac, ctx, p) => {
   if (p.lateFee != null) ac.lateFee = num(p.lateFee, 0, 100000);
   if (ac.lateAfter < ac.dueDay) ac.lateAfter = ac.dueDay;
   if (p.google != null) ac.settings.google = !!p.google;
+  if (p.selfCheckin != null) ac.selfCheckin = !!p.selfCheckin;
   if (p.sport != null && C.SPORTS[p.sport] && p.sport !== (ac.sport || 'football')) {
     // new sport: swap the starter drills (keep any the academy added or used in a plan)
     const used = new Set(Object.values(ac.plans).flatMap(x => x.drills || []));
@@ -274,14 +282,29 @@ def('staff.reset', AD, (ac, ctx, p, env) => {
   return { msg: 'New password made', data: { login: { email: s.email, temp }, name: s.name } };
 });
 def('staff.mark', AM, (ac, ctx, p) => {
-  const s = staffOf(ac, p.sid) || err('Not found'); const d = T.date(ctx.now);
-  if (!['P', 'L', 'A', 'off'].includes(p.s)) err('Bad mark');
+  const s = staffOf(ac, p.sid) || err('Not found'); const today = T.date(ctx.now);
+  const d = p.d && /^\d{4}-\d\d-\d\d$/.test(p.d) ? p.d : today;
+  if (d !== today && ctx.role !== 'admin') err('Only the admin can change other days');
+  if (d > today) err('Pick today or an earlier day');
+  if (!['P', 'L', 'A', 'off', ''].includes(p.s)) err('Bad mark');
   const day = ac.staffAtt[d] = ac.staffAtt[d] || {}; const was = day[s.id];
-  day[s.id] = { s: p.s, t: p.s === 'P' || p.s === 'L' ? (was && was.t) || T.clock(ctx.now) : null, by: ctx.name };
-  if (p.s === 'A') post(ac, ctx, { ico: 'whistle', title: `${s.name} marked absent today`, sub: 'By ' + ctx.name, aud: { roles: ['admin', 'manager'] }, href: { admin: 'staff', manager: 'staffatt' } });
+  if (p.s === '') { delete day[s.id]; return {}; }
+  day[s.id] = { s: p.s, t: p.s === 'P' || p.s === 'L' ? (was && was.t) || (d === today ? T.clock(ctx.now) : null) : null, by: ctx.name };
+  if (p.s === 'A' && d === today) post(ac, ctx, { ico: 'whistle', title: `${s.name} marked absent today`, sub: 'By ' + ctx.name, aud: { roles: ['admin', 'manager'] }, href: { admin: 'staff', manager: 'staffatt' } });
   return {};
 });
+def('staff.leave', AD, (ac, ctx, p) => {
+  const s = staffOf(ac, p.sid) || err('Not found'); const ok = x => /^\d{4}-\d\d-\d\d$/.test(x || '');
+  if (!ok(p.from)) err('Pick the first day of leave'); const to = ok(p.to) ? p.to : p.from; if (to < p.from) err('The last day is before the first day');
+  const n = Math.round((Date.parse(to) - Date.parse(p.from)) / 864e5) + 1; if (n > 62) err('Leave can be at most 62 days at a time');
+  for (let i = 0; i < n; i++) { const d = T.add(p.from, i); const day = ac.staffAtt[d] = ac.staffAtt[d] || {};
+    if (p.clear) { if (day[s.id] && day[s.id].s === 'H') delete day[s.id]; } else day[s.id] = { s: 'H', paid: !!p.paid, why: str(p.why, 80), by: ctx.name }; }
+  if (p.clear) return { msg: `Leave removed for ${s.name}` };
+  post(ac, ctx, { ico: 'whistle', title: `${s.name} on leave`, sub: `${T.short(p.from)}${to !== p.from ? ' to ' + T.short(to) : ''}${p.paid ? ' · paid' : ' · unpaid'}`, aud: { roles: ['admin', 'manager'], sids: [s.id] }, href: { admin: 'staff', manager: 'staffatt' } });
+  return { msg: `${s.name} on leave for ${n} day${n === 1 ? '' : 's'}${p.paid ? ' (paid)' : ' (unpaid)'}` };
+});
 def('coach.checkin', ['coach', 'manager'], (ac, ctx) => {
+  if (!ac.selfCheckin) err('Your admin marks attendance for coaches');
   const s = staffOf(ac, ctx.sid) || err('Not found'); const d = T.date(ctx.now);
   const day = ac.staffAtt[d] = ac.staffAtt[d] || {};
   if (day[s.id] && day[s.id].t) err('You are already checked in');
@@ -295,7 +318,8 @@ def('salary.paid', AD, (ac, ctx, p) => {
   const s = staffOf(ac, p.sid) || err('Not found'); const m = p.m || T.date(ctx.now).slice(0, 7);
   const sal = C.salaryFor(ac, s, m, T.date(ctx.now));
   ac.salaries[m] = ac.salaries[m] || {}; if (ac.salaries[m][s.id]) { delete ac.salaries[m][s.id]; return { msg: 'Marked unpaid' }; }
-  ac.salaries[m][s.id] = { amt: sal.amt, at: ctx.now };
+  const amt = p.amt != null && p.amt !== '' ? num(p.amt, -1) : sal.amt; if (amt < 0) err('Enter the amount paid');
+  ac.salaries[m][s.id] = { amt, at: ctx.now, note: str(p.note, 80) };
   return { msg: `${s.name}'s salary marked paid` };
 });
 
@@ -341,6 +365,19 @@ def('player.import', AD, (ac, ctx, p, env) => {
   return { msg: added ? `${added} player${added === 1 ? '' : 's'} added${bad.length ? `, ${bad.length} skipped` : ''}` : 'No players added', data: { added, bad, parents: logins.length } };
 });
 def('player.update', AD, (ac, ctx, p, env) => { const ex = playerOf(ac, p.id) || err('Player not found'); const { login } = savePlayer(ac, ctx, p, env, ex); return { msg: 'Player saved', data: login && login.temp ? { login, name: ex.parentName } : null }; });
+def('player.break', AD, (ac, ctx, p) => {
+  const pl = playerOf(ac, p.id) || err('Player not found'); pl.breaks = pl.breaks || [];
+  if (p.remove != null) { pl.breaks.splice(+p.remove, 1); return { msg: `Break removed. ${pl.name} is back on fees and attendance.` }; }
+  const mm = x => /^\d{4}-\d\d$/.test(x || ''); if (!mm(p.from)) err('Pick the first month of the break');
+  const to = mm(p.to) ? p.to : ''; if (to && to < p.from) err('The last month is before the first month');
+  if (pl.breaks.some(b => b.from <= (to || '9999-12') && (!b.to || b.to >= p.from))) err('This overlaps a break already added');
+  if (Object.entries(pl.fees || {}).some(([m, f]) => f.st === 'paid' && m >= p.from && (!to || m <= to))) err('A month in this break is already paid. Pick other months.');
+  pl.breaks.push({ from: p.from, to, why: str(p.why, 80), by: ctx.name, at: ctx.now }); pl.breaks.sort((a, b) => a.from.localeCompare(b.from));
+  ac.queue = ac.queue.filter(x => !(x.pid === pl.id && x.m >= p.from && (!to || x.m <= to)));
+  Object.keys(pl.fees || {}).forEach(m => { if (pl.fees[m].st === 'verify' && m >= p.from && (!to || m <= to)) delete pl.fees[m]; });
+  post(ac, ctx, { ico: 'players', title: `${pl.name} is on a break`, sub: `${T.monthOnly(p.from)}${to ? (to !== p.from ? ' to ' + T.monthOnly(to) : '') : ' until further notice'} · no fee for these months`, aud: { pids: [pl.id], roles: ['admin'] }, href: { parent: 'fees', admin: 'players' } });
+  return { msg: `${pl.name} is on a break. No fee for those months.` };
+});
 def('player.leave', AD, (ac, ctx, p, env) => {
   const pl = playerOf(ac, p.id) || err('Player not found'); pl.left = T.date(ctx.now);
   if (pl.parentUid && !active(ac).some(x => x.parentUid === pl.parentUid)) env.unlink(pl.parentUid, ac.id, 'parent');
@@ -416,7 +453,7 @@ def('fee.reject', AD, (ac, ctx, p) => {
 def('fee.record', AD, (ac, ctx, p, env) => {
   const pl = playerOf(ac, p.pid) || err('Pick a player'); const today = T.date(ctx.now);
   const m = p.m || (C.openBills(ac, pl, today)[0] || {}).m || err('Nothing due for this player');
-  const bill = C.billFor(ac, pl, m, today); if (bill.st === 'paid') err('Already paid');
+  const bill = C.billFor(ac, pl, m, today); if (bill.st === 'paid') err('Already paid'); if (bill.st === 'break') err(`${pl.name} is on a break in ${T.monthOnly(m)}. Remove the break first.`);
   const amt = num(p.amt, 0) || bill.amt;
   ac.queue = ac.queue.filter(x => !(x.pid === pl.id && x.m === m));
   const no = receipt(ac, ctx, pl, m, amt, str(p.via, 30) || 'Cash', '', env);
@@ -629,7 +666,7 @@ C.boot = (ac, me, now, extra) => {
   const seeAllPlayers = role !== 'parent';
   const players = active(ac).filter(p => seeAllPlayers || kids.includes(p.id)).map(p => {
     const mo = C.playerMonth(ac, p, month, today);
-    const o = { id: p.id, name: p.name, no: p.no, batch: p.batch, dob: p.dob, joined: p.joined, parentName: p.parentName, att: mo.pct, attN: mo.n, med: p.med || {}, docs: p.docs || {} };
+    const o = { id: p.id, name: p.name, no: p.no, batch: p.batch, dob: p.dob, joined: p.joined, parentName: p.parentName, att: mo.pct, attN: mo.n, med: p.med || {}, docs: p.docs || {}, brk: C.breakIn(p, month), breaks: role === 'admin' ? (p.breaks || []) : undefined };
     if (role === 'admin' || role === 'manager' || role === 'parent') { o.parentEmail = p.parentEmail || ''; o.parentPhone = p.parentPhone || ''; o.hasApp = !!p.parentUid; }
     if (role === 'coach' && myBatches.includes(p.batch)) o.parentPhone = p.parentPhone || '';
     if (role === 'admin' || role === 'parent') { o.bills = C.bills(ac, p, today); o.fee = feeOf(ac, p); o.feeCustom = p.fee != null; }
@@ -639,8 +676,9 @@ C.boot = (ac, me, now, extra) => {
   });
   const staff = ac.staff.map(s => {
     const o = { id: s.id, name: s.name, role: s.role, title: s.title };
-    if (role !== 'parent') { const st = C.staffMonth(ac, s, month, today); o.today = (ac.staffAtt[today] || {})[s.id] || null; o.days = st.worked; o.of = st.expected; o.phone = s.phone || ''; }
-    if (role === 'admin') { o.email = s.email; o.pay = s.pay; o.sal = C.salaryFor(ac, s, month, today); }
+    if (role !== 'parent') { const st = C.staffMonth(ac, s, month, today); o.today = (ac.staffAtt[today] || {})[s.id] || null; o.days = st.worked; o.of = st.expected; o.leave = st.leave; o.phone = s.phone || ''; }
+    if (role === 'admin') { o.email = s.email; o.pay = s.pay; o.sal = C.salaryFor(ac, s, month, today); o.hist = []; for (let i = 1; i <= 6; i++) { const m = T.addMonth(month, -i); const x = C.salaryFor(ac, s, m, today); if (x.paid || x.days || x.leave) o.hist.push({ m, amt: x.amt, paid: x.paid, days: x.days, leave: x.leave }); }
+      o.cal = {}; Object.keys(ac.staffAtt).forEach(d => { if (d.slice(0, 7) === month && ac.staffAtt[d][s.id]) o.cal[d] = ac.staffAtt[d][s.id]; }); }
     return o;
   });
   const visibleTo = n => role !== 'parent' ? (role !== 'coach' || n.to === 'all' || n.to === 'coaches' || myBatches.includes(n.to)) : (n.to === 'all' || players.some(p => p.batch === n.to));
@@ -649,7 +687,7 @@ C.boot = (ac, me, now, extra) => {
   const att = {}; [today].forEach(d => { att[d] = {}; Object.entries(ac.att[d] || {}).forEach(([bid, r]) => { if (role === 'parent') { const m = {}; kids.forEach(k => { if (r.marks[k]) m[k] = r.marks[k]; }); att[d][bid] = { marks: m, at: r.at, by: r.by }; } else att[d][bid] = r; }); });
   const B = {
     v: ac.v, now, today, month, me: { uid: me.uid, role, sid: me.sid || '', name: me.name, email: me.email || '' },
-    academy: { id: ac.id, name: ac.name, place: ac.place, sport: ac.sport || 'football', upi: ac.upi, payee: ac.payee || ac.name, dueDay: ac.dueDay, lateAfter: ac.lateAfter, lateFee: ac.lateFee, settings: role === 'admin' ? ac.settings : { google: ac.settings.google } },
+    academy: { id: ac.id, name: ac.name, place: ac.place, sport: ac.sport || 'football', upi: ac.upi, payee: ac.payee || ac.name, dueDay: ac.dueDay, lateAfter: ac.lateAfter, lateFee: ac.lateFee, selfCheckin: !!ac.selfCheckin, settings: role === 'admin' ? ac.settings : { google: ac.settings.google } },
     plan: { type: ac.plan.type, until: ac.plan.until, active: C.planActive(ac, now), suspended: !!ac.suspended, daysLeft: Math.max(0, Math.ceil((ac.plan.until - now) / DAY)) },
     batches: ac.batches.map(b => ({ ...b, off: (b.off || []).filter(d => d >= T.add(today, -7)) })), grounds: ac.grounds, staff, players, kids, myBatches,
     att, sessionsToday: C.sessionsOn(ac, today).map(b => b.id),

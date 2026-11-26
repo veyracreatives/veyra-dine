@@ -29,7 +29,7 @@ const ground = id => (B && B.grounds.find(g => g.id === id)) || { name: '' };
 const coachName = b => b.coach ? staff(b.coach).name : 'No coach yet';
 const jersey = (p, cls) => `<span class="jersey ${cls || ''}" style="background:${tintBg(batch(p.batch).tint)}">${p.no || initials(p.name)}</span>`;
 const av = (name, cls) => { let h = 0; for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) % 360; return `<span class="av ${cls || ''}" style="background:hsl(${h} 30% 30%)">${initials(name)}</span>`; };
-const feePill = s => ({ paid: '<span class="pill p-ok">Paid</span>', verify: '<span class="pill p-info">Check UPI</span>', due: '<span class="pill p-warn">Due</span>', overdue: '<span class="pill p-bad">Overdue</span>', waived: '<span class="pill p-mute">Waived</span>', none: '<span class="pill p-mute plain">No bill</span>' }[s] || '');
+const feePill = s => ({ paid: '<span class="pill p-ok">Paid</span>', verify: '<span class="pill p-info">Check UPI</span>', due: '<span class="pill p-warn">Due</span>', overdue: '<span class="pill p-bad">Overdue</span>', waived: '<span class="pill p-mute">Waived</span>', break: '<span class="pill p-info plain">On break</span>', none: '<span class="pill p-mute plain">No bill</span>' }[s] || '');
 const attPill = v => v == null ? '<span class="pill p-mute plain">New</span>' : v >= 85 ? `<span class="pill p-ok plain tnum">${v}%</span>` : v >= 70 ? `<span class="pill p-warn plain tnum">${v}%</span>` : `<span class="pill p-bad plain tnum">${v}%</span>`;
 const chev = (n, of = 4) => `<span class="chev" aria-hidden="true">${Array.from({ length: of }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</span>`;
 const empty = (icon, text, btn) => `<div class="empty-cta">${ic(icon)}<p>${text}</p>${btn || ''}</div>`;

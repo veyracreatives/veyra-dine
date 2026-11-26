@@ -112,7 +112,7 @@ function banners(role) {
 /* ---------- shared cards ---------- */
 const todayMarks = bid => (B.att[B.today] || {})[bid];
 function tally(bid, marks) {
-  const list = B.players.filter(p => p.batch === bid); const m = marks || {};
+  const list = B.players.filter(p => p.batch === bid && !p.brk); const m = marks || {};
   const v = list.map(p => m[p.id]); return { P: v.filter(x => x === 'P').length, L: v.filter(x => x === 'L').length, A: v.filter(x => x === 'A').length, n: list.length };
 }
 function sessionsCard(role) {
@@ -129,7 +129,7 @@ function queueCard(compact) {
 function staffTodayCard(link) {
   const list = B.staff;
   return `<div class="card"><div class="card-h"><div><h3>Coaches today</h3><div class="sub">Check-in times</div></div>${link ? `<a class="btn btn-quiet btn-sm" href="${link}">Open</a>` : ''}</div>
-  <div class="list">${list.length ? list.map(s => { const a = s.today; return `<div class="row"><div class="who grow">${av(s.name, 'sm')}<div><b>${esc(s.name)}</b><small>${esc(s.title)}</small></div></div>${!a ? '<span class="pill p-mute plain">Not in yet</span>' : a.s === 'off' ? '<span class="pill p-mute plain">Day off</span>' : a.s === 'A' ? '<span class="pill p-bad">Absent</span>' : `<span class="pill ${a.s === 'L' ? 'p-warn' : 'p-ok'} tnum">${a.s === 'L' ? 'Late · ' : ''}${a.t}</span>`}</div>`; }).join('') : `<div class="empty">No coaches added yet.</div>`}</div></div>`;
+  <div class="list">${list.length ? list.map(s => { const a = s.today; return `<div class="row"><div class="who grow">${av(s.name, 'sm')}<div><b>${esc(s.name)}</b><small>${esc(s.title)}</small></div></div>${!a ? '<span class="pill p-mute plain">Not in yet</span>' : a.s === 'H' ? '<span class="pill p-info plain">On leave</span>' : a.s === 'off' ? '<span class="pill p-mute plain">Day off</span>' : a.s === 'A' ? '<span class="pill p-bad">Absent</span>' : `<span class="pill ${a.s === 'L' ? 'p-warn' : 'p-ok'} tnum">${a.s === 'L' ? 'Late · ' : ''}${a.t}</span>`}</div>`; }).join('') : `<div class="empty">No coaches added yet.</div>`}</div></div>`;
 }
 function lowCard() {
   const low = B.players.filter(p => p.att != null && p.attN >= 3 && p.att < 65);
@@ -147,7 +147,7 @@ function trendCard() {
   <div class="card-b"><div class="bars">${B.trend.map(([d, v]) => `<div class="b"><i class="${v != null && v < 80 ? 'lo' : ''}" style="height:${v != null ? Math.max(8, (v - 50) * 2) : 4}%;${v != null ? '' : 'background:var(--line)'}" title="${T.dayShort(d)}: ${v != null ? v + '%' : 'no sessions'}"></i><small>${+d.slice(8)}</small></div>`).join('')}</div></div></div>`;
 }
 function markCard(bid, role, day) {
-  const b = batch(bid), list = B.players.filter(p => p.batch === bid);
+  const b = batch(bid), list = B.players.filter(p => p.batch === bid && !p.brk);
   const iso = day === 'yesterday' ? B.yesterday : B.today;
   const saved = day === 'yesterday' ? (B.attYesterday || {})[bid] : todayMarks(bid);
   const key = bid + '|' + iso;
@@ -166,9 +166,11 @@ function batchPicker(cur, ids, act) {
   return `<div class="seg" role="group" aria-label="Batch" style="max-width:100%;overflow-x:auto">${ids.map(id => `<button type="button" data-act="${act || 'pickBatch'}" data-b="${id}" aria-pressed="${cur === id}">${esc(batch(id).name)}</button>`).join('')}</div>`;
 }
 function staffMark(canEdit) {
-  return `<div class="card glow"><div class="card-h"><div><h3>Coach & staff attendance</h3><div class="sub">${T.long(B.today)} · arrival time is saved with each mark</div></div></div>
-  ${B.staff.length ? `<div class="mark-list">${B.staff.map(s => { const a = s.today || {}; return `<div class="mark"><div class="who">${av(s.name)}<div><b>${esc(s.name)}</b><small>${esc(s.title)} · ${a.s === 'off' ? 'Day off' : a.t ? 'In at ' + a.t : a.s === 'A' ? 'Absent' : 'Not in yet'} · ${s.days}/${s.of} this month</small></div></div>${canEdit ? `<div class="pal" role="group" aria-label="${esc(s.name)}">${['P', 'L', 'A'].map(x => `<button type="button" data-act="smark" data-s="${s.id}" data-v="${x}" aria-pressed="${a.s === x}" ${a.s === x ? `data-on="${x}"` : ''} aria-label="${{ P: 'Present', L: 'Late', A: 'Absent' }[x]}">${x}</button>`).join('')}<button type="button" data-act="smark" data-s="${s.id}" data-v="off" aria-pressed="${a.s === 'off'}" title="Day off" style="font-size:11px">Off</button></div>` : ''}</div>`; }).join('')}</div>` : `<div class="card-b">${empty('whistle', 'Add your coaches and manager first.', B.me.role === 'admin' ? `<button class="btn btn-primary btn-sm" type="button" data-act="addStaff">${ic('plus')}Add coach or manager</button>` : '')}</div>`}
-  <div class="sum-bar"><span class="faint" style="font-size:13px">Marks save as you tap. Coaches can also check in from their own app.</span></div></div>`;
+  const adm = B.me.role === 'admin'; const d = adm && U.sday && U.sday <= B.today && U.sday.slice(0, 7) === B.month ? U.sday : B.today; const past = d !== B.today;
+  const rec = s => (past ? (s.cal || {})[d] : s.today) || {};
+  return `<div class="card glow"><div class="card-h" style="flex-wrap:wrap"><div><h3>Coach & staff attendance</h3><div class="sub">${T.long(d)} · ${past ? 'changing an earlier day' : 'arrival time is saved with each mark'}</div></div>${adm ? `<input class="input" type="date" id="sday" aria-label="Day" value="${d}" min="${B.month}-01" max="${B.today}" style="width:auto">` : ''}</div>
+  ${B.staff.length ? `<div class="mark-list">${B.staff.map(s => { const a = rec(s); return `<div class="mark"><div class="who">${av(s.name)}<div><b>${esc(s.name)}</b><small>${esc(s.title)} · ${a.s === 'H' ? 'On leave' + (a.paid ? ' (paid)' : '') : a.s === 'off' ? 'Day off' : a.t ? 'In at ' + a.t : a.s === 'P' || a.s === 'L' ? 'Present' : a.s === 'A' ? 'Absent' : past ? 'Not marked' : 'Not in yet'} · ${s.days}/${s.of} this month${s.leave ? ` · ${s.leave} leave` : ''}</small></div></div>${canEdit ? (a.s === 'H' ? `<span class="pill p-info plain">Leave</span>` : `<div class="pal pal4" role="group" aria-label="${esc(s.name)}">${['P', 'L', 'A'].map(x => `<button type="button" data-act="smark" data-s="${s.id}" data-d="${d}" data-v="${x}" aria-pressed="${a.s === x}" ${a.s === x ? `data-on="${x}"` : ''} aria-label="${{ P: 'Present', L: 'Late', A: 'Absent' }[x]}">${x}</button>`).join('')}<button type="button" data-act="smark" data-s="${s.id}" data-d="${d}" data-v="off" aria-pressed="${a.s === 'off'}" title="Day off" style="font-size:11px">Off</button></div>`) : ''}</div>`; }).join('')}</div>` : `<div class="card-b">${empty('whistle', 'Add your coaches and manager first.', B.me.role === 'admin' ? `<button class="btn btn-primary btn-sm" type="button" data-act="addStaff">${ic('plus')}Add coach or manager</button>` : '')}</div>`}
+  <div class="sum-bar"><span class="faint" style="font-size:13px">Marks save as you tap.${B.academy.selfCheckin ? ' Coaches can also check in from their own app.' : ''}${adm ? ' For leave or holidays, open Manage on the coach.' : ''}</span></div></div>`;
 }
 
 /* ---------- admin ---------- */
@@ -259,7 +261,7 @@ function remindersView() {
 function staffView() {
   return `<div class="page-head"><div><h2>Coaches & staff</h2><p>Each person logs in with their own email or Google account.</p></div><button class="btn btn-primary" type="button" data-act="addStaff">${ic('plus')}Add coach or manager</button></div>
   <div class="card">${B.staff.length ? `<div class="table-wrap"><table class="t"><thead><tr><th>Name</th><th class="hide-sm">Role</th><th class="hide-sm">Batches</th><th>This month</th><th class="hide-xs">Today</th><th></th></tr></thead><tbody>
-  ${B.staff.map(s => { const a = s.today; const bs = B.batches.filter(b => b.coach === s.id).map(b => b.name).join(', ') || (s.role === 'manager' ? 'All batches' : 'None yet'); return `<tr><td><div class="who">${av(s.name)}<div><b>${esc(s.name)}</b><small>${esc(s.email || '')}</small></div></div></td><td class="hide-sm"><span class="pill ${s.role === 'manager' ? 'p-info' : 'p-brand'} plain">${esc(s.title)}</span></td><td class="hide-sm">${esc(bs)}</td><td class="tnum">${s.days}/${s.of} days</td><td class="hide-xs">${!a ? '<span class="pill p-mute plain">Not in</span>' : a.s === 'off' ? '<span class="pill p-mute plain">Day off</span>' : a.s === 'A' ? '<span class="pill p-bad">Absent</span>' : `<span class="pill ${a.s === 'L' ? 'p-warn' : 'p-ok'} tnum">${a.t}</span>`}</td><td class="r"><button class="btn btn-quiet btn-sm" type="button" data-act="editStaff" data-s="${s.id}">Manage</button></td></tr>`; }).join('')}
+  ${B.staff.map(s => { const a = s.today; const bs = B.batches.filter(b => b.coach === s.id).map(b => b.name).join(', ') || (s.role === 'manager' ? 'All batches' : 'None yet'); return `<tr><td><div class="who">${av(s.name)}<div><b>${esc(s.name)}</b><small>${esc(s.email || '')}</small></div></div></td><td class="hide-sm"><span class="pill ${s.role === 'manager' ? 'p-info' : 'p-brand'} plain">${esc(s.title)}</span></td><td class="hide-sm">${esc(bs)}</td><td class="tnum">${s.days}/${s.of} days</td><td class="hide-xs">${!a ? '<span class="pill p-mute plain">Not in</span>' : a.s === 'H' ? '<span class="pill p-info plain">On leave</span>' : a.s === 'off' ? '<span class="pill p-mute plain">Day off</span>' : a.s === 'A' ? '<span class="pill p-bad">Absent</span>' : `<span class="pill ${a.s === 'L' ? 'p-warn' : 'p-ok'} tnum">${a.t}</span>`}</td><td class="r"><button class="btn btn-quiet btn-sm" type="button" data-act="editStaff" data-s="${s.id}">Manage</button></td></tr>`; }).join('')}
   </tbody></table></div>` : `<div class="card-b">${empty('whistle', 'No coaches yet. Add one and they get their own login.', `<button class="btn btn-primary btn-sm" type="button" data-act="addStaff">${ic('plus')}Add coach or manager</button>`)}</div>`}</div>${B.staff.length ? staffMark(true) : ''}`;
 }
 function parentsView() {

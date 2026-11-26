@@ -32,7 +32,14 @@ document.addEventListener('click', async e => {
     mark: () => { (U.draft[d.k] = U.draft[d.k] || {})[d.p] = d.v; rerender(); },
     allP: () => { const m = U.draft[d.k] = U.draft[d.k] || {}; B.players.filter(p => p.batch === d.b).forEach(p => m[p.id] = 'P'); rerender(); },
     saveAtt: async () => { const r = await act('att.save', { bid: d.b, marks: U.draft[d.k] || {}, date: d.d }, { offline: true, link: role === 'coach' ? null : null }); if (r) delete U.draft[d.k]; rerender(); },
-    smark: () => act('staff.mark', { sid: d.s, s: d.v }, { quiet: true }),
+    smark: () => act('staff.mark', { sid: d.s, s: d.v, d: d.d }, { quiet: true }),
+    breakModal: () => openModal({ t: 'break', p: d.p }),
+    saveBreak: () => act('player.break', { id: U.modal.p, from: val('br-f'), to: val('br-t'), why: val('br-w') }),
+    unbreak: () => act('player.break', { id: d.p, remove: +d.i }, { keep: true }),
+    leaveModal: () => openModal({ t: 'sleave', s: d.s }),
+    saveLeave: () => act('staff.leave', { sid: U.modal.s, from: val('lv-f'), to: val('lv-t'), paid: val('lv-p') === '1', why: val('lv-w') }),
+    clearLeave: () => act('staff.leave', { sid: U.modal.s, from: val('lv-f'), to: val('lv-t'), clear: true }),
+    salModal: () => openModal({ t: 'sal', s: d.s }),
     checkin: () => act('coach.checkin', {}),
     approve: () => act('fee.approve', { id: d.id }),
     reject: () => openModal({ t: 'reject', id: d.id }),
@@ -123,7 +130,7 @@ document.addEventListener('click', async e => {
     addExp: () => openModal({ t: 'exp' }),
     saveExp: () => act('expense.add', { what: val('e-n'), amt: val('e-a'), cat: val('e-c'), date: val('e-d') }),
     delExp: () => { if (armed(a, '×?')) act('expense.delete', { id: d.id }); },
-    paySal: () => act('salary.paid', { sid: d.s }),
+    paySal: () => U.modal && U.modal.t === 'sal' ? act('salary.paid', { sid: U.modal.s, amt: val('sal-a'), note: val('sal-n') }) : act('salary.paid', { sid: d.s }),
     ground: () => { U.ground = d.v; rerender(); },
     addGround: () => openModal({ t: 'ground' }), editGround: () => openModal({ t: 'ground', id: d.v }),
     saveGround: () => act('ground.save', { id: M.id, name: val('g-n') }),
@@ -147,7 +154,7 @@ document.addEventListener('click', async e => {
     buyTest: async () => { const r = await DemoAPI.buyPlan(M.plan); await refresh(); U.modal = null; rerender(); toast(r.msg, CFG.hosted ? undefined : { href: 'hq.html', label: 'See it in HQ' }); },
     lic: async () => { const code = val('lic'); if (!/^VFB-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(code)) return toast('Keys look like VFB-XXXX-XXXX-XXXX'); try { const r = await API.activateKey(code); await refresh(); rerender(); toast(r.msg || 'Key activated'); } catch (er) { fail(er); } },
     saveFees: () => act('academy.save', { upi: val('s-upi'), payee: val('s-payee'), dueDay: val('s-due'), lateAfter: val('s-lateafter'), lateFee: val('s-late') }),
-    saveAcademy: () => act('academy.save', { name: val('s-name'), place: val('s-place'), sport: val('s-sport') }),
+    saveAcademy: () => act('academy.save', { name: val('s-name'), place: val('s-place'), sport: val('s-sport'), selfCheckin: !!($('#s-self') || {}).checked }),
     savePw: async () => { try { const r = await API.changePw(val('ac-old'), val('ac-new')); closeModal(); toast(r.msg || 'Password changed'); } catch (er) { fail(er); } },
     savePhone: () => act('parent.phone', { phone: val('ac-ph') })
   };
@@ -168,6 +175,7 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (t.id === 'pb') { U.pb = t.value; rerender(); }
   if (t.id === 'feeMonth') { U.feeMonth = t.value; rerender(); }
+  if (t.id === 'sday') { U.sday = t.value; rerender(); }
   if (t.id === 'progP') { readProg(); U.progP = t.value; rerender(); }
   if (t.id === 'c-p') { $('#c-months').innerHTML = cashMonths(t.value); }
   if (t.dataset.rule) act('reminders.save', { rules: { [t.dataset.rule]: t.checked } }, { quiet: true }).then(() => toast(t.checked ? 'Reminder on' : 'Reminder off'));

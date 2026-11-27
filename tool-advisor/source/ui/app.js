@@ -269,7 +269,7 @@ function renderAll() {
     for (const g of [...grp.values()].sort((a, b) => a.r - b.r)) h += row(g.col, `R${fx(g.r)} ${esc(g.t)} × ${g.n}`, g.faces);
   }
   if (an.chamfers.length) h += `<div class="fgroup">Chamfers</div>` + row('#06b6d4', `${an.chamfers.length} chamfer face(s), ≈${fx(Math.max(...an.chamfers.map(c => c.size || 0)))} mm`, an.chamfers.map(c => c.idx));
-  if (an.surfaces.length) h += `<div class="fgroup">3D surfaces</div>` + row('#eab308', `${an.surfaces.length} curved face(s), smallest R≈${fx(Math.min(...an.surfaces.map(x => x.rmin || 99)))}`, an.surfaces.map(x => x.idx));
+  for (const d of Object.values(an.threeD || {})) h += `<div class="fgroup">3D area · ${SIDE_NAME[d.dir]}</div>` + row('#eab308', `${d.faces.length} face(s) · ${fx(d.depth)} deep · ${d.steepPct}% steep / ${100 - d.steepPct}% shallow${d.concR ? ` · smallest inside R${fx(d.concR)}` : ''}${d.convR ? ` · edge R${fx(d.convR)}` : ''}`, d.faces);
   if (an.bosses.length) h += `<div class="fgroup">Outside diameters</div>` + an.bosses.map(b => row('#94a3b8', `Ø${fx(b.dia)}`, b.faces)).join('');
   $('#featList').innerHTML = h || '<div class="muted">No machining features found (simple block).</div>';
 
@@ -433,7 +433,7 @@ $('#libClose').onclick = () => $('#libDlg').close();
 
 // ---------------- settings UI ----------------
 $('#selMat').innerHTML = MATERIALS.map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
-const SET_MAP = { setMaxRpm: 'maxRpm', setMaxFeed: 'maxFeed', setVise: 'viseOpening', setJaw: 'viseJawHeight', setSide: 'allowSide', setTop: 'allowTop', setGrip: 'gripExtra', setFin: 'finishStock' };
+const SET_MAP = { setScallop: 'scallop', setMaxRpm: 'maxRpm', setMaxFeed: 'maxFeed', setVise: 'viseOpening', setJaw: 'viseJawHeight', setSide: 'allowSide', setTop: 'allowTop', setGrip: 'gripExtra', setFin: 'finishStock' };
 function loadSettingsUI() {
   $('#selMat').value = settings.material; $('#selUp').value = settings.up;
   for (const [id, k] of Object.entries(SET_MAP)) $('#' + id).value = settings[k];

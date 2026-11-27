@@ -58,5 +58,6 @@ export const DEFAULT_SETTINGS = {
   allowTop: 1,       // facing allowance on top (mm)
   gripExtra: 7,      // extra stock height to hold in vise in setup 1 (mm)
   finishStock: 0.3,  // left for finishing (mm)
+  scallop: 0.01,     // 3D finish scallop height (mm)
   up: '+Z',
 };

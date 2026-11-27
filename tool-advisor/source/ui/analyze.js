@@ -190,13 +190,13 @@ function fitFace(geo, f, idx) {
     return { ...base, kind: 'cone', axis: ca, center: pm, nz: nb[2], halfAngle: Math.asin(Math.min(1, Math.abs(md))) / DEG, rmin: Math.min(...rads), rmax: Math.max(...rads), tmin: Math.min(...ts), tmax: Math.max(...ts), concaveHint: md };
   }
   // freeform: estimate smallest curvature radius from vertex pairs
-  const radii = [];
+  const radii = [], cradii = [];
   for (let t = f.first; t <= f.last; t++) {
     for (let e = 0; e < 3; e++) {
       const i = geo.tri[t * 3 + e], j = geo.tri[t * 3 + (e + 1) % 3];
       const pi = [geo.pos[i * 3], geo.pos[i * 3 + 1], geo.pos[i * 3 + 2]], pj = [geo.pos[j * 3], geo.pos[j * 3 + 1], geo.pos[j * 3 + 2]];
       const ni = norm([geo.nrm[i * 3], geo.nrm[i * 3 + 1], geo.nrm[i * 3 + 2]]), nj = norm([geo.nrm[j * 3], geo.nrm[j * 3 + 1], geo.nrm[j * 3 + 2]]);
-      const dn = len(sub(ni, nj)); if (dn > 0.02) radii.push(len(sub(pi, pj)) / dn);
+      const dn = len(sub(ni, nj)); if (dn > 0.02) { const rr = len(sub(pi, pj)) / dn; radii.push(rr); if (dot(sub(nj, ni), sub(pj, pi)) < 0) cradii.push(rr); }
     }
   }
   radii.sort((a, b) => a - b);
@@ -204,7 +204,9 @@ function fitFace(geo, f, idx) {
   // concave if normals point toward the curvature centre on average
   let conc = 0;
   for (let k = 0; k < Math.min(P.length, 200); k++) { const d = sub(P[k], box.c); conc += dot(d, N[k]) < 0 ? 1 : -1; }
-  return { ...base, kind: 'free', rmin, normal: nm };
+  cradii.sort((a, b) => a - b);
+  const rconc = cradii.length > radii.length * 0.2 ? cradii[Math.floor(cradii.length * 0.1)] : null;
+  return { ...base, kind: 'free', rmin, rconc, normal: nm };
 }
 
 function angSpan(angs) {
@@ -359,7 +361,7 @@ export function analyzePart(geo0, up = '+Z') {
   for (const c of cones) if (!holeFaceSet.has(c.idx) && (c.rmax - c.rmin) < 5) chamfers.push({ tilt: r2(90 - c.halfAngle), area: c.area, idx: c.idx, size: r2((c.rmax - c.rmin) * Math.SQRT2), dir: Math.abs(c.tmax - zTop) < 0.05 ? '+Z' : Math.abs(c.tmin - zBot) < 0.05 ? '-Z' : (c.nz > 0 ? '+Z' : '-Z'), round: true });
 
   const free = faces.filter(f => f.kind === 'free');
-  const surfaces = free.map(f => ({ idx: f.idx, rmin: r2(f.rmin), area: f.area, dir: f.normal[2] > 0.2 ? '+Z' : f.normal[2] < -0.2 ? '-Z' : axisName(f.normal, 0.7) }));
+  const surfaces = free.map(f => ({ idx: f.idx, rmin: r2(f.rmin), rconc: f.rconc ? r2(f.rconc) : null, area: f.area, dir: f.normal[2] > 0.2 ? '+Z' : f.normal[2] < -0.2 ? '-Z' : axisName(f.normal, 0.7) }));
 
   // --- pockets / steps: group floors by side + depth ---
   const pockets = [];
@@ -404,7 +406,44 @@ export function analyzePart(geo0, up = '+Z') {
   const minCorner = corners.length ? Math.min(...corners.map(c => c.r)) : null;
   const minFillet = Math.min(...[...fillets.filter(f => f.concave).map(f => f.r), ...surfaces.map(s => s.rmin).filter(x => x > 0)], Infinity);
 
+  // --- 3D areas (need surface toolpaths) ---
+  const pocketFloorR = new Set();
+  const g3 = [];
+  for (const sf of surfaces) g3.push({ idx: [sf.idx], concR: sf.rconc, kind: 'surface' });
+  for (const f of fillets) { if (f.axis === '+Z' || f.axis === '-Z') continue; if (f.concave && pockets.some(p => p.floorR && Math.abs(p.floorR - f.r) < 0.05)) continue; g3.push({ idx: f.faces, concR: f.concave ? f.r : null, convR: f.concave ? null : f.r, kind: f.concave ? 'concave fillet' : 'rounded edge' }); }
+  for (const a of angled) g3.push({ idx: [a.idx], kind: 'angled face' });
+  const threeD = {};
+  for (const g of g3) {
+    let A = 0, steep = 0, nz = 0, zmin = Infinity, zmax = -Infinity;
+    for (const fi of g.idx) {
+      const f = geo.faces[fi];
+      for (let t = f.first; t <= f.last; t++) {
+        const ids = [geo.tri[t * 3], geo.tri[t * 3 + 1], geo.tri[t * 3 + 2]];
+        const v = ids.map(i => [geo.pos[i * 3], geo.pos[i * 3 + 1], geo.pos[i * 3 + 2]]);
+        const c = cross(sub(v[1], v[0]), sub(v[2], v[0])); const a = len(c) / 2; if (a <= 0) continue;
+        const n = mul(c, 1 / (2 * a));
+        A += a; nz += n[2] * a; if (Math.abs(n[2]) < 0.707) steep += a;
+        for (const p of v) { zmin = Math.min(zmin, p[2]); zmax = Math.max(zmax, p[2]); }
+      }
+    }
+    if (A <= 0) continue;
+    const dir = nz / A < -0.25 ? '-Z' : '+Z';
+    const d = threeD[dir] || (threeD[dir] = { dir, faces: [], area: 0, steep: 0, concR: null, convR: null, zmin: Infinity, zmax: -Infinity, kinds: {} });
+    d.faces.push(...g.idx); d.area += A; d.steep += steep; d.zmin = Math.min(d.zmin, zmin); d.zmax = Math.max(d.zmax, zmax);
+    d.kinds[g.kind] = (d.kinds[g.kind] || 0) + 1;
+    if (g.concR) d.concR = d.concR == null ? g.concR : Math.min(d.concR, g.concR);
+    if (g.convR) d.convR = d.convR == null ? g.convR : Math.min(d.convR, g.convR);
+  }
+  for (const d of Object.values(threeD)) {
+    d.steepPct = Math.round(100 * d.steep / d.area);
+    d.depth = r2(d.dir === '+Z' ? bb.max[2] - d.zmin : d.zmax - bb.min[2]);
+    d.area = Math.round(d.area); d.zmin = r2(d.zmin); d.zmax = r2(d.zmax); d.concR = d.concR && r2(d.concR); d.convR = d.convR && r2(d.convR);
+    d.onlyEdges = Object.keys(d.kinds).every(k => k === 'rounded edge');
+    if (!d.onlyEdges) addSide(d.dir, '3D');
+  }
+
   return {
+    threeD,
     bbox: { min: bb.min.map(r2), max: bb.max.map(r2), size: bb.size.map(r2) },
     faceCount: faces.length, approx: !!geo.approx,
     faceKinds: faces.map(f => f.kind),

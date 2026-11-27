@@ -75,6 +75,7 @@ export function makePlan(an, lib, settings, opts = {}) {
   const sideSetups = order.filter(s => s !== '+Z' && s !== '-Z' && count(s) > 0);
 
   // ---------- stock & workholding ----------
+  const td3 = Object.values(an.threeD || {});
   const thin = H <= 12 && Math.max(L, W) >= 8 * H;
   const round = an.roundPart;
   const narrow = Math.min(L, W);
@@ -210,12 +211,54 @@ export function makePlan(an, lib, settings, opts = {}) {
       }
     }
 
-    // 6 3D surfaces
-    if (f.surf.length) {
-      const rmin = Math.min(...f.surf.map(x => x.rmin || 99));
-      const b = ofType('ballnose').filter(t => t.dia / 2 <= rmin + 0.01)[0] || null;
-      if (b) { use(b); const d = millData(b, 'finish'); s.ops.push({ mc: { tp: 'Surface High Speed – Scallop', mode: 'Rough first with Optirough, leave 0.3', z: null, stw: 0, stf: 0, step: r1(b.dia * 0.08) + ' mm' }, op: `3D finish curved surfaces (${f.surf.length})`, tool: b, ...d, ap: '', ae: `stepover ${r1(b.dia * 0.08)} mm (smaller = smoother)`, note: `Smallest concave radius ≈ R${r1(rmin)}. Rough first with an end mill, leave 0.3 mm.`, finish: true }); }
-      else s.ops.push({ op: '3D finish curved surfaces', tool: need(`Ball nose ≤ Ø${r1(2 * rmin)}`) });
+    // 6 3D surface toolpaths
+    const td = an.threeD && an.threeD[side];
+    if (td) {
+      const h = Math.max(0.001, settings.scallop || 0.01);
+      const so = R => Math.round(Math.min(R, 2 * Math.sqrt(Math.max(0, 2 * R * h - h * h))) * 100) / 100;
+      const depth = Math.max(0.5, td.depth);
+      const reach = depth + 2;
+      const lim = td.concR || Infinity; // smallest concave radius (limits ball size)
+      const ids = `${td.faces.length} face(s), ${td.steepPct}% steep`;
+      const tol = (fin) => fin ? 'Total tolerance 0.01' : 'Total tolerance 0.025';
+      if (!td.onlyEdges) {
+        // roughing
+        const rt = endmill({ minReach: reach, maxDia: 16, prefer: 12 }) || ofType('bullnose').find(t => (t.reach || 0) >= reach);
+        if (rt) {
+          const d = millData(rt, 'rough');
+          const sd = r1(Math.min(depth, rt.dia * (mat.ap >= 1 ? 1 : 0.6)));
+          s.ops.push({ mc: { tp: 'Dynamic OptiRough (3D HST)', mode: `${tol(false)}. Containment = part outline + tool radius. Entry: helix`, z: -r1(depth), stw: finish, stf: finish, step: `${Math.round(rt.dia * 0.12 * 10) / 10} mm (12%)`, cuts: `Step down ${sd}, step up 0.5 (fill-in steps ON)` }, op: `3D rough all surfaces (${ids})`, tool: rt, ...d, ap: `step down ${sd}`, ae: `${r1(rt.dia * 0.12)} mm`, note: `Leaves ${finish} mm on all surfaces. Uses full flute length with small stepover.` });
+          // rest rough if tool too big for concave areas
+          if (lim < rt.dia / 2) {
+            const rr = endmill({ maxDia: Math.max(1, 2 * lim * 0.9), minReach: reach });
+            if (rr) { const d2 = millData(rr, 'rough'); s.ops.push({ mc: { tp: 'Area Roughing (rest material)', mode: `Rest from previous op. ${tol(false)}`, z: -r1(depth), stw: finish, stf: finish, step: '15%', cuts: `Step down ${r1(rr.dia * 0.5)}` }, op: 'Rest rough corners the big tool could not reach', tool: rr, ...d2, ap: `step down ${r1(rr.dia * 0.5)}`, ae: `${r1(rr.dia * 0.15)} mm`, note: `Smallest concave radius R${td.concR}.` }); }
+          }
+        } else s.ops.push({ op: '3D rough', tool: need(`End mill / bull nose with reach ≥ ${r1(reach)} mm`) });
+        // finishing tool: largest ball nose with R < smallest concave radius, enough reach
+        const balls = ofType('ballnose').filter(t => (t.reach || 0) >= reach);
+        const fb = balls.filter(t => t.dia <= 10)[0] || balls.slice(-1)[0];
+        if (fb) {
+          use(fb); const d = millData(fb, 'finish'); const R = fb.dia / 2; const st = so(R);
+          if (td.steepPct > 10) s.ops.push({ mc: { tp: 'Surface High Speed – Waterline', mode: `Steep areas only (45°–90°). ${tol(true)}. Climb`, z: -r1(depth), stw: 0, stf: 0, cuts: `Step down ${st} (scallop ${h})` }, op: `3D finish steep walls (${td.steepPct}% of 3D area)`, tool: fb, ...d, ap: `step down ${st}`, ae: '', note: 'Waterline cuts in Z levels, best on steep walls.', finish: true });
+          if (td.steepPct < 90) s.ops.push({ mc: { tp: td.steepPct <= 10 ? 'Surface High Speed – Raster' : 'Surface High Speed – Scallop', mode: `${td.steepPct <= 10 ? 'Cut angle 45°, ' : ''}Shallow areas only (0°–45°). ${tol(true)}`, z: -r1(depth), stw: 0, stf: 0, step: `${st} mm (scallop ${h})`, cuts: 'Single level' }, op: `3D finish shallow areas (${100 - td.steepPct}% of 3D area)`, tool: fb, ...d, ap: '', ae: `stepover ${st} mm`, note: 'Smaller scallop = smoother surface but longer time. Overlap 1 mm with Waterline.', finish: true });
+          if (td.concR && R > td.concR * 0.95) {
+            const pb = ofType('ballnose').filter(t => t.dia / 2 <= td.concR * 0.95 && (t.reach || 0) >= reach)[0];
+            if (pb) { use(pb); const d3 = millData(pb, 'finish'); s.ops.push({ mc: { tp: 'Surface High Speed – Pencil', mode: `Corners / fillets. ${tol(true)}`, z: -r1(depth), stw: 0, stf: 0, cuts: 'Pencil passes: 3, overlap 0.5' }, op: `Clean inside corners (smallest R${td.concR})`, tool: pb, ...d3, ap: '', ae: '', note: 'Removes the material the finishing ball left in concave corners.', finish: true }); }
+            else s.ops.push({ op: `Clean inside corners R${td.concR}`, tool: need(`Ball nose < Ø${r1(2 * td.concR)}`) });
+          }
+        } else s.ops.push({ op: '3D finish', tool: need(`Ball nose ≤ Ø${r1(Math.min(12, 2 * lim))} with reach ≥ ${r1(reach)} mm`) });
+      }
+      // convex rounded edges
+      if (td.convR) {
+        const cr = ofType('cornerround').find(t => Math.abs(t.cornerR - td.convR) < 0.05);
+        if (cr) { use(cr); const d = millData(cr, 'finish'); s.ops.push({ mc: { tp: 'Contour (2D)', mode: `Corner rounding tool R${td.convR}, tip offset 0.1`, z: -r1(td.convR + 0.1), stw: 0, stf: 0 }, op: `Round top edges R${td.convR}`, tool: cr, ...d, note: 'Fastest way for an outside edge radius.', finish: true }); }
+        else if (td.onlyEdges) {
+          const b2 = ofType('ballnose').filter(t => (t.reach || 0) >= td.convR + 5)[0];
+          if (b2) { use(b2); const d = millData(b2, 'finish'); s.ops.push({ mc: { tp: 'Surface High Speed – Waterline', mode: `Edge radius only. ${tol(true)}`, z: -r1(td.convR), stw: 0, stf: 0, cuts: `Step down ${so(b2.dia / 2)}` }, op: `Round edges R${td.convR} (3D)`, tool: b2, ...d, note: `Or buy a corner rounding tool R${td.convR} (much faster).`, finish: true }); }
+          need(`Corner rounding tool R${td.convR} (optional, faster)`);
+        }
+      }
+      if (side === '+Z' && an.threeD['-Z'] && !an.threeD['-Z'].onlyEdges) {}
     }
 
     // 7 chamfers / deburr
@@ -307,11 +350,19 @@ export function makePlan(an, lib, settings, opts = {}) {
   if (an.approx) warnings.push('STL file: no exact circles or faces, so hole sizes and radii are estimated. Use STEP for accurate results.');
   if (an.pockets.some(p => p.cornerR === null)) warnings.push('Some pockets have sharp inside corners in CAD. A milling tool always leaves a radius.');
   for (const h of holes) if (h.blocked) warnings.push(`${h.id} Ø${h.dia}: tool cannot reach it straight down on a 3-axis machine (undercut / hidden). Needs a special tool (T-slot / lollipop cutter) or design change.`);
+  if (td3.some(d => d.steepPct > 60 && d.depth > 25)) warnings.push('Deep steep 3D walls: check ball nose reach and holder clearance in Mastercam simulation (Verify).');
   if (an.angled.length) warnings.push(`${an.angled.length} angled face(s) found: on a 3-axis machine use an angle plate / sine vise, or 3D-surface it with a ball nose (slow, step marks).`);
   if (H > settings.viseJawHeight * 2 && hold === 'vise') warnings.push(`Part is tall (${r1(H)} mm). Check the vise grip and tool reach. Consider holding on a longer grip.`);
   for (const h of holes) if (h.tap && !h.tapGuess) warnings.push(`${h.id}: marked as tapped but Ø${h.dia} is not a standard tap-drill size.`);
 
   // ---------- number ops, tool list ----------
+  for (const st of setups) {
+    const r3 = st.ops.filter(o => /OptiRough|Area Roughing/.test(o.mc?.tp || '') || /^3D rough/.test(o.op));
+    if (!r3.length) continue;
+    const rest = st.ops.filter(o => !r3.includes(o));
+    let at = 0; rest.forEach((o, i) => { if (/^(Face|Rough)/.test(o.op)) at = i + 1; });
+    st.ops = [...rest.slice(0, at), ...r3, ...rest.slice(at)];
+  }
   let n = 1; for (const s of setups) for (const o of s.ops) { o.no = n++; const m = /(\d+(?:\.\d+)?) (?:mm )?deep|down to (\d+(?:\.\d+)?)|depth (\d+(?:\.\d+)?)|x (\d+(?:\.\d+)?) /.exec(o.op + ' ' + (o.ap || '') + ' ' + (o.note || '')); const dp = m ? parseFloat(m[1] || m[2] || m[3] || m[4]) : 0; if (o.tool && !o.tool.missing && o.tool.type !== 'note' && o.tool.type !== 'facemill') o.stickout = Math.max(Math.round(o.tool.dia * 2.5), Math.ceil(dp + 5)); }
   const tools = [...used.values()].sort((a, b) => (a.T || 999) - (b.T || 999));
   // estimate cycle (very rough): count

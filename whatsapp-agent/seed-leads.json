@@ -1,0 +1,552 @@
+[
+ {
+  "name": "Dhiraj Hotel",
+  "product": "Dine In",
+  "phone": "+91 84096 29060",
+  "area": "",
+  "address": "Pipeline Rd, Thane (West)",
+  "map": "https://maps.google.com/?q=19.1960172,72.9621014",
+  "website": "azd.com",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "NHG Sports Arena - by SPORLOC",
+  "product": "Academy",
+  "phone": "+91 81697 29906",
+  "area": "",
+  "address": "Penkarpada Road, Mumbai",
+  "map": "https://maps.google.com/?q=19.2648436,72.8708073",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Abbu Dhabha",
+  "product": "Dine In",
+  "phone": "+91 25165 44999",
+  "area": "",
+  "address": "Gandhi Rd, Ulhasnagar",
+  "map": "https://maps.google.com/?q=19.2048037,73.1619825",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Gaurav Sweets And Snacks",
+  "product": "Dine In",
+  "phone": "",
+  "area": "",
+  "address": "",
+  "map": "https://maps.google.com/?q=19.2362948,72.970035",
+  "website": "https://gauravsweets.com/",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Cafe Nostalgia",
+  "product": "Dine In",
+  "phone": "+91 99879 56423",
+  "area": "",
+  "address": "New Golden Nest Road, Bhyander",
+  "map": "https://maps.google.com/?q=19.2997325,72.8610666",
+  "website": "https://cafe.com",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Om Sai Chinese Corner",
+  "product": "Dine In",
+  "phone": "+91 88794 65194",
+  "area": "",
+  "address": "Guru Krupa Society, Saraswat Colony, Near Ganesh Mandir, Nehru Road,, Dombivili East",
+  "map": "https://maps.google.com/?q=19.2231878,73.0943804",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Amit Garden",
+  "product": "Dine In",
+  "phone": "+91 98768 79099",
+  "area": "",
+  "address": "Old Mumbai - Pune Road, Thane",
+  "map": "https://maps.google.com/?q=19.202341,73.0023805",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Parsik Cafe",
+  "product": "Dine In",
+  "phone": "+91 87529 39999",
+  "area": "",
+  "address": "Old Mumbai - Pune Road, Parsik Nagar",
+  "map": "https://maps.google.com/?q=19.2088665,73.0108191",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Health Juice and Fast Food",
+  "product": "Dine In",
+  "phone": "+91 84337 97777",
+  "area": "",
+  "address": "",
+  "map": "https://maps.google.com/?q=19.0356206,73.0081726",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Thane Cafe",
+  "product": "Dine In",
+  "phone": "+91 22355 56778",
+  "area": "",
+  "address": "Gadkari Road, Thane",
+  "map": "https://maps.google.com/?q=19.19199,72.9699465",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Hotel Kokan Ratna",
+  "product": "Dine In",
+  "phone": "+91 98926 24944",
+  "area": "",
+  "address": "Kalyan - Shil Road, Thane",
+  "map": "https://maps.google.com/?q=19.1526973,73.0580348",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Lake Woods Cafe",
+  "product": "Dine In",
+  "phone": "+91 84228 82295",
+  "area": "",
+  "address": "Shivaji Path, Thane",
+  "map": "https://maps.google.com/?q=19.1925023,72.9769019",
+  "website": "https://sites.google.com/view/lakewoodscafe",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Shivali Garden",
+  "product": "Dine In",
+  "phone": "+91 22281 26044",
+  "area": "",
+  "address": "Gokul Village, Shanti Park, Mira Road East",
+  "map": "https://maps.google.com/?q=19.2790128,72.8678399",
+  "website": "https://www.zomato.com/mumbai/shivali-garden-mira-road",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "KGN",
+  "product": "Dine In",
+  "phone": "+91 86919 62633",
+  "area": "",
+  "address": "Sunrise Apartment, Naya Nagar Road,, Mira Road East",
+  "map": "https://maps.google.com/?q=19.2851992,72.8564653",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Patel Coffee House",
+  "product": "Dine In",
+  "phone": "+91 98076 89709",
+  "area": "",
+  "address": "Fataka Galli, Thane",
+  "map": "https://maps.google.com/?q=19.184055,72.973239",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "MSQ Social - Muscle Squadron",
+  "product": "Academy",
+  "phone": "+91 85914 09835",
+  "area": "",
+  "address": "near Orange Hospital, Indralok Phase 6, Mira Bhayandar",
+  "map": "https://maps.google.com/?q=19.3019968,72.8694064",
+  "website": "https://musclesquadron.com/",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Prashant Corner",
+  "product": "Dine In",
+  "phone": "+91 22254 05879",
+  "area": "",
+  "address": "Gagangiri Society, Panchpakhadi, Thane (West)",
+  "map": "https://maps.google.com/?q=19.1933217,72.9673087",
+  "website": "https://prashantcorner.com/",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "होटल आमंत्रण",
+  "product": "Dine In",
+  "phone": "+91 86928 63816",
+  "area": "",
+  "address": "MIDC Road",
+  "map": "https://maps.google.com/?q=19.1728547,73.0032656",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Basil & Beans",
+  "product": "Dine In",
+  "phone": "+91 86555 87333",
+  "area": "",
+  "address": "Turbhe MIDC Road, Turbhe",
+  "map": "https://maps.google.com/?q=19.0631889,73.0275881",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Sizzling Saffron Restaurant",
+  "product": "Dine In",
+  "phone": "+91 93092 88535",
+  "area": "",
+  "address": "Mohan Greenwoods, Phase 3, Manjerli, BADLAPUR",
+  "map": "https://maps.google.com/?q=19.1737414,73.2404972",
+  "website": "https://sizzlingsaffron.com",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Veg sizzler",
+  "product": "Dine In",
+  "phone": "+91 82861 06666",
+  "area": "",
+  "address": "Kalyan-Dombivli",
+  "map": "https://maps.google.com/?q=19.1594873,73.1143614",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Canvas Bistro Bar",
+  "product": "Dine In",
+  "phone": "",
+  "area": "",
+  "address": "",
+  "map": "https://maps.google.com/?q=19.0246796,73.0279352",
+  "website": "https://pavithrahospitality.com/",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Hotel Radha Krishna Grand",
+  "product": "Dine In",
+  "phone": "+91 98333 43867",
+  "area": "",
+  "address": "Agra Road",
+  "map": "https://maps.google.com/?q=19.2791849,73.0467731",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Poptate's",
+  "product": "Dine In",
+  "phone": "+91 82918 23484",
+  "area": "",
+  "address": "eastern express way, Thane (West)",
+  "map": "https://maps.google.com/?q=19.2026853,72.965407",
+  "website": "https://poptates.co.in/poptates-korum-mall/",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Fatima's Snacks",
+  "product": "Dine In",
+  "phone": "+91 98905 20382",
+  "area": "",
+  "address": "Teenbatti, Bhiwandi",
+  "map": "https://maps.google.com/?q=19.3021484,73.0588407",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Family Tree",
+  "product": "Dine In",
+  "phone": "",
+  "area": "",
+  "address": "MadanLal Dhingra Road, Thane",
+  "map": "https://maps.google.com/?q=19.1933278,72.9669702",
+  "website": "htpps//:familytree.com",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "MINTMORSEL RESTAURANT",
+  "product": "Dine In",
+  "phone": "+91 93263 76877",
+  "area": "",
+  "address": "Mhalsa Heights, Sant Achyut Maharaj Marg, Sector 20C, Sector No",
+  "map": "https://maps.google.com/?q=19.1609326,72.9904216",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Veg Foodio",
+  "product": "Dine In",
+  "phone": "+91 77009 80037",
+  "area": "",
+  "address": "Block 1, Emerald Plaza hiranandani Meadows, Glady's Alwares Avenue, Thane",
+  "map": "https://maps.google.com/?q=19.2265579,72.9706128",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Gajanan Vada Pav",
+  "product": "Dine In",
+  "phone": "+91 22254 07867",
+  "area": "",
+  "address": "Deshpande Rd, Thane",
+  "map": "https://maps.google.com/?q=19.189986,72.969546",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Achija",
+  "product": "Dine In",
+  "phone": "+91 95948 05060",
+  "area": "",
+  "address": "Deshpande Rd, Thane",
+  "map": "https://maps.google.com/?q=19.1902099,72.9698938",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Shiv Sagar Veg. Restaurant",
+  "product": "Dine In",
+  "phone": "+91 99301 01208",
+  "area": "",
+  "address": "Gokhale Road, Thane",
+  "map": "https://maps.google.com/?q=19.1878773,72.9759058",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "The Backlane Kitchen & Bar",
+  "product": "Dine In",
+  "phone": "+91 99308 11999",
+  "area": "",
+  "address": "Pomal Industrial Estate, Dhokali, Thane",
+  "map": "https://maps.google.com/?q=19.2285126,72.9854862",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "DNA Street",
+  "product": "Dine In",
+  "phone": "+91 75065 07888",
+  "area": "",
+  "address": "Kalyan Road, Dombivli",
+  "map": "https://maps.google.com/?q=19.2139956,73.1025838",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Potoba",
+  "product": "Dine In",
+  "phone": "+91 99207 97836",
+  "area": "",
+  "address": "MIDC Road",
+  "map": "https://maps.google.com/?q=19.2094701,73.1054221",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Mumbai Chat",
+  "product": "Dine In",
+  "phone": "",
+  "area": "",
+  "address": "Thane",
+  "map": "https://maps.google.com/?q=19.1632115,73.0283208",
+  "website": "https://mumbaichart.com",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Maitri Restaurent & Bar",
+  "product": "Dine In",
+  "phone": "+91 99308 53152",
+  "area": "",
+  "address": "East SATIS Road, Thane",
+  "map": "https://maps.google.com/?q=19.185088,72.9753353",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "New Modern Cafe Pure Veg Restrauant",
+  "product": "Dine In",
+  "phone": "",
+  "area": "",
+  "address": "Phadke Road, Dombivli East, Mumbai",
+  "map": "https://maps.google.com/?q=19.2199228,73.0915828",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Deepak Snacks Corner",
+  "product": "Dine In",
+  "phone": "",
+  "area": "",
+  "address": "Shahid Bhagat Singh Road, Dombivli East",
+  "map": "https://maps.google.com/?q=19.2164325,73.0911057",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "PRSTIGE RESTRAUNT",
+  "product": "Dine In",
+  "phone": "+91 98735 64728",
+  "area": "",
+  "address": "MUMBAI, MUMBAI",
+  "map": "https://maps.google.com/?q=19.6296577,73.4687573",
+  "website": "http://prestige",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Stomach Divine Foods",
+  "product": "Dine In",
+  "phone": "+91 93217 46412",
+  "area": "",
+  "address": "Swami Vivekanand Road, Old MHADA Colony, Thane W",
+  "map": "https://maps.google.com/?q=19.2241031,72.967958",
+  "website": "https://stomachdivine.petpooja.com/orders/menu",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Alif Cafe",
+  "product": "Dine In",
+  "phone": "",
+  "area": "",
+  "address": "banegar lane, mira road",
+  "map": "https://maps.google.com/?q=19.2883374,72.8579912",
+  "website": "cafe@gmail.com",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Regency Family Restaurant and Bar",
+  "product": "Dine In",
+  "phone": "+91 25124 30044",
+  "area": "",
+  "address": "Dr",
+  "map": "https://maps.google.com/?q=19.2149977,73.0941913",
+  "website": "",
+  "source": "OpenStreetMap"
+ },
+ {
+  "name": "Urban Sports Nerul",
+  "product": "Academy",
+  "phone": "",
+  "area": "",
+  "address": "",
+  "map": "https://discover.lyfskills.com/listing/22731",
+  "website": "https://discover.lyfskills.com/listing/22731",
+  "source": "Web listing"
+ },
+ {
+  "name": "Urban Sports N R Bhagat",
+  "product": "Academy",
+  "phone": "",
+  "area": "",
+  "address": "",
+  "map": "https://discover.lyfskills.com/listing/22622",
+  "website": "https://discover.lyfskills.com/listing/22622",
+  "source": "Web listing"
+ },
+ {
+  "name": "Pro School Sports India",
+  "product": "Academy",
+  "phone": "",
+  "area": "",
+  "address": "",
+  "map": "https://discover.lyfskills.com/listing/21674",
+  "website": "https://discover.lyfskills.com/listing/21674",
+  "source": "Web listing"
+ },
+ {
+  "name": "Thane City FC (NR Bhagat)",
+  "product": "Academy",
+  "phone": "",
+  "area": "",
+  "address": "",
+  "map": "https://discover.lyfskills.com/listing/21959",
+  "website": "https://discover.lyfskills.com/listing/21959",
+  "source": "Web listing"
+ },
+ {
+  "name": "Ace Cricket Academy Kharghar",
+  "product": "Academy",
+  "phone": "",
+  "area": "",
+  "address": "",
+  "map": "https://cricketgraph.com/?p=66885",
+  "website": "https://cricketgraph.com/?p=66885",
+  "source": "Web listing"
+ },
+ {
+  "name": "Capital Sports Club",
+  "product": "Academy",
+  "phone": "",
+  "area": "",
+  "address": "",
+  "map": "https://playo.co/amp/venues/navi-mumbai-mumbai/capital-sports-club-navi-mumbai-mumbai",
+  "website": "https://playo.co/amp/venues/navi-mumbai-mumbai/capital-sports-club-navi-mumbai-mumbai",
+  "source": "Web listing"
+ },
+ {
+  "name": "AP Cricket Coaching Academy",
+  "product": "Academy",
+  "phone": "",
+  "area": "",
+  "address": "",
+  "map": "https://discover.lyfskills.com/classes/navi-mumbai/in/vashi/cricket",
+  "website": "https://discover.lyfskills.com/classes/navi-mumbai/in/vashi/cricket",
+  "source": "Web listing"
+ },
+ {
+  "name": "3S Sports Cricket Academy",
+  "product": "Academy",
+  "phone": "",
+  "area": "",
+  "address": "",
+  "map": "https://discover.lyfskills.com/classes/navi-mumbai/in/vashi/cricket",
+  "website": "https://discover.lyfskills.com/classes/navi-mumbai/in/vashi/cricket",
+  "source": "Web listing"
+ },
+ {
+  "name": "Sports Ignite Thane",
+  "product": "Academy",
+  "phone": "",
+  "area": "",
+  "address": "",
+  "map": "https://www.district.in/play/sports-ignite-thane-sports-ignite-best-sports-academy-in-thane-badminton-football-basketball-athletics-gymnastics-pickleball-thane-slots-booking",
+  "website": "https://www.district.in/play/sports-ignite-thane-sports-ignite-best-sports-academy-in-thane-badminton-football-basketball-athletics-gymnastics-pickleball-thane-slots-booking",
+  "source": "Web listing"
+ },
+ {
+  "name": "Football World Ghodbunder Road",
+  "product": "Academy",
+  "phone": "",
+  "area": "",
+  "address": "",
+  "map": "https://discover.lyfskills.com/classes/thane/football",
+  "website": "https://discover.lyfskills.com/classes/thane/football",
+  "source": "Web listing"
+ },
+ {
+  "name": "Plaython India Football",
+  "product": "Academy",
+  "phone": "",
+  "area": "",
+  "address": "",
+  "map": "https://discover.lyfskills.com/listing/20103",
+  "website": "https://discover.lyfskills.com/listing/20103",
+  "source": "Web listing"
+ },
+ {
+  "name": "Conquer Badminton Academy",
+  "product": "Academy",
+  "phone": "",
+  "area": "",
+  "address": "",
+  "map": "https://www.district.in/play/conquer-badminton-academy-thane-west-thane-west-thane-slots-booking",
+  "website": "https://www.district.in/play/conquer-badminton-academy-thane-west-thane-west-thane-slots-booking",
+  "source": "Web listing"
+ },
+ {
+  "name": "Durva Sports Academy",
+  "product": "Academy",
+  "phone": "",
+  "area": "",
+  "address": "",
+  "map": "",
+  "website": "",
+  "source": "Web listing"
+ }
+]

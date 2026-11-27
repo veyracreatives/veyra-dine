@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0B0C">
+<meta name="robots" content="noindex">
+<link rel="manifest" href="/app.webmanifest">
+<link rel="icon" href="/icon.svg">
+<title>Veyra Leads</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--noir:#0B0B0C;--graphite:#1F1F22;--line:#2C2C30;--pearl:#F6F3ED;--mist:#A8A296;--gold:#C9A35A;--gold2:#E9D29C;--ok:#5FBF8A;--warn:#E7B04B;--bad:#E0675A}
+*{box-sizing:border-box}html,body{margin:0;background:var(--noir);color:var(--pearl);font:15px/1.45 "Hanken Grotesk",system-ui,sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}
+.mono{font:500 11px/1 "IBM Plex Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--mist)}
+header>*{max-width:760px;margin-left:auto;margin-right:auto}
+header{position:sticky;top:0;z-index:5;background:rgba(11,11,12,.96);border-bottom:1px solid var(--line);padding:12px 16px calc(10px) ;padding-top:max(12px,env(safe-area-inset-top))}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+h1{font:400 24px/1 "DM Serif Display",serif;margin:0}h1 i{color:var(--gold)}
+.tabs{display:flex;gap:6px;margin-top:12px;overflow-x:auto}
+.tab{flex:1 0 auto;white-space:nowrap;border:1px solid var(--line);background:var(--graphite);border-radius:999px;padding:9px 10px;font-weight:600;font-size:14px}
+.tab.on{background:var(--pearl);color:var(--noir);border-color:var(--pearl)}
+.badge[hidden]{display:none!important}
+.badge{display:inline-block;min-width:20px;padding:1px 6px;border-radius:99px;background:var(--gold);color:var(--noir);font-size:12px;margin-left:4px}
+main{padding:12px 16px 120px;max-width:760px;margin:0 auto}
+.card{background:var(--graphite);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.name{font-weight:700;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sub{color:var(--mist);font-size:13px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.pill{font-size:12px;font-weight:600;border-radius:99px;padding:3px 9px;border:1px solid var(--line);white-space:nowrap}
+.pill.gold{border-color:var(--gold);color:var(--gold2)}.pill.ok{border-color:var(--ok);color:var(--ok)}.pill.warn{border-color:var(--warn);color:var(--warn)}.pill.bad{border-color:var(--bad);color:var(--bad)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:10px 16px;border-radius:12px;border:1px solid var(--line);background:#2A2A2E;font-weight:600;text-decoration:none;color:var(--pearl);cursor:pointer}
+.btn.gold{background:linear-gradient(135deg,#A9843F,#E9D29C 55%,#C9A35A);color:var(--noir);border:0}
+.btn.wa{background:#1FA855;border:0;color:#fff}
+.btn.sm{min-height:36px;padding:6px 12px;font-size:14px}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btns .btn{flex:1 1 120px;white-space:nowrap}
+.hint{color:var(--mist);font-size:13px;margin:0 0 12px}
+.empty{color:var(--mist);text-align:center;padding:40px 10px}
+.status{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.status>div{background:var(--graphite);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--bad)}.dot.on{background:var(--ok)}
+textarea,input[type=text],input[type=password]{width:100%;background:#151517;border:1px solid var(--line);border-radius:12px;padding:12px;outline:none}
+textarea:focus,input:focus{border-color:var(--gold)}
+/* chat */
+#chat{position:fixed;inset:0;background:var(--noir);z-index:10;display:none;flex-direction:column}
+#chat.on{display:flex}
+.chead{padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.chead .back{min-width:44px}
+.msgs{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.b{max-width:84%;padding:9px 12px;border-radius:14px;white-space:pre-wrap;word-wrap:break-word;font-size:15px}
+.b.them{align-self:flex-start;background:var(--graphite);border:1px solid var(--line);border-bottom-left-radius:4px}
+.b.bot{align-self:flex-end;background:#2B2617;border:1px solid #4A3F22;border-bottom-right-radius:4px}
+.b.team{align-self:flex-end;background:var(--pearl);color:var(--noir);border-bottom-right-radius:4px}
+.b .t{display:block;font-size:11px;opacity:.6;margin-top:4px}
+.lead{margin:0 16px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;font-size:13px;color:var(--mist)}
+.lead b{color:var(--pearl)}
+.compose{border-top:1px solid var(--line);padding:10px 16px;padding-bottom:max(10px,env(safe-area-inset-bottom));display:flex;gap:8px;align-items:flex-end}
+.compose textarea{min-height:44px;max-height:140px;resize:none}
+.ctrls{display:flex;gap:8px;padding:8px 16px 0;flex-wrap:wrap}
+#login{max-width:380px;margin:18vh auto 0;padding:0 16px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--pearl);color:var(--noir);padding:10px 16px;border-radius:12px;font-weight:600;z-index:20;display:none;max-width:90vw}
+.filters{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto}
+.filters .btn{flex:0 0 auto}
+.filters .btn.on{border-color:var(--gold);color:var(--gold2)}
+details summary{cursor:pointer;color:var(--gold2);font-weight:600;margin-top:10px}
+@media (min-width:700px){.status{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+<div id="login" hidden>
+  <div class="mono">Veyra Lab · WhatsApp</div>
+  <h1 style="margin:10px 0 20px">Lead <i>inbox</i></h1>
+  <input id="pw" type="password" placeholder="Inbox password" autocomplete="current-password">
+  <button class="btn gold" style="width:100%;margin-top:10px" onclick="login()">Sign in</button>
+  <p class="sub" id="lerr"></p>
+</div>
+
+<div id="app" hidden>
+<header>
+  <div class="top"><h1>Veyra <i>leads</i></h1><span class="mono" id="sync">Live</span></div>
+  <div class="tabs">
+    <button class="tab on" data-t="you">For you<span class="badge" id="nYou" hidden></span></button>
+    <button class="tab" data-t="chats">Chats</button>
+    <button class="tab" data-t="leads">Leads<span class="badge" id="nNew" hidden></span></button>
+    <button class="tab" data-t="setup">Setup</button>
+  </div>
+</header>
+<main id="view"></main>
+</div>
+
+<div id="chat">
+  <div class="chead"><button class="btn sm back" onclick="closeChat()">‹</button><div style="min-width:0;flex:1"><div class="name" id="cName"></div><div class="mono" id="cSub" style="margin-top:4px"></div></div></div>
+  <div class="ctrls" id="cCtrls"></div>
+  <div class="msgs" id="cMsgs"></div>
+  <div class="lead" id="cLead"></div>
+  <div class="compose"><textarea id="cText" rows="1" placeholder="Reply as Veyra…"></textarea><button class="btn gold" onclick="sendTeam()">Send</button></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let S=null, tab=location.hash==="#leads"?"leads":"you", openWa=null, leadFilter="New";
+const toast=t=>{const e=$("#toast");e.textContent=t;e.style.display="block";clearTimeout(e._t);e._t=setTimeout(()=>e.style.display="none",2600)};
+async function api(p,b){const r=await fetch(p,b===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});if(r.status===401){show(false);throw new Error("auth")}const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||"Failed");return j}
+function show(ok){$("#login").hidden=ok;$("#app").hidden=!ok}
+async function login(){try{await api("/api/login",{password:$("#pw").value});show(true);load()}catch(e){$("#lerr").textContent=e.message}}
+$("#pw").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{tab=b.dataset.t;render()});
+const isMobile=p=>/^91[6-9]\d{9}$/.test(p);
+const fmtPh=p=>"+91 "+p.slice(2,7)+" "+p.slice(7);
+const ago=t=>{if(!t)return"";const m=Math.round((Date.now()-Date.parse(t))/60000);return m<1?"now":m<60?m+"m":m<1440?Math.round(m/60)+"h":Math.round(m/1440)+"d"};
+const stagePill=s=>`<span class="pill ${/Qualified|Trial/.test(s)?"ok":/call/.test(s)?"gold":/Not/.test(s)?"bad":""}">${esc(s||"New")}</span>`;
+
+async function load(){try{S=await api("/api/state");show(true);$("#sync").textContent="Live";render();if(openWa)refreshChat()}catch(e){if(e.message!=="auth")$("#sync").textContent="Offline"}}
+function render(){
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on",b.dataset.t===tab));
+  const you=S.chats.filter(c=>c.needsYou), nw=S.found.filter(f=>f.status==="New");
+  $("#nYou").hidden=!you.length;$("#nYou").textContent=you.length;$("#nNew").hidden=!nw.length;$("#nNew").textContent=nw.length;
+  const v=$("#view");
+  if(tab==="you"){v.innerHTML=(you.length?`<div class="mono" style="margin:4px 0 10px">The bot handed these to you</div>`+you.map(chatCard).join(""):`<div class="empty">Nothing needs you right now.<br>The bot is answering new chats.</div>`)+tryBox()}
+  if(tab==="chats"){v.innerHTML=S.chats.length?S.chats.map(chatCard).join(""):`<div class="empty">No WhatsApp chats yet.</div>`+tryBox()}
+  if(tab==="leads"){
+    const list=S.found.filter(f=>leadFilter==="All"||f.status===leadFilter);
+    v.innerHTML=`<div class="filters">${["New","Messaged","Replied","Won","Skip","All"].map(f=>`<button class="btn sm ${f===leadFilter?"on":""}" onclick="leadFilter='${f}';render()">${f} ${f==="All"?S.found.length:S.found.filter(x=>x.status===f).length}</button>`).join("")}</div>
+    <p class="hint">Tap <b>WhatsApp</b>: it opens your own WhatsApp with the message ready. You check it and press send. Nothing is sent without you.</p>`+
+    (list.length?list.map(leadCard).join(""):`<div class="empty">No leads here.</div>`)}
+  if(tab==="setup")v.innerHTML=setupView();
+}
+function chatCard(c){const l=c.lead||{};return `<div class="card" onclick="openChat('${esc(c.wa)}')" style="cursor:pointer">
+ <div class="row"><div class="name">${esc(l.business||l.name||c.name||"+"+c.wa)}${c.sim?' <span class="pill">test</span>':""}</div><span class="mono">${ago(c.updatedAt)}</span></div>
+ <div class="sub">${esc(c.last?.text||"")}</div>
+ <div class="row" style="margin-top:10px;justify-content:flex-start;gap:6px;flex-wrap:wrap">${stagePill(l.stage)}${l.interest?`<span class="pill gold">${esc(l.interest)}</span>`:""}${c.botPaused?'<span class="pill warn">You reply</span>':'<span class="pill ok">Bot on</span>'}${c.optOut?'<span class="pill bad">Opted out</span>':""}${c.unread?`<span class="badge">${c.unread}</span>`:""}</div></div>`}
+function leadCard(f){const msg=encodeURIComponent(f.opener||"");return `<div class="card">
+ <div class="row"><div class="name">${esc(f.name)}</div><span class="pill ${f.product==="Academy"?"gold":"ok"}">${esc(f.product)}</span></div>
+ <div class="sub">${esc([f.area,f.address].filter(Boolean).join(" · "))}${f.rating?` · ${f.rating}★ (${f.reviews})`:""}</div>
+ <div class="mono" style="margin-top:8px">${esc(f.source)} · ${f.phone?fmtPh(f.phone):"no phone"} · ${esc(f.status)}</div>
+ <details><summary>Message</summary><textarea rows="6" onchange="saveOpener('${esc(f.id)}',this.value)">${esc(f.opener||"")}</textarea></details>
+ <div class="btns">${f.phone&&isMobile(f.phone)?`<a class="btn wa" href="https://wa.me/${esc(f.phone)}?text=${msg}" target="_blank" rel="noopener" onclick="markF('${esc(f.id)}','Messaged')">WhatsApp</a>`:f.phone?`<a class="btn" href="tel:+${esc(f.phone)}">Call (landline)</a>`:(f.map||f.website?`<a class="btn" href="${esc(f.map||f.website)}" target="_blank" rel="noopener">Find contact</a>`:"")}
+ ${f.map&&f.phone?`<a class="btn sm" href="${esc(f.map)}" target="_blank" rel="noopener">Map</a>`:""}
+ ${f.status!=="Won"?`<button class="btn sm" onclick="markF('${esc(f.id)}','Won')">Won</button>`:""}${f.status!=="Skip"?`<button class="btn sm" onclick="markF('${esc(f.id)}','Skip')">Skip</button>`:`<button class="btn sm" onclick="markF('${esc(f.id)}','New')">Undo</button>`}</div></div>`}
+function tryBox(){return `<div class="card" style="margin-top:16px"><div class="mono">Try the bot (test only, sends nothing)</div><div style="display:flex;gap:8px;margin-top:10px"><input type="text" id="tryText" placeholder="e.g. I have a cafe in Vashi, price?"><button class="btn gold" onclick="trySim()">Ask</button></div></div>`}
+async function trySim(){const t=$("#tryText").value.trim();if(!t)return;toast("Bot is thinking…");await api("/api/sim",{text:t});await load();openChat("test-me")}
+function setupView(){const s=S.status;const it=(ok,t,h)=>`<div><span class="dot ${ok?"on":""}"></span><b>${t}</b><div class="sub">${h}</div></div>`;
+ return `<div class="status">${it(s.whatsapp,"WhatsApp",s.whatsapp?"Connected":"Needs Meta setup")}${it(s.ai,"AI replies",s.ai?esc(s.model):"Rule replies until API key")}${it(s.email,"Email alerts",s.email?"On":"Off")}${it(S.settings.botOn,"Bot",S.settings.botOn?"Answering":"Paused")}</div>
+ <div class="card"><div class="row"><div><b>Auto-reply bot</b><div class="sub">Turn off to answer every chat yourself.</div></div><button class="btn sm ${S.settings.botOn?"":"gold"}" onclick="toggleBot()">${S.settings.botOn?"Pause bot":"Turn on"}</button></div></div>
+ <div class="card"><b>Lead finder</b><div class="sub">Runs every day at 9 AM. Last run: ${s.lastFind?esc(new Date(s.lastFind.at).toLocaleString("en-IN"))+` · ${s.lastFind.google} from Google, ${s.lastFind.osm} from OpenStreetMap`:"not yet"}</div><div class="btns"><button class="btn" onclick="findNow(this)">Find leads now</button><a class="btn" href="/api/export.csv">Download CSV</a></div></div>
+ <div class="card"><b>Connect accounts</b><div class="sub">Paste a key and press Save. Saved keys are never shown again. Saved: ${esc(s.keys.join(", ")||"none")}</div>
+ <div class="mono" style="margin:14px 0 6px">For Meta webhook</div><div class="sub" style="-webkit-line-clamp:unset">Callback URL: <b>${esc(s.webhook)}</b><br>Verify token: <b>${esc(s.verifyToken||"(set in server)")}</b></div>
+ ${[["WA_TOKEN","WhatsApp permanent access token"],["WA_PHONE_ID","WhatsApp phone number ID"],["WA_APP_SECRET","Meta app secret"],["ANTHROPIC_API_KEY","Anthropic API key (AI replies)"],["GOOGLE_PLACES_KEY","Google Places API key (better leads)"],["SMTP_USER","Email alerts: Gmail address"],["SMTP_PASS","Email alerts: Gmail app password"]].map(([k,l])=>`<label class="mono" style="display:block;margin:12px 0 6px">${l}${s.keys.includes(k)?" ✓":""}</label><input type="password" data-k="${k}" autocomplete="off" placeholder="${s.keys.includes(k)?"Saved (paste to replace)":"Paste here"}">`).join("")}
+ <div class="btns"><button class="btn gold" onclick="saveKeys()">Save keys</button></div></div>
+ <div class="card"><b>Add to home screen</b><div class="sub">In Chrome tap ⋮ then "Add to Home screen" so this opens like an app.</div></div>`}
+async function saveKeys(){const b={};document.querySelectorAll("[data-k]").forEach(i=>{if(i.value.trim())b[i.dataset.k]=i.value.trim()});if(b.SMTP_USER||b.SMTP_PASS){b.SMTP_HOST="smtp.gmail.com";b.SMTP_PORT="465"}try{await api("/api/keys",b);toast("Saved");load()}catch(e){toast(e.message)}}
+async function toggleBot(){await api("/api/settings",{botOn:!S.settings.botOn});load()}
+async function findNow(b){b.disabled=true;b.textContent="Searching…";try{const r=await api("/api/find-now",{});toast(`${r.google+r.osm} new leads`)}catch(e){toast(e.message)}load()}
+async function markF(id,status){await api("/api/found-update",{id,status});const f=S.found.find(x=>x.id===id);if(f)f.status=status;render()}
+async function saveOpener(id,opener){await api("/api/found-update",{id,opener});toast("Message saved");load()}
+
+async function openChat(wa){openWa=wa;$("#chat").classList.add("on");history.replaceState(null,"","#"+wa);await refreshChat(true)}
+function closeChat(){openWa=null;$("#chat").classList.remove("on");history.replaceState(null,"","#");load()}
+async function refreshChat(scroll){const c=await api("/api/chat?wa="+encodeURIComponent(openWa));const l=c.lead||{};
+ $("#cName").textContent=l.business||l.name||c.name||"+"+c.wa;$("#cSub").textContent=(c.sim?"Test chat":"+"+c.wa)+(c.open||c.sim?" · can reply":" · 24h window closed");
+ const box=$("#cMsgs"),atEnd=box.scrollTop+box.clientHeight>=box.scrollHeight-40;
+ box.innerHTML=c.msgs.map(m=>`<div class="b ${m.from}">${esc(m.text)}<span class="t">${m.from==="bot"?"Bot":m.from==="team"?"You":"Them"} · ${ago(m.at)}${m.ok===false?" · not sent: "+esc(m.error):""}</span></div>`).join("");
+ if(scroll||atEnd)box.scrollTop=box.scrollHeight;
+ $("#cLead").innerHTML=`<b>${esc(l.name||"Name ?")}</b> · ${esc(l.business||"business ?")} · ${esc(l.city||"area ?")} · ${esc(l.interest||"?")}${l.size?" · "+esc(l.size):""}<br>${esc(l.summary||"")}`;
+ $("#cCtrls").innerHTML=`<button class="btn sm ${c.botPaused?"gold":""}" onclick="setPaused(${!c.botPaused})">${c.botPaused?"Let bot reply":"I'll take over"}</button>
+  <select class="btn sm" onchange="setStage(this.value)">${["New","Qualified","Trial link sent","Wants call","Customer","Not a fit"].map(s=>`<option ${s===l.stage?"selected":""}>${s}</option>`).join("")}</select>
+  ${!c.sim?`<a class="btn sm wa" href="https://wa.me/${esc(c.wa)}" target="_blank" rel="noopener">Open in my WhatsApp</a>`:`<button class="btn sm" onclick="delSim()">Delete test</button>`}`}
+async function setPaused(v){await api("/api/chat-update",{wa:openWa,botPaused:v});refreshChat()}
+async function setStage(s){await api("/api/chat-update",{wa:openWa,stage:s});toast("Saved")}
+async function delSim(){await api("/api/chat-update",{wa:openWa,delete:true});closeChat()}
+async function sendTeam(){const t=$("#cText").value.trim();if(!t)return;try{await api("/api/send",{wa:openWa,text:t});$("#cText").value="";refreshChat(true)}catch(e){toast(e.message)}}
+$("#cText").addEventListener("input",e=>{e.target.style.height="auto";e.target.style.height=Math.min(140,e.target.scrollHeight)+"px"});
+
+fetch("/api/state").then(r=>{if(r.ok){show(true);return r.json()}show(false)}).then(j=>{if(j){S=j;render();const h=location.hash.slice(1);if(h&&h!=="leads")openChat(h)}});
+setInterval(()=>{if(!$("#app").hidden&&document.visibilityState==="visible")load()},8000);
+if("serviceWorker"in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
+</script>
+</body>
+</html>

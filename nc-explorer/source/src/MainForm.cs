@@ -126,6 +126,8 @@ namespace VeyraNC
 
         ComboBox ipBox = new ComboBox();
         FlatBtn libraryBtn = new FlatBtn("Program library", false);
+        FlatBtn liveBtn = new FlatBtn("● Live status", true);
+        FlatBtn toolLifeBtn = new FlatBtn("Tool life", false);
         FlatBtn backupNowBtn = new FlatBtn("Back up machine now", false);
         FlatBtn connectBtn = new FlatBtn("Connect", true);
         Label statusDot = new Label();
@@ -234,7 +236,7 @@ namespace VeyraNC
             // Bottom: tools + log
             Panel bottom = new Panel { Dock = DockStyle.Bottom, Height = 190, BackColor = Theme.Bg, Padding = new Padding(16, 0, 16, 12) };
             FlowLayoutPanel tools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 46, BackColor = Theme.Bg, Padding = new Padding(0, 2, 0, 0) };
-            foreach (FlatBtn b in new FlatBtn[] { libraryBtn, backupsBtn, backupNowBtn, netBtn, settingsBtn }) { b.AutoSize = true; b.Margin = new Padding(0, 0, 8, 0); tools.Controls.Add(b); }
+            foreach (FlatBtn b in new FlatBtn[] { liveBtn, toolLifeBtn, libraryBtn, backupsBtn, backupNowBtn, netBtn, settingsBtn }) { b.AutoSize = true; b.Margin = new Padding(0, 0, 8, 0); tools.Controls.Add(b); }
             progress.Width = 260; progress.Height = 10; progress.Margin = new Padding(16, 14, 0, 0); progress.Style = ProgressBarStyle.Continuous; progress.Visible = false;
             tools.Controls.Add(progress);
             logBox.Multiline = true; logBox.ReadOnly = true; logBox.ScrollBars = ScrollBars.Vertical;
@@ -269,6 +271,8 @@ namespace VeyraNC
             backupsBtn.Click += delegate { Directory.CreateDirectory(BackupRoot()); Process.Start("explorer.exe", "\"" + BackupRoot() + "\""); };
             netBtn.Click += delegate { RunNetCheck(true); };
             settingsBtn.Click += delegate { ShowSettings(); };
+            liveBtn.Click += delegate { new LiveForm(IpOf(ipBox.Text)).Show(this); };
+            toolLifeBtn.Click += delegate { new ToolLifeForm().Show(this); };
             libraryBtn.Click += delegate { new LibraryForm(localDir, Path.Combine(S.BackupFolder(), "Daily")).Show(this); };
             backupNowBtn.Click += delegate { MachineBackup(true); };
 
@@ -1054,6 +1058,12 @@ namespace VeyraNC
         static int Main(string[] args)
         {
             if (args.Length > 0 && args[0] == "--diag") return Diag.Run(args);
+            if (args.Length > 0 && (args[0] == "--live" || args[0] == "--toollife"))
+            {
+                Application.EnableVisualStyles();
+                Application.Run(args[0] == "--live" ? (Form)new LiveForm(args.Length > 1 ? args[1] : "192.168.200.1") : new ToolLifeForm());
+                return 0;
+            }
             if (args.Length > 0 && File.Exists(args[0]))
             {
                 Application.EnableVisualStyles();
